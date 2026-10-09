@@ -23,9 +23,14 @@
     </section>
     <section class="panel" aria-labelledby="edge-heading">
       <h2 id="edge-heading">Add and Hide buttons</h2>
-      <p class="muted">Where the buttons appear on every video, on every site.</p>
+      <p class="muted">Show or hide the buttons on every site, and choose where they appear. Videos you hid stay hidden either way.</p>
+      <fieldset id="buttons-enabled" class="edge-choice">
+        <legend>Add and Hide buttons</legend>
+        <label><input type="radio" name="buttons-enabled" value="on"> <span>Enable</span></label>
+        <label><input type="radio" name="buttons-enabled" value="off"> <span>Disable</span></label>
+      </fieldset>
       <fieldset id="button-edge" class="edge-choice">
-        <legend>Buttons on videos</legend>
+        <legend>Position</legend>
         <label><input type="radio" name="button-edge" value="top"> <span>Top</span></label>
         <label><input type="radio" name="button-edge" value="bottom"> <span>Bottom</span></label>
       </fieldset>

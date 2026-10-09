@@ -400,6 +400,7 @@ check("mergeBackup unions picks and shallow merges prefs", () => {
 });
 check("mergeBackup reports changed and new counts", () => assert.deepEqual(merge.counts, { added: 1, hidden: 1, sites: 1 }));
 
+check("buttons are enabled unless turned off", () => assert.deepEqual([HOA.buttonsEnabledOf(false), HOA.buttonsEnabledOf(true), HOA.buttonsEnabledOf(undefined)], [false, true, true]));
 check("button edge defaults to top", () => assert.deepEqual([HOA.buttonEdgeOf("bottom"), HOA.buttonEdgeOf("top"), HOA.buttonEdgeOf(undefined), HOA.buttonEdgeOf("left")], ["bottom", "top", "top", "top"]));
 
 // The popup injects shared.js/catalog.js again into pages that already run them (picker, Enable).

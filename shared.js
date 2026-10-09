@@ -15,6 +15,12 @@ var HOA = Object.freeze((() => {
   const PREFS_KEY = "addedViewPrefs";
   // Where the Add/Hide bar sits on every site: "top" (default) or "bottom" of the video picture.
   const BUTTON_EDGE_KEY = "buttonEdge";
+  // Whether the Add/Hide bar shows at all (hidden videos stay hidden either way). Default on.
+  const BUTTONS_ENABLED_KEY = "buttonsEnabled";
+
+  function buttonsEnabledOf(value) {
+    return value !== false;
+  }
 
   function buttonEdgeOf(value) {
     return value === "bottom" ? "bottom" : "top";
@@ -1235,6 +1241,8 @@ var HOA = Object.freeze((() => {
     SITES_KEY,
     PREFS_KEY,
     BUTTON_EDGE_KEY,
+    BUTTONS_ENABLED_KEY,
+    buttonsEnabledOf,
     buttonEdgeOf,
     MAX_HIDDEN,
     MAX_ADDED,

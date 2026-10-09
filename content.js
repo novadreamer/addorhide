@@ -22,6 +22,7 @@ window.__hoaLoaded = true;
   let observedRoot = null;
   let retired = false;
   let buttonEdge = "top";
+  let buttonsEnabled = true;
 
   function contextAlive() {
     try {
@@ -855,8 +856,22 @@ window.__hoaLoaded = true;
     if (changes[HOA.BUTTON_EDGE_KEY]) {
       setButtonEdge(changes[HOA.BUTTON_EDGE_KEY].newValue);
     }
+    if (changes[HOA.BUTTONS_ENABLED_KEY]) {
+      setButtonsEnabled(changes[HOA.BUTTONS_ENABLED_KEY].newValue);
+    }
     scheduleApply();
   });
+
+  // Enable/Disable only hides the bars (a page-level class), so hidden videos stay hidden and turning the
+  // buttons back on needs no rebuild.
+  function setButtonsEnabled(value) {
+    buttonsEnabled = HOA.buttonsEnabledOf(value);
+    rootElement.classList.toggle("hoa-buttons-off", !buttonsEnabled);
+    if (!buttonsEnabled) {
+      hideFloatBar();
+    }
+  }
+  chrome.storage.local.get({ [HOA.BUTTONS_ENABLED_KEY]: true }, result => setButtonsEnabled(result[HOA.BUTTONS_ENABLED_KEY]));
 
   // Re-place every bar this script owns when the Top/Bottom choice changes.
   function setButtonEdge(value) {
@@ -973,7 +988,7 @@ window.__hoaLoaded = true;
 
   function syncFloatBar() {
     const actions = pointerHost && pointerHost.isConnected && pointerHost.querySelector(":scope > .hoa-actions");
-    if (retired || !actions || pointerHost.classList.contains(ACTIVE_CLASS)) {
+    if (retired || !buttonsEnabled || !actions || pointerHost.classList.contains(ACTIVE_CLASS)) {
       hideFloatBar();
       return;
     }

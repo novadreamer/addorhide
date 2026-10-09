@@ -104,3 +104,6 @@
 #hoa-banner[hidden], #hoa-toast[hidden] { display: none !important; }
 
 /* Placement (top edge, chosen side, sliding past the site's own controls) is set inline by content.js placeActions. */
+
+/* Enable/Disable in the popup or Options: buttons off on every site, hidden videos stay hidden. */
+.hoa-buttons-off .hoa-actions { display: none !important; }

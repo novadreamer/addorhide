@@ -168,4 +168,5 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 .edge-choice label { display: inline-flex; gap: 6px; align-items: center; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; }
 .edge-choice label:has(input:checked) { color: var(--accent); background: var(--surface-2); border-color: var(--accent); font-weight: 600; }
 .edge-choice input { accent-color: var(--accent); margin: 0; }
-.popup-edge { margin: 0 0 10px; }
+.popup-edge { display: grid; gap: 8px; margin: 0 0 10px; }
+.edge-choice:disabled label { opacity: .5; cursor: default; }
