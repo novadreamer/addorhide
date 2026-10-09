@@ -65,7 +65,8 @@ const HOA_ADDED = (() => {
     const intro = element("div");
     intro.appendChild(element("p", "eyebrow", "Your collection"));
     intro.appendChild(element("h1", "", "Added Videos"));
-    intro.appendChild(element("p", "muted", "Only videos you added are shown here."));
+    const introSummary = element("p", "muted", "Nothing saved yet.");
+    intro.appendChild(introSummary);
     header.appendChild(intro);
     const headerActions = element("div", "added-header-actions");
     const support = element("a", "support-link");
@@ -293,7 +294,7 @@ const HOA_ADDED = (() => {
       typeSelect.focus();
     }
 
-    function makeCard(key, entry) {
+    function makeCard(key, entry, hasPlayable) {
       const href = HOA.safeHref(key);
       if (!href) {
         return null;
@@ -326,8 +327,10 @@ const HOA_ADDED = (() => {
           media.appendChild(duration);
         }
       }
-      media.appendChild(element("span", "player-corner-label", player
-        ? "▶ Popup player" : `↗ Opens on ${siteName}`));
+      if (player || hasPlayable) {
+        media.appendChild(element("span", "player-corner-label", player
+          ? "▶ Popup player" : `↗ Opens on ${siteName}`));
+      }
       if (player) {
         const playError = element("span", "card-play-error");
         playError.hidden = true;
@@ -368,7 +371,6 @@ const HOA_ADDED = (() => {
       body.appendChild(makeMeta(entry));
       const addedTime = element("time", "added-date", `Added ${localDate(entry.ts)}`);
       addedTime.dateTime = Number.isFinite(entry.ts) ? new Date(entry.ts).toISOString() : "";
-      body.appendChild(addedTime);
       const actions = element("div", "video-actions");
       const tag = element("button", "ghost-button", "Tag");
       tag.type = "button";
@@ -406,12 +408,15 @@ const HOA_ADDED = (() => {
       });
       actions.appendChild(tag);
       actions.appendChild(remove);
-      body.appendChild(actions);
+      const footer = element("div", "card-footer");
+      footer.appendChild(addedTime);
+      footer.appendChild(actions);
+      body.appendChild(footer);
       card.appendChild(body);
       return card;
     }
 
-    function makeSubgroup(site, subgroup) {
+    function makeSubgroup(site, subgroup, hasPlayable) {
       const section = element("section", "added-subgroup");
       if (subgroup.label) {
         const heading = element("h3", "subgroup-heading");
@@ -427,7 +432,7 @@ const HOA_ADDED = (() => {
         }
         const grid = element("div", className);
         entries.forEach(([key, entry]) => {
-          const card = makeCard(key, entry);
+          const card = makeCard(key, entry, hasPlayable);
           if (card) {
             grid.appendChild(card);
           }
@@ -511,7 +516,7 @@ const HOA_ADDED = (() => {
         const body = element("div", "site-group-body");
         const sorted = HOA.sortEntries(group.entries, sort, dir);
         HOA.orderGroupsBySort(HOA.groupEntries(sorted, groupMode), sorted, groupMode)
-          .forEach(subgroup => body.appendChild(makeSubgroup(group.site, subgroup)));
+          .forEach(subgroup => body.appendChild(makeSubgroup(group.site, subgroup, hasPlayable)));
         section.appendChild(body);
       }
       return section;
@@ -532,6 +537,8 @@ const HOA_ADDED = (() => {
         groupsRoot.firstChild.remove();
       }
       const groups = HOA.groupBySite(added);
+      const videoCount = groups.reduce((count, group) => count + group.entries.length, 0);
+      introSummary.textContent = HOA.addedSummaryText(videoCount, groups.length);
       empty.hidden = groups.length !== 0;
       groups.forEach(group => groupsRoot.appendChild(renderSite(group)));
       groupsRoot.style.minHeight = "";

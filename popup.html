@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AddOrHide</title>
+  <script src="theme.js"></script>
   <link rel="stylesheet" href="pages.css">
   <style>
     .site-setting { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0; }
@@ -20,6 +21,18 @@
           <p class="muted">Take control of your feed.</p>
         </div>
       </div>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark theme" title="Switch to dark theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <line x1="12" y1="2" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="22"></line>
+          <line x1="2" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="22" y2="12"></line>
+          <line x1="4.93" y1="4.93" x2="7.05" y2="7.05"></line><line x1="16.95" y1="16.95" x2="19.07" y2="19.07"></line>
+          <line x1="4.93" y1="19.07" x2="7.05" y2="16.95"></line><line x1="16.95" y1="7.05" x2="19.07" y2="4.93"></line>
+        </svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+        </svg>
+      </button>
     </header>
     <section class="panel site-card" aria-labelledby="site-heading">
       <div class="card-heading">

@@ -241,8 +241,9 @@ body.hoa-added-view main {
 }
 .hoa-added-page .meta-chip { padding: 2px 6px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; }
 .hoa-added-page .type-chip { color: var(--accent); }
-.hoa-added-page .added-date { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; }
-.hoa-added-page .video-actions { display: flex; gap: 4px; justify-content: flex-end; margin-top: 10px; }
+.hoa-added-page .card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.hoa-added-page .added-date { display: block; color: var(--muted); font-size: 11px; }
+.hoa-added-page .video-actions { display: flex; gap: 4px; justify-content: flex-end; }
 .hoa-added-page .video-actions button { min-height: 28px; padding: 3px 8px; font-size: 12px; }
 .hoa-added-page .video-actions button { opacity: 0; pointer-events: none; }
 .hoa-added-page .added-card:hover .video-actions button,
@@ -278,10 +279,14 @@ body.hoa-added-view main {
 }
 
 @media (prefers-color-scheme: dark) {
-  .hoa-added-page .site-monogram {
+  :root:not([data-theme="light"]) .hoa-added-page .site-monogram {
     color: hsl(var(--h) 80% 82%);
     background: hsl(var(--h) 35% 22%);
   }
+}
+:root[data-theme="dark"] .hoa-added-page .site-monogram {
+  color: hsl(var(--h) 80% 82%);
+  background: hsl(var(--h) 35% 22%);
 }
 
 @media (prefers-reduced-motion: no-preference) {

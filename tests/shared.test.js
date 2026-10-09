@@ -407,6 +407,16 @@ check("mergeBackup reports changed and new counts", () => assert.deepEqual(merge
 
 check("buttons are enabled unless turned off", () => assert.deepEqual([HOA.buttonsEnabledOf(false), HOA.buttonsEnabledOf(true), HOA.buttonsEnabledOf(undefined)], [false, true, true]));
 check("button edge defaults to top", () => assert.deepEqual([HOA.buttonEdgeOf("bottom"), HOA.buttonEdgeOf("top"), HOA.buttonEdgeOf(undefined), HOA.buttonEdgeOf("left")], ["bottom", "top", "top", "top"]));
+check("theme key and values", () => {
+  assert.equal(HOA.THEME_KEY, "theme");
+  assert.deepEqual([HOA.themeOf("light"), HOA.themeOf("dark"), HOA.themeOf("system"), HOA.themeOf(undefined)], ["light", "dark", "", ""]);
+});
+check("added summary text", () => assert.deepEqual([
+  HOA.addedSummaryText(0, 0),
+  HOA.addedSummaryText(1, 1),
+  HOA.addedSummaryText(3, 1),
+  HOA.addedSummaryText(2, 4)
+], ["Nothing saved yet.", "1 video saved on 1 site", "3 videos saved on 1 site", "2 videos saved across 4 sites"]));
 
 // The popup injects shared.js/catalog.js again into pages that already run them (picker, Enable).
 check("shared.js and catalog.js can be injected twice into one world", () => {

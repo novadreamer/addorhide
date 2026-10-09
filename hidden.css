@@ -148,8 +148,9 @@ body.hoa-hidden-view main { max-width: 1180px; margin: 0 auto; }
 .hoa-hidden-view .hidden-empty { justify-content: center; margin: 80px 0; }
 
 @media (prefers-color-scheme: dark) {
-  .hoa-hidden-view .site-monogram { color: hsl(var(--h) 80% 82%); background: hsl(var(--h) 35% 22%); }
+  :root:not([data-theme="light"]) .hoa-hidden-view .site-monogram { color: hsl(var(--h) 80% 82%); background: hsl(var(--h) 35% 22%); }
 }
+:root[data-theme="dark"] .hoa-hidden-view .site-monogram { color: hsl(var(--h) 80% 82%); background: hsl(var(--h) 35% 22%); }
 
 @media (prefers-reduced-motion: reduce) {
   .hoa-hidden-view .hidden-actions button:hover,

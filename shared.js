@@ -15,6 +15,7 @@ var HOA = Object.freeze((() => {
   // Optional tip jar. Nothing in the extension depends on it.
   const SUPPORT_URL = "https://ko-fi.com/ashmustafa";
   const PREFS_KEY = "addedViewPrefs";
+  const THEME_KEY = "theme";
   // Where the Add/Hide bar sits on every site: "top" (default) or "bottom" of the video picture.
   const BUTTON_EDGE_KEY = "buttonEdge";
   // Whether the Add/Hide bar shows at all (hidden videos stay hidden either way). Default on.
@@ -26,6 +27,10 @@ var HOA = Object.freeze((() => {
 
   function buttonEdgeOf(value) {
     return value === "bottom" ? "bottom" : "top";
+  }
+
+  function themeOf(value) {
+    return value === "light" || value === "dark" ? value : "";
   }
   const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
   const TWITCH_CHANNEL_RE = /^[A-Za-z0-9_]{2,25}$/;
@@ -418,6 +423,18 @@ var HOA = Object.freeze((() => {
       return "No hidden videos.";
     }
     return count === 1 ? "There is 1 hidden video." : `There are ${count} hidden videos.`;
+  }
+
+  function addedSummaryText(videoCount, siteCount) {
+    const videos = Number.isInteger(videoCount) && videoCount >= 0 ? videoCount : 0;
+    const sites = Number.isInteger(siteCount) && siteCount >= 0 ? siteCount : 0;
+    if (videos === 0) {
+      return "Nothing saved yet.";
+    }
+    if (sites === 1) {
+      return `${videos} video${videos === 1 ? "" : "s"} saved on 1 site`;
+    }
+    return `${videos} video${videos === 1 ? "" : "s"} saved across ${sites} sites`;
   }
 
   function playerFor(key, title) {
@@ -1249,10 +1266,12 @@ var HOA = Object.freeze((() => {
     ADDED_KEY,
     SITES_KEY,
     PREFS_KEY,
+    THEME_KEY,
     BUTTON_EDGE_KEY,
     BUTTONS_ENABLED_KEY,
     buttonsEnabledOf,
     buttonEdgeOf,
+    themeOf,
     MAX_HIDDEN,
     MAX_ADDED,
     MAX_TITLE,
@@ -1276,6 +1295,7 @@ var HOA = Object.freeze((() => {
     splitGenres,
     siteDisplayName,
     hiddenSummaryText,
+    addedSummaryText,
     siteMonogram,
     typeLabel,
     formatDuration,

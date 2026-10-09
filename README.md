@@ -12,6 +12,8 @@ The Add/Hide buttons appear centred at the top of a card (or at the bottom of it
 
 AddOrHide uses a calm indigo-and-violet interface with warm neutrals, clear controls, and small motion cues that make feed control feel approachable. It supports light and dark system themes and respects reduced-motion preferences.
 
+The sun/moon switch in the popup header picks a light or dark theme for all AddOrHide pages (the default follows the system), and the popup's troubleshooting Details line is folded away until needed.
+
 ## Load the extension
 
 1. Open `chrome://extensions` in Brave.

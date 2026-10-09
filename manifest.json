@@ -58,6 +58,7 @@
         "https://www.youtube.com/robots.txt*"
       ],
       "js": [
+        "theme.js",
         "shared.js",
         "added-ui.js",
         "added-view.js"

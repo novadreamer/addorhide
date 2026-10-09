@@ -7,6 +7,7 @@ const openAddedButton = document.getElementById("open-added-button");
 const openOptionsButton = document.getElementById("open-options-button");
 const siteContent = document.getElementById("site-content");
 const siteStatus = document.getElementById("site-status");
+const themeToggle = document.getElementById("theme-toggle");
 
 let hidden = {};
 let activeTab = null;
@@ -46,6 +47,11 @@ function appendPageStatus(container) {
       line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"} on this page. Move your mouse over one to see Add and Hide.`;
     }
     // One compact line the user can read back when something does not work.
+    const detailsBox = document.createElement("details");
+    detailsBox.className = "page-details-box";
+    const summary = document.createElement("summary");
+    summary.textContent = "Details";
+    detailsBox.appendChild(summary);
     const details = document.createElement("p");
     details.className = "muted page-details";
     const manifestVersion = chrome.runtime.getManifest().version;
@@ -53,7 +59,8 @@ function appendPageStatus(container) {
       ? `Details: page script v${reply.version || "?"} (extension v${manifestVersion}), cards ${reply.cards}, buttons ${reply.overlays}`
         + `${reply.staleOverlays ? `, old buttons ${reply.staleOverlays}` : ""}, hidden here ${reply.hiddenHere || 0}`
       : `Details: no page script answered (extension v${manifestVersion})`;
-    container.appendChild(details);
+    detailsBox.appendChild(details);
+    container.appendChild(detailsBox);
   });
 }
 
@@ -61,6 +68,20 @@ function activeScheme() {
   return activeTab && typeof activeTab.url === "string" && activeTab.url.startsWith("http://") ? "http" : "https";
 }
 let siteRules = {};
+
+function refreshThemeToggle() {
+  if (!themeToggle || !window.HOA_THEME) {
+    return;
+  }
+  const dark = window.HOA_THEME.effective() === "dark";
+  const sun = themeToggle.querySelector(".icon-sun");
+  const moon = themeToggle.querySelector(".icon-moon");
+  sun.hidden = !dark;
+  moon.hidden = dark;
+  const label = dark ? "Switch to light theme" : "Switch to dark theme";
+  themeToggle.setAttribute("aria-label", label);
+  themeToggle.title = label;
+}
 
 function setStatus(message, kind = "") {
   popupStatus.textContent = message;
@@ -108,24 +129,20 @@ function pickedSelectors(rule) {
   return HOA.usablePicks(rule);
 }
 
-function addLearnedControl(host, catalog, rule) {
+function addLearnedControl(host, catalog, rule, container) {
   const count = pickedSelectors(rule).length;
   if (!count) {
     return;
   }
-  const row = document.createElement("div");
-  row.className = "site-setting";
-  const text = document.createElement("span");
-  text.textContent = `You taught ${count} kind${count === 1 ? "" : "s"} of card here`;
-  row.appendChild(text);
-  row.appendChild(siteButton(count === 1 ? "Forget taught card" : "Forget taught cards", () => {
+  const forget = button(count === 1 ? "Forget taught card" : "Forget taught cards", () => {
     const nextRule = { ...siteRule(host), pickedSelectors: [], pendingPick: !catalog };
     delete nextRule.cardSelector;
     const next = { ...siteRules, [host]: nextRule };
     siteRules = next;
     chrome.storage.local.set({ [HOA.SITES_KEY]: next }, renderSite);
-  }, true));
-  siteContent.appendChild(row);
+  });
+  forget.className = "link-button";
+  container.appendChild(forget);
 }
 
 function renderSite() {
@@ -199,9 +216,11 @@ function renderSite() {
   siteContent.appendChild(heading);
   const status = document.createElement("p");
   status.className = "muted";
-   const learnedCount = pickedSelectors(rule).length;
+  const learnedCount = pickedSelectors(rule).length;
   // Labels follow what the user has actually done on this site.
-  status.textContent = isCatalog ? "Supported" : (learnedCount ? "Cards taught" : "Pick the cards to finish setup");
+  status.textContent = learnedCount
+    ? `You taught ${learnedCount} kind${learnedCount === 1 ? "" : "s"} of card here`
+    : (isCatalog ? "Supported" : "Pick the cards to finish setup");
   siteContent.appendChild(status);
   appendPageStatus(siteContent);
   const actions = document.createElement("div");
@@ -228,25 +247,29 @@ function renderSite() {
   toggleLabel.appendChild(toggle);
   toggleLabel.appendChild(document.createTextNode(" Hide the whole feed"));
   actions.appendChild(toggleLabel);
-   siteContent.appendChild(actions);
-   addLearnedControl(activeHost, isCatalog, rule);
-  const manage = document.createElement("div");
-  manage.className = "page-actions";
-  manage.appendChild(siteButton("Disable on this site", () => HOA_SITES.disableSite(activeHost, result => {
+  siteContent.appendChild(actions);
+  const links = document.createElement("div");
+  links.className = "site-links";
+  addLearnedControl(activeHost, isCatalog, rule, links);
+  const disable = button("Disable on this site", () => HOA_SITES.disableSite(activeHost, result => {
     if (result.ok) {
       siteRules = { ...siteRules, [activeHost]: { ...siteRule(activeHost), enabled: false } };
       renderSite();
     }
-  }), true));
-  manage.appendChild(siteButton("Forget this site", () => HOA_SITES.forgetSite(activeHost, result => {
+  }));
+  disable.className = "link-button";
+  links.appendChild(disable);
+  const forgetSite = button("Forget this site", () => HOA_SITES.forgetSite(activeHost, result => {
     if (result.ok) {
       const next = { ...siteRules };
       delete next[activeHost];
       siteRules = next;
       renderSite();
     }
-  }), true));
-  siteContent.appendChild(manage);
+  }));
+  forgetSite.className = "link-button";
+  links.appendChild(forgetSite);
+  siteContent.appendChild(links);
   };
   chrome.permissions.contains({ origins: [HOA_SITES.matchPattern(activeHost, activeScheme())] }, renderEnabled);
 }
@@ -309,7 +332,24 @@ document.getElementById("support-link").addEventListener("click", event => {
   event.preventDefault();
   openInThisWindow(HOA.SUPPORT_URL);
 });
+themeToggle.addEventListener("click", () => {
+  window.HOA_THEME.toggle();
+  refreshThemeToggle();
+});
+refreshThemeToggle();
+const themeMedia = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+if (themeMedia) {
+  const refreshOnMediaChange = () => refreshThemeToggle();
+  if (themeMedia.addEventListener) {
+    themeMedia.addEventListener("change", refreshOnMediaChange);
+  } else if (themeMedia.addListener) {
+    themeMedia.addListener(refreshOnMediaChange);
+  }
+}
 chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "local" && changes[HOA.THEME_KEY]) {
+    refreshThemeToggle();
+  }
   if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.ADDED_KEY])) {
     HOA.readLists(lists => { hidden = lists.hidden; render(); });
   }
