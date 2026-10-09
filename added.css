@@ -1,0 +1,236 @@
+.hoa-added-page,
+body.hoa-added-view main {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.hoa-added-page .added-header {
+  position: sticky;
+  top: -1px;
+  z-index: 2;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin: -12px 0 28px;
+  padding: 12px 0 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.hoa-added-page .added-header h1 { margin-bottom: 4px; }
+.hoa-added-page .added-header .muted { max-width: 540px; margin-bottom: 0; }
+.hoa-added-page .count-badge {
+  display: inline-grid;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 7px;
+  place-items: center;
+  color: var(--accent);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hoa-added-page .empty-state { margin: 14px 0 24px; }
+.hoa-added-page .added-groups { display: grid; gap: 28px; }
+.hoa-added-page .site-group { min-width: 0; }
+.hoa-added-page .site-heading {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.hoa-added-page .collapse-button,
+.hoa-added-page .direction-button {
+  display: inline-grid;
+  width: 32px;
+  min-height: 32px;
+  padding: 4px;
+  place-items: center;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+  font-size: 18px;
+}
+.hoa-added-page .site-logo {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  padding: 3px;
+  place-items: center;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.hoa-added-page .site-logo img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 7px; }
+.hoa-added-page .site-monogram {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: hsl(var(--h) 55% 32%);
+  background: hsl(var(--h) 70% 92%);
+  border-radius: 7px;
+  font-weight: 700;
+}
+.hoa-added-page .site-identity { display: flex; gap: 9px; min-width: 0; align-items: center; }
+.hoa-added-page .site-identity h2 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hoa-added-page .site-controls { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.hoa-added-page .site-controls select,
+.hoa-added-page .tag-editor select,
+.hoa-added-page .tag-editor input {
+  min-height: 32px;
+  padding: 5px 8px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+.hoa-added-page .site-controls select { max-width: 165px; }
+.hoa-added-page .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.hoa-added-page .site-group-body { padding-top: 14px; }
+.hoa-added-page .added-subgroup + .added-subgroup { margin-top: 24px; }
+.hoa-added-page .subgroup-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+.hoa-added-page .subgroup-heading .count-badge { vertical-align: 0; }
+.hoa-added-page .added-card-grid { display: grid; gap: 16px; }
+.hoa-added-page .landscape-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.hoa-added-page .short-grid { grid-template-columns: repeat(auto-fill, minmax(145px, 190px)); }
+.hoa-added-page .added-card {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 5px 16px rgba(42, 39, 91, .08);
+}
+.hoa-added-page .card-media { position: relative; }
+.hoa-added-page .card-media img,
+.hoa-added-page .card-media .hoa-placeholder {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+.hoa-added-page .short-grid .card-media img,
+.hoa-added-page .short-grid .card-media .hoa-placeholder { aspect-ratio: 9 / 16; }
+.hoa-added-page .duration-badge {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  padding: 2px 5px;
+  color: #fff;
+  background: rgba(0, 0, 0, .78);
+  border-radius: 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.hoa-added-page .added-card-body { padding: 12px 14px 14px; }
+.hoa-added-page .added-card h3 { margin: 0 0 7px; }
+.hoa-added-page .added-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.hoa-added-page .added-meta { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; min-height: 22px; }
+.hoa-added-page .meta-chip,
+.hoa-added-page .meta-text {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+.hoa-added-page .meta-chip { padding: 2px 6px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; }
+.hoa-added-page .type-chip { color: var(--accent); }
+.hoa-added-page .added-date { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; }
+.hoa-added-page .video-actions { display: flex; gap: 4px; justify-content: flex-end; margin-top: 10px; }
+.hoa-added-page .video-actions button { min-height: 28px; padding: 3px 8px; font-size: 12px; }
+.hoa-added-page .video-actions button { opacity: 0; pointer-events: none; }
+.hoa-added-page .added-card:hover .video-actions button,
+.hoa-added-page .added-card:focus-within .video-actions button { opacity: 1; pointer-events: auto; }
+/* Tag and Remove pop on hover like the on-page Add/Hide buttons: lift, fill and a soft ring and shadow. */
+.hoa-added-page .video-actions button:hover:not(:disabled),
+.hoa-added-page .video-actions button:focus-visible {
+  /* Fixed strong fills (not the theme tokens, which turn pastel in dark mode) keep white text readable. */
+  color: #fff;
+  background: #5b5bf0;
+  transform: translateY(-1px) scale(1.06);
+  box-shadow: 0 0 0 2px rgba(91, 91, 240, .3), 0 6px 14px rgba(20, 18, 60, .35);
+}
+.hoa-added-page .video-actions .danger-button:hover:not(:disabled),
+.hoa-added-page .video-actions .danger-button:focus-visible {
+  background: #d93a49;
+  box-shadow: 0 0 0 2px rgba(217, 58, 73, .3), 0 6px 14px rgba(90, 15, 25, .35);
+}
+.hoa-added-page .tag-editor { display: grid; gap: 8px; margin-top: 10px; align-items: end; }
+.hoa-added-page .tag-field { display: grid; gap: 4px; }
+.hoa-added-page .tag-field label { font-size: 11px; font-weight: 600; }
+.hoa-added-page .tag-actions { display: flex; gap: 4px; justify-content: flex-end; }
+.hoa-added-page .tag-actions button { min-height: 28px; padding: 3px 8px; font-size: 12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hoa-added-page .video-actions button:hover,
+  .hoa-added-page .video-actions button:focus-visible { transform: none; }
+}
+
+@media (hover: none) {
+  .hoa-added-page .video-actions button,
+  .hoa-added-page .added-card:focus-within .video-actions button { opacity: 1; pointer-events: auto; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .hoa-added-page .site-monogram {
+    color: hsl(var(--h) 80% 82%);
+    background: hsl(var(--h) 35% 22%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hoa-added-page button,
+  .hoa-added-page a,
+  .hoa-added-page select,
+  .hoa-added-page input,
+  .hoa-added-page .added-card { transition: background-color 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out, opacity 150ms ease-out, transform 150ms ease-out, box-shadow 150ms ease-out; }
+  .hoa-added-page .added-card:hover,
+  .hoa-added-page .added-card:focus-within { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(42, 39, 91, .14); }
+  .hoa-added-page .added-card.is-leaving { opacity: 0; transform: scale(.96); }
+}
+
+@media (max-width: 700px) {
+  .hoa-added-page .site-heading { grid-template-columns: auto auto minmax(0, 1fr); }
+  .hoa-added-page .site-controls { grid-column: 1 / -1; justify-content: flex-start; padding-left: 42px; }
+}
+
+@media (max-width: 560px) {
+  .hoa-added-page .added-header { align-items: flex-start; }
+  .hoa-added-page .short-grid { grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)); }
+}

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AddOrHide options</title>
+  <link rel="stylesheet" href="pages.css">
+  <style>
+    .site-setting { display: inline-flex; align-items: center; gap: 7px; margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <p class="eyebrow">Control centre</p>
+      <h1>AddOrHide</h1>
+      <p class="muted">Hide recommendations or add videos for later on supported streaming sites.</p>
+    </header>
+    <section class="panel" aria-labelledby="sites-heading">
+      <h2 id="sites-heading">Sites</h2>
+      <div id="site-list" class="site-list"></div>
+      <p id="site-empty" class="empty-state muted" hidden>No other sites yet. Open the AddOrHide popup on a site and choose Enable on this site.</p>
+    </section>
+    <section class="panel" aria-labelledby="feed-heading">
+      <h2 id="feed-heading">Hide whole feeds</h2>
+      <label class="switch-row"><input id="bulk-hide" type="checkbox" role="switch"> <span>Hide every recommendation on YouTube</span></label>
+      <label class="switch-row"><input id="bulk-hide-tubi" type="checkbox" role="switch"> <span>Hide every tile on Tubi</span></label>
+    </section>
+    <section class="panel" aria-labelledby="add-heading">
+      <h2 id="add-heading">Add a video by URL</h2>
+      <form id="add-form">
+        <div class="field"><label for="url-input">Video URL</label><input id="url-input" type="text" autocomplete="off" placeholder="https://..." aria-label="Video URL" required></div>
+        <div class="field"><label for="title-input">Title <span class="muted">(optional)</span></label><input id="title-input" type="text" autocomplete="off" placeholder="Give it a name" aria-label="Optional title"></div>
+        <button id="add-button" class="primary-button" type="submit">Add video</button>
+      </form>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+    </section>
+    <section class="panel" aria-labelledby="hidden-heading">
+      <h2 id="hidden-heading">Hidden videos</h2>
+      <div class="stat-grid"><div class="stat-tile"><strong id="hidden-count">Loading...</strong><span class="muted">listed videos</span></div><div class="stat-tile"><strong id="hidden-removed-count">—</strong><span class="muted">removed but still hidden</span></div></div>
+      <div class="page-actions">
+        <button id="unhide-all-button" class="ghost-button danger-button" type="button">Unhide everything (including removed from list)</button>
+        <button id="open-added-button" class="secondary-button" type="button">Open added page</button>
+      </div>
+      <div id="hidden-status" class="status" role="status" aria-live="polite"></div>
+    </section>
+    <section class="panel" aria-labelledby="privacy-heading">
+      <h2 id="privacy-heading">Your data</h2>
+      <p>AddOrHide keeps the videos you hide or add, your site settings and your page preferences in this browser only. Nothing is sent to the developer, and there are no accounts, ads or analytics.</p>
+      <p class="muted">When you click <strong>Hide</strong> or <strong>Add</strong>, the extension reads that video's link, title, thumbnail link and any duration, view count, date, rating or genre shown on its card, and stores them on this device. It uses this data only to hide videos and to build your Added Videos page, and it never sells or shares it. Thumbnails and site icons are loaded straight from the sites they come from. You can delete it at any time: Restore or Unhide everything for hidden videos, Remove or Clear page for added videos, Forget for a site's settings, or remove the extension.</p>
+    </section>
+  </main>
+  <script src="shared.js"></script>
+  <script src="catalog.js"></script>
+  <script src="sites.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

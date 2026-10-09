@@ -1,0 +1,532 @@
+"use strict";
+
+const HOA_ADDED = (() => {
+  const SORT_LABELS = {
+    added: "Date added",
+    published: "Date published",
+    views: "Views",
+    votes: "Votes",
+    score: "Rating",
+    duration: "Duration",
+    title: "A-Z",
+    year: "Year"
+  };
+  const GROUP_LABELS = { none: "No grouping", type: "By type", genre: "By genre" };
+  const TAG_TYPES = [
+    ["video", "Video"], ["short", "Short"], ["movie", "Movie"], ["tv", "TV"],
+    ["live", "Live"], ["music", "Music"], ["sport", "Sport"], ["other", "Other"]
+  ];
+
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) {
+      node.className = className;
+    }
+    if (text !== undefined) {
+      node.textContent = text;
+    }
+    return node;
+  }
+
+  function labelFor(text, control) {
+    const label = element("label", "visually-hidden", text);
+    label.htmlFor = control.id;
+    return label;
+  }
+
+  function defaultDirection(sort) {
+    return sort === "title" ? "asc" : "desc";
+  }
+
+  function localDate(timestamp) {
+    if (!Number.isFinite(timestamp)) {
+      return "";
+    }
+    return new Date(timestamp).toLocaleDateString();
+  }
+
+  function mount(rootElement) {
+    if (!rootElement || rootElement.__hoaAddedMount) {
+      return;
+    }
+    rootElement.__hoaAddedMount = true;
+    rootElement.className = "hoa-added-page";
+    while (rootElement.firstChild) {
+      rootElement.firstChild.remove();
+    }
+
+    let added = {};
+    let prefs = {};
+    let editingKey = "";
+    let pendingRefresh = false;
+    const removing = new Set();
+
+    const header = element("header", "added-header");
+    const intro = element("div");
+    intro.appendChild(element("p", "eyebrow", "Your collection"));
+    intro.appendChild(element("h1", "", "Added Videos"));
+    intro.appendChild(element("p", "muted", "Only videos you added are shown here."));
+    header.appendChild(intro);
+    const clearButton = element("button", "ghost-button danger-button", "Clear page");
+    clearButton.type = "button";
+    header.appendChild(clearButton);
+    rootElement.appendChild(header);
+
+    const empty = element("p", "empty-state muted");
+    empty.hidden = true;
+    const emptyIcon = element("span", "empty-icon");
+    emptyIcon.setAttribute("aria-hidden", "true");
+    const emptySvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    emptySvg.setAttribute("viewBox", "0 0 32 32");
+    emptySvg.setAttribute("focusable", "false");
+    const emptyPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    emptyPath.setAttribute("d", "M6 9h20v17H6zM10 9V6h12v3M12 14v7M20 14v7");
+    emptySvg.appendChild(emptyPath);
+    emptyIcon.appendChild(emptySvg);
+    empty.appendChild(emptyIcon);
+    empty.appendChild(document.createTextNode("Nothing added yet. Use the Add button on a video."));
+    rootElement.appendChild(empty);
+
+    const groupsRoot = element("div", "added-groups");
+    groupsRoot.setAttribute("aria-live", "polite");
+    rootElement.appendChild(groupsRoot);
+
+    function setPrefs(site, changes) {
+      prefs = { ...prefs, [site]: { ...(prefs[site] || {}), ...changes } };
+      HOA.writePrefs(prefs);
+    }
+
+    function makeMonogram(tile, site) {
+      while (tile.firstChild) {
+        tile.firstChild.remove();
+      }
+      const monogram = HOA.siteMonogram(site);
+      tile.style.setProperty("--h", monogram.hue);
+      tile.appendChild(element("span", "site-monogram", monogram.letter));
+    }
+
+    function makeLogo(group) {
+      const tile = element("div", "site-logo");
+      const icon = HOA.safeHref(group.icon) || HOA.safeHref(`https://${group.site}/favicon.ico`);
+      // Show the letter tile immediately; swap in the site's own favicon only if it actually loads,
+      // so a missing or slow favicon never leaves an empty tile.
+      makeMonogram(tile, group.site);
+      if (!icon) {
+        return tile;
+      }
+      const image = document.createElement("img");
+      image.referrerPolicy = "no-referrer";
+      image.alt = "";
+      image.addEventListener("load", () => {
+        if (!image.naturalWidth) {
+          return;
+        }
+        tile.style.removeProperty("--h");
+        while (tile.firstChild) {
+          tile.firstChild.remove();
+        }
+        tile.appendChild(image);
+      }, { once: true });
+      image.src = icon;
+      return tile;
+    }
+
+    function makeSelect(site, kind, values, selected) {
+      const select = document.createElement("select");
+      select.id = `added-${kind}-${site.replace(/[^a-z0-9]+/gi, "-")}`;
+      values.forEach(value => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = kind === "sort" ? SORT_LABELS[value] : GROUP_LABELS[value];
+        option.selected = value === selected;
+        select.appendChild(option);
+      });
+      return select;
+    }
+
+    function makeMeta(entry) {
+      const meta = element("div", "added-meta");
+      if (entry.type && entry.type !== "video") {
+        meta.appendChild(element("span", "meta-chip type-chip", HOA.typeLabel(entry.type)));
+      }
+      if (Number.isFinite(entry.views)) {
+        meta.appendChild(element("span", "meta-text", HOA.formatViews(entry.views)));
+      }
+      if (Number.isFinite(entry.score)) {
+        const score = HOA.formatScore(entry.score);
+        if (score) {
+          meta.appendChild(element("span", "meta-chip", `★ ${score}`));
+        }
+      }
+      if (Number.isFinite(entry.votes)) {
+        const votes = HOA.formatVotes(entry.votes);
+        if (votes) {
+          meta.appendChild(element("span", "meta-text", votes));
+        }
+      }
+      if (Number.isFinite(entry.published)) {
+        meta.appendChild(element("span", "meta-text", HOA.formatAge(entry.published, Date.now())));
+      } else if (Number.isInteger(entry.year)) {
+        meta.appendChild(element("span", "meta-text", String(entry.year)));
+      }
+      if (entry.rating) {
+        meta.appendChild(element("span", "meta-chip", entry.rating));
+      }
+      if (Array.isArray(entry.genres)) {
+        // A genre that just repeats the type chip ("Music" / "Music") adds nothing.
+        const typeName = entry.type ? HOA.typeLabel(entry.type).toLowerCase() : "";
+        const genres = entry.genres.filter(genre => genre.toLowerCase() !== typeName);
+        genres.slice(0, 3).forEach(genre => meta.appendChild(element("span", "meta-chip", genre)));
+        if (genres.length > 3) {
+          const more = element("span", "meta-chip", `+${genres.length - 3} more`);
+          more.title = genres.slice(3).join(", ");
+          meta.appendChild(more);
+        }
+      }
+      return meta;
+    }
+
+    function animateCard(card, action) {
+      const reduced = typeof window.matchMedia === "function"
+        && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!card || reduced) {
+        action();
+        return;
+      }
+      let finished = false;
+      const finish = () => {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        card.removeEventListener("transitionend", onTransitionEnd);
+        action();
+      };
+      const onTransitionEnd = event => {
+        if (event.target === card && (event.propertyName === "opacity" || event.propertyName === "transform")) {
+          finish();
+        }
+      };
+      card.addEventListener("transitionend", onTransitionEnd);
+      card.classList.add("is-leaving");
+      window.setTimeout(finish, 180);
+    }
+
+    function closeEditor() {
+      editingKey = "";
+      pendingRefresh = false;
+      refresh();
+    }
+
+    function makeTagEditor(key, entry, card) {
+      const form = element("form", "tag-editor");
+      form.addEventListener("submit", event => {
+        event.preventDefault();
+        const type = typeSelect.value;
+        const genres = HOA.splitGenres(genresInput.value);
+        HOA.readLists(lists => {
+          if (!lists.added[key]) {
+            closeEditor();
+            return;
+          }
+          const nextEntry = { ...lists.added[key], type };
+          if (genres.length) {
+            nextEntry.genres = genres;
+          } else {
+            delete nextEntry.genres;
+          }
+          const nextAdded = { ...lists.added, [key]: nextEntry };
+          HOA.writeLists({ added: nextAdded }, () => {
+            closeEditor();
+          });
+        });
+      });
+      form.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeEditor();
+        }
+      });
+      const typeField = element("div", "tag-field");
+      const typeSelect = document.createElement("select");
+      typeSelect.id = `tag-type-${key.replace(/[^a-z0-9]+/gi, "-")}`;
+      TAG_TYPES.forEach(([value, label]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        option.selected = value === (entry.type || HOA.typeOf(key));
+        typeSelect.appendChild(option);
+      });
+      typeField.appendChild(labelFor("Type", typeSelect));
+      typeField.appendChild(typeSelect);
+      const genresField = element("div", "tag-field");
+      const genresInput = document.createElement("input");
+      genresInput.type = "text";
+      genresInput.placeholder = "Action, Comedy";
+      genresInput.value = Array.isArray(entry.genres) ? entry.genres.join(", ") : "";
+      genresInput.id = `tag-genres-${key.replace(/[^a-z0-9]+/gi, "-")}`;
+      genresField.appendChild(labelFor("Genres", genresInput));
+      genresField.appendChild(genresInput);
+      form.appendChild(typeField);
+      form.appendChild(genresField);
+      const actions = element("div", "tag-actions");
+      const save = element("button", "secondary-button", "Save");
+      save.type = "submit";
+      const cancel = element("button", "ghost-button", "Cancel");
+      cancel.type = "button";
+      cancel.addEventListener("click", closeEditor);
+      actions.appendChild(save);
+      actions.appendChild(cancel);
+      form.appendChild(actions);
+      card.appendChild(form);
+      typeSelect.focus();
+    }
+
+    function makeCard(key, entry) {
+      const href = HOA.safeHref(key);
+      if (!href) {
+        return null;
+      }
+      const card = element("article", "added-card");
+      const media = element("div", "card-media");
+      if (entry.thumb) {
+        const image = document.createElement("img");
+        image.src = HOA.safeHref(entry.thumb) || "";
+        image.alt = "";
+        image.loading = "lazy";
+        media.appendChild(image);
+      } else {
+        media.appendChild(element("div", "hoa-placeholder"));
+      }
+      if (Number.isInteger(entry.duration)) {
+        const duration = element("span", "duration-badge", HOA.formatDuration(entry.duration));
+        if (duration.textContent) {
+          media.appendChild(duration);
+        }
+      }
+      card.appendChild(media);
+      const body = element("div", "added-card-body");
+      const title = element("h3");
+      const titleLink = element("a", "added-title", entry.title);
+      titleLink.href = href;
+      titleLink.title = `Added ${localDate(entry.ts)}`;
+      title.appendChild(titleLink);
+      body.appendChild(title);
+      body.appendChild(makeMeta(entry));
+      const addedTime = element("time", "added-date", `Added ${localDate(entry.ts)}`);
+      addedTime.dateTime = Number.isFinite(entry.ts) ? new Date(entry.ts).toISOString() : "";
+      body.appendChild(addedTime);
+      const actions = element("div", "video-actions");
+      const tag = element("button", "ghost-button", "Tag");
+      tag.type = "button";
+      tag.addEventListener("click", () => {
+        if (editingKey) {
+          return;
+        }
+        editingKey = key;
+        makeTagEditor(key, entry, card);
+        tag.hidden = true;
+        remove.hidden = true;
+      });
+      const remove = element("button", "ghost-button danger-button", "Remove");
+      remove.type = "button";
+      remove.addEventListener("click", () => {
+        if (removing.has(key)) {
+          return;
+        }
+        removing.add(key);
+        animateCard(card, () => {
+          HOA.readLists(lists => {
+            const nextAdded = { ...lists.added };
+            if (!Object.prototype.hasOwnProperty.call(nextAdded, key)) {
+              removing.delete(key);
+              refresh();
+              return;
+            }
+            delete nextAdded[key];
+            HOA.writeLists({ added: nextAdded }, () => {
+              removing.delete(key);
+              refresh();
+            });
+          });
+        });
+      });
+      actions.appendChild(tag);
+      actions.appendChild(remove);
+      body.appendChild(actions);
+      card.appendChild(body);
+      return card;
+    }
+
+    function makeSubgroup(site, subgroup) {
+      const section = element("section", "added-subgroup");
+      if (subgroup.label) {
+        const heading = element("h3", "subgroup-heading");
+        heading.appendChild(document.createTextNode(subgroup.label));
+        heading.appendChild(element("span", "count-badge", String(subgroup.entries.length)));
+        section.appendChild(heading);
+      }
+      const landscape = subgroup.entries.filter(pair => pair[1] && pair[1].type !== "short" && pair[1].kind !== "short");
+      const shorts = subgroup.entries.filter(pair => pair[1] && (pair[1].type === "short" || pair[1].kind === "short"));
+      const appendGrid = (entries, className) => {
+        if (!entries.length) {
+          return;
+        }
+        const grid = element("div", className);
+        entries.forEach(([key, entry]) => {
+          const card = makeCard(key, entry);
+          if (card) {
+            grid.appendChild(card);
+          }
+        });
+        section.appendChild(grid);
+      };
+      appendGrid(landscape, "added-card-grid landscape-grid");
+      appendGrid(shorts, "added-card-grid short-grid");
+      return section;
+    }
+
+    function renderSite(group) {
+      const sitePrefs = prefs[group.site] || {};
+      const sorts = HOA.availableSorts(group.entries);
+      const sort = sorts.includes(sitePrefs.sort) ? sitePrefs.sort : (sorts.includes("added") ? "added" : sorts[0] || "added");
+      const dir = sitePrefs.dir === "asc" || sitePrefs.dir === "desc" ? sitePrefs.dir : defaultDirection(sort);
+      const groups = HOA.availableGroups(group.entries);
+      const groupMode = groups.includes(sitePrefs.group) ? sitePrefs.group : "none";
+      const section = element("section", "site-group");
+      section.dataset.site = group.site;
+      const slug = group.site.replace(/[^a-z0-9]+/gi, "-");
+      const heading = element("div", "site-heading");
+      const collapse = element("button", "collapse-button", sitePrefs.collapsed ? "▸" : "▾");
+      collapse.type = "button";
+      collapse.id = `added-collapse-${slug}`;
+      collapse.setAttribute("aria-expanded", String(!sitePrefs.collapsed));
+      collapse.setAttribute("aria-label", `${sitePrefs.collapsed ? "Expand" : "Collapse"} ${group.name}`);
+      collapse.addEventListener("click", () => {
+        setPrefs(group.site, { collapsed: !sitePrefs.collapsed });
+        render();
+      });
+      heading.appendChild(collapse);
+      heading.appendChild(makeLogo(group));
+      const identity = element("div", "site-identity");
+      const name = element("h2", "", group.name);
+      identity.appendChild(name);
+      identity.appendChild(element("span", "count-badge", String(group.entries.length)));
+      heading.appendChild(identity);
+      const controls = element("div", "site-controls");
+      // Only controls that change something for this website are shown (see HOA.availableSorts/Groups).
+      if (sorts.length >= 2) {
+        const sortSelect = makeSelect(group.site, "sort", sorts, sort);
+        sortSelect.addEventListener("change", () => {
+          const nextSort = sortSelect.value;
+          setPrefs(group.site, { sort: nextSort, dir: defaultDirection(nextSort) });
+          render();
+        });
+        controls.appendChild(labelFor("Sort by", sortSelect));
+        controls.appendChild(sortSelect);
+      }
+      if (sorts.length >= 1) {
+        const direction = element("button", "direction-button", dir === "asc" ? "↑" : "↓");
+        direction.type = "button";
+        direction.id = `added-direction-${slug}`;
+        const label = sorts.length === 1 ? `${SORT_LABELS[sort]}, ` : "";
+        direction.setAttribute("aria-label", `${label}${dir === "asc" ? "ascending" : "descending"}`);
+        direction.title = `${SORT_LABELS[sort]}: ${dir === "asc" ? "ascending" : "descending"}`;
+        direction.addEventListener("click", () => {
+          setPrefs(group.site, { sort, dir: dir === "asc" ? "desc" : "asc" });
+          render();
+        });
+        controls.appendChild(direction);
+      }
+      if (groups.length > 1) {
+        const groupSelect = makeSelect(group.site, "group", groups, groupMode);
+        groupSelect.addEventListener("change", () => {
+          setPrefs(group.site, { group: groupSelect.value });
+          render();
+        });
+        controls.appendChild(labelFor("Group by", groupSelect));
+        controls.appendChild(groupSelect);
+      }
+      heading.appendChild(controls);
+      section.appendChild(heading);
+      if (!sitePrefs.collapsed) {
+        const body = element("div", "site-group-body");
+        const sorted = HOA.sortEntries(group.entries, sort, dir);
+        HOA.orderGroupsBySort(HOA.groupEntries(sorted, groupMode), sorted, groupMode)
+          .forEach(subgroup => body.appendChild(makeSubgroup(group.site, subgroup)));
+        section.appendChild(body);
+      }
+      return section;
+    }
+
+    // Every change rebuilds the list. Keep the reader where they were: the website section they were working
+    // in stays at the same height on screen (otherwise the page jumped to the top), and focus returns to
+    // the same control.
+    function render() {
+      const focused = document.activeElement;
+      const focusId = focused && focused.id && groupsRoot.contains(focused) ? focused.id : "";
+      const anchor = focused && focused.closest ? focused.closest(".site-group") : null;
+      const anchorSite = anchor ? anchor.dataset.site : "";
+      const anchorTop = anchor ? anchor.getBoundingClientRect().top : 0;
+      const scrollTop = window.scrollY;
+      groupsRoot.style.minHeight = `${groupsRoot.offsetHeight}px`;
+      while (groupsRoot.firstChild) {
+        groupsRoot.firstChild.remove();
+      }
+      const groups = HOA.groupBySite(added);
+      empty.hidden = groups.length !== 0;
+      groups.forEach(group => groupsRoot.appendChild(renderSite(group)));
+      groupsRoot.style.minHeight = "";
+      const nextAnchor = anchorSite
+        ? Array.from(groupsRoot.querySelectorAll(".site-group")).find(section => section.dataset.site === anchorSite)
+        : null;
+      if (nextAnchor) {
+        window.scrollBy(0, nextAnchor.getBoundingClientRect().top - anchorTop);
+      } else {
+        window.scrollTo(0, scrollTop);
+      }
+      const nextFocus = focusId ? document.getElementById(focusId) : null;
+      if (nextFocus) {
+        nextFocus.focus({ preventScroll: true });
+      }
+    }
+
+    function refresh() {
+      HOA.readLists(lists => {
+        added = lists.added;
+        HOA.readPrefs(nextPrefs => {
+          prefs = nextPrefs;
+          render();
+        });
+      });
+    }
+
+    clearButton.addEventListener("click", () => {
+      if (!window.confirm("Clear every added video from this page?")) {
+        return;
+      }
+      editingKey = "";
+      HOA.readLists(lists => HOA.writeLists({ added: {} }, refresh));
+    });
+
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName !== "local" || (!changes[HOA.ADDED_KEY] && !changes[HOA.PREFS_KEY])) {
+          return;
+        }
+        if (editingKey) {
+          pendingRefresh = true;
+          return;
+        }
+        refresh();
+      });
+    }
+    refresh();
+  }
+
+  return { mount };
+})();
+
+if (typeof window !== "undefined") {
+  window.HOA_ADDED = HOA_ADDED;
+}

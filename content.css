@@ -1,0 +1,106 @@
+.hoa-removed { display: none !important; }
+.hoa-host { position: relative !important; }
+/* Site stylesheets target card children (IMDb sets position: relative on poster-card divs, which drops our
+   bar into the card's flex flow at the bottom), so the layout-critical properties are !important. */
+.hoa-actions {
+  box-sizing: border-box !important;
+  display: flex !important;
+  position: absolute !important;
+  top: 8px;
+  right: 8px;
+  flex: none !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  z-index: 2147483000 !important;
+  gap: 8px;
+  max-width: calc(100% - 16px);
+  padding: 4px;
+  /* See-through so the card stays visible behind the bar; a thin edge and text shadow keep the labels
+     readable on bright thumbnails. */
+  background: rgba(20, 20, 28, .45);
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .18);
+  backdrop-filter: blur(1.5px);
+  opacity: 0;
+  pointer-events: none;
+}
+.hoa-host:hover > .hoa-actions,
+.hoa-host.hoa-show > .hoa-actions,
+.hoa-host:focus-within > .hoa-actions { opacity: 1; pointer-events: auto; }
+.hoa-actions button { text-shadow: 0 1px 2px rgba(0, 0, 0, .75); }
+/* Copy of the bar drawn above a site layer that covers the card (see syncFloatBar in content.js). */
+.hoa-actions.hoa-float { position: fixed !important; right: auto; opacity: 1; pointer-events: auto; z-index: 2147483647 !important; }
+.hoa-actions.hoa-float[hidden] { display: none !important; }
+.hoa-actions button, #hoa-banner button, #hoa-toast button {
+  box-sizing: border-box;
+  min-height: 28px;
+  padding: 0 9px;
+  color: #fff;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-family: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 26px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+#hoa-banner button:hover, #hoa-banner button:focus-visible,
+#hoa-toast button:hover, #hoa-toast button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+/* Hovered Add/Hide lift off the card: raised a little, a white ring with a thin dark edge so it still reads on
+   very bright thumbnails, a sheen on top and a layered drop shadow underneath. Keyboard focus keeps an outline. */
+.hoa-actions button:hover, .hoa-actions button:focus-visible {
+  transform: translateY(-2px) scale(1.08);
+  background-image: linear-gradient(rgba(255, 255, 255, .22), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, .14));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .45),
+    0 0 0 2px #fff,
+    0 0 0 3px rgba(0, 0, 0, .55),
+    0 3px 5px rgba(0, 0, 0, .45),
+    0 10px 22px rgba(0, 0, 0, .5);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, .35);
+}
+.hoa-actions button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.hoa-actions button[data-action="add"][aria-pressed="true"] { color: #fff; background: #5b5bf0; }
+.hoa-actions button[data-action="add"][aria-pressed="true"]::before { content: "✓"; margin-right: 4px; }
+.hoa-actions button[data-action="add"]:hover, .hoa-actions button[data-action="add"]:focus-visible { color: #fff; background: #1f9d55; }
+.hoa-actions button[data-action="hide"]:hover, .hoa-actions button[data-action="hide"]:focus-visible { color: #fff; background: #d93a49; }
+#hoa-toast, #hoa-banner {
+  box-sizing: border-box;
+  display: flex;
+  position: fixed;
+  z-index: 2147483001;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 12px;
+  color: #fff;
+  background: rgba(20, 20, 28, .94);
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+  font-family: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.2;
+}
+#hoa-toast { bottom: 20px; left: 20px; }
+#hoa-banner { top: 14px; left: 50%; transform: translateX(-50%); }
+#hoa-toast button, #hoa-banner button { min-height: 24px; padding: 0 5px; color: #aaaaff; line-height: 22px; }
+@media (prefers-reduced-motion: no-preference) {
+  .hoa-actions, #hoa-toast, #hoa-banner { transition: opacity 160ms ease-out, transform 160ms ease-out; }
+  .hoa-actions button { transition: transform 140ms ease-out, box-shadow 140ms ease-out, background-color 140ms ease-out; }
+  #hoa-toast, #hoa-banner { animation: hoa-fade-in 160ms ease-out both; }
+  #hoa-banner { animation-name: hoa-banner-in; }
+  @keyframes hoa-fade-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes hoa-banner-in { from { opacity: 0; transform: translate(-50%, -5px); } to { opacity: 1; transform: translate(-50%, 0); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  #hoa-banner { right: 16px; left: 16px; justify-content: center; transform: none; }
+  .hoa-actions button:hover, .hoa-actions button:focus-visible { transform: none; }
+}
+
+#hoa-banner[hidden], #hoa-toast[hidden] { display: none !important; }
+
+/* Placement (top edge, chosen side, sliding past the site's own controls) is set inline by content.js placeActions. */

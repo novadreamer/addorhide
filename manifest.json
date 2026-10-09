@@ -1,0 +1,91 @@
+{
+  "manifest_version": 3,
+  "name": "AddOrHide",
+  "version": "0.10.0",
+  "version_name": "0.10.0-prerelease",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "description": "Hide recommendations or save videos to your own Added list on YouTube, Tubi, IMDb, TMDB, Dailymotion, Twitch and any site you choose.",
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://i.ytimg.com/*",
+    "https://tubitv.com/*",
+    "https://www.tubitv.com/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "shared.js",
+        "catalog.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://tubitv.com/*",
+        "https://www.tubitv.com/*"
+      ],
+      "js": [
+        "shared.js",
+        "catalog.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/robots.txt*"
+      ],
+      "js": [
+        "shared.js",
+        "added-ui.js",
+        "added-view.js"
+      ],
+      "css": [
+        "pages.css",
+        "added.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "AddOrHide",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  }
+}

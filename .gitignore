@@ -1,0 +1,5 @@
+node_modules/
+.task-brief.txt
+*.log
+.DS_Store
+Thumbs.db

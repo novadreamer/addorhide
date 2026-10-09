@@ -1,0 +1,127 @@
+# AddOrHide: Chrome Web Store submission pack (draft)
+
+Everything in [BRACKETS] needs your input. Field limits and required assets below come from the current Chrome Web Store documentation, except where marked "(dashboard limit)", which are limits the dashboard enforces that the docs page does not state.
+
+---
+
+## 1. Store listing tab
+
+**Name** (dashboard limit 75): `AddOrHide`
+
+**Summary** (dashboard limit 132):
+`Hide videos you don't want and save the ones you like to your own list on YouTube, Tubi, IMDb, TMDB, Dailymotion, Twitch and sites you choose.`
+
+**Category:** Productivity
+**Language:** English
+
+**Detailed description**
+
+```
+AddOrHide puts you in charge of the video recommendations on the sites you use. Hide anything you don't want to see, or add it to your own Added Videos list so you can find it again later.
+
+HOW IT WORKS
+Hover over a video on a supported site and two small buttons appear:
+- Hide removes the video from the feed. Changed your mind? Tap Undo, or restore it from the extension popup.
+- Add saves the video to your Added Videos page. The video stays where it is, and the button turns into "Added".
+
+YOUR ADDED VIDEOS PAGE
+- Videos are grouped by website, each with its own logo tile.
+- Sort each site's videos by date added, date published, views, duration, year or A-Z.
+- Group them by type (video, short, movie, TV, live, music, sport) or by genre where the site shows one.
+- Tag any video with your own type and genres.
+- Works in private windows too, if you allow the extension there.
+
+THE HIDDEN LIST
+The toolbar popup lists every video you hid. Restore one or all of them, or remove a row to keep the video hidden without cluttering the list.
+
+WORKS ON
+- YouTube and Tubi, built in.
+- IMDb charts/lists, TMDB lists, Dailymotion home and Twitch directory: choose Enable on this site for one-click support.
+- Any other site you choose. Turn it on for that site, click one video tile to show the extension what a video looks like, and the buttons appear on every similar tile. The browser asks for permission one site at a time, and you can take it back whenever you like.
+
+PRIVATE BY DESIGN
+Everything stays on your device. AddOrHide has no accounts, no servers, no ads and no analytics, and it never sends your lists to anyone.
+
+GOOD TO KNOW
+- AddOrHide never hides or changes ads and never downloads videos.
+- Details such as duration, views and genre appear only when the site shows them on the video's card. You can tag the rest yourself.
+- Websites change their layout from time to time, which can occasionally affect the buttons. Please report problems at [SUPPORT URL OR EMAIL].
+
+AddOrHide is an independent project and is not affiliated with, endorsed by or sponsored by YouTube, Google, Tubi or any other streaming service. All product names and trademarks belong to their owners.
+```
+
+**Graphic assets** (current requirements: store icon 128x128; at least 1 screenshot at 1280x800, up to 5; small promo tile 440x280 PNG or JPEG; marquee 1400x560 optional)
+
+- **Store icon (128x128):** done, `icons/icon128.png`.
+- **Screenshots (1280x800), suggested set.** Use mock or your own videos, not other people's thumbnails and not real YouTube or Tubi pages:
+  1. *Hide anything you don't want.* A feed grid with the Hide and Add buttons on one card.
+  2. *Save videos to your own list.* A card showing the "Added" state next to the Added Videos page.
+  3. *Every site, neatly grouped.* The Added Videos page with logo-tiled groups.
+  4. *Sort and group your way.* One site group with the Sort by and Group by controls open.
+  5. *Restore anytime.* The popup with the hidden list, Restore and Remove all.
+- **Small promo tile (440x280):** the icon, the name AddOrHide and the line "Hide it. Or add it."
+- **Marquee (1400x560), optional:** same artwork, wider.
+
+**Optional fields:** Homepage URL [URL], Support URL [URL], leave "mature content" unchecked.
+
+---
+
+## 2. Privacy tab
+
+**Single purpose description**
+`AddOrHide lets you control the video recommendations shown on video websites: hide any video from a feed, or save it to your own Added Videos list.`
+
+**Permission justifications**
+
+| Permission | Justification to paste |
+|---|---|
+| `storage` | Saves the videos the user hides or adds, per-site settings and display preferences in local extension storage on the user's device. |
+| `scripting` | Injects the extension's content script and, where needed, its card picker into a site the user has turned the extension on for, so the Hide and Add buttons appear without a page reload, and re-registers that script for the site after a restart. |
+| `activeTab` | When the user opens the popup on a page, lets the extension read that tab's address to show the right controls and to start setup or the card picker on it. |
+| Host permissions: `https://www.youtube.com/*`, `https://tubitv.com/*`, `https://www.tubitv.com/*` | Built-in support for these two sites: the extension adds its buttons to video cards there and hides cards the user previously hid. On YouTube it also builds the Added Videos page for private windows (see Test instructions). |
+| Host permission: `https://i.ytimg.com/*` | Shows YouTube thumbnails for hidden and added videos. |
+| Optional host permissions: `https://*/*`, `http://*/*` | Requested one site at a time, only when the user chooses "Enable on this site" in the popup, to run the extension on a site the user picks or to enable one-click support for IMDb, TMDB, Dailymotion or Twitch. They are never requested in bulk, are always user initiated, and the user can revoke each one with "Disable on this site". |
+| Remote code | **No, I am not using remote code.** All scripts are packaged with the extension. |
+
+**Data usage disclosure** (tick what applies; this is my reading of the Chrome Web Store user data guidance, which says local-only handling still requires disclosure. Confirm against the wording in your dashboard.)
+
+- **Website content:** tick. The extension reads video links, titles and thumbnails from pages and stores those the user hides or adds.
+- **Web history:** tick conservatively. The extension stores the addresses of videos the user chooses to hide or add. It does not record browsing generally.
+- Leave unticked: personally identifiable information, health, financial, authentication, personal communications, location, user activity (clicks and keystrokes).
+
+**Certifications:** tick all three: not sold or transferred to third parties outside approved uses, not used for purposes unrelated to the single purpose, not used to determine creditworthiness or for lending. Certify compliance with the Limited Use policy.
+
+**Privacy policy URL:** [HOSTED URL OF store/privacy-policy.html]. It must be reachable without signing in.
+
+**Test instructions for reviewers** (paste into the Distribution/test instructions field):
+
+```
+No account or login is needed.
+1. Open https://tubitv.com/ (works logged out) and hover over any movie or TV tile: Hide and Add buttons appear at the top-right of the tile.
+2. Click Add on a tile (it shows "Added"), then Hide on another tile (it disappears; an Undo message appears).
+3. Click the AddOrHide toolbar icon: the hidden video is listed with Restore and Remove buttons. Click "Open added page" to see the added video, grouped under Tubi. Use the Sort by control and the Tag button there.
+4. YouTube is also supported: the home feed (shown only to signed-in users) and any creator's page (for example `https://www.youtube.com/@NASA`, Home, Videos, Shorts and Live tabs), which works signed out.
+5. Open https://www.imdb.com/chart/moviemeter/, open the popup and choose "Enable on this site". After the single-site permission prompt, Hide and Add buttons appear on the chart rows without using the picker.
+6. Any other site: open the popup on it and click "Enable on this site". The browser asks for permission for that single site, then a picker asks you to click one video tile.
+Note: browsers cannot open extension pages in private windows, so in a private window "Open added page" opens https://www.youtube.com/robots.txt#addorhide-added. The extension's content script (restricted to that exact address) draws the Added Videos page there from the local list. It reads nothing from YouTube and sends nothing to it.
+```
+
+---
+
+## 3. Distribution tab
+
+- **Visibility:** Public (or Unlisted for a beta first).
+- **Regions:** all.
+- **Trader status (EU):** if this is a free hobby project with no commercial activity you can usually declare non-trader. If you charge or run it as a business, you must declare trader status and publish contact details. Check the dashboard wording.
+
+---
+
+## 4. Before you submit
+
+1. **Fill the brackets** in the listing, the policy and the test instructions, and host the policy at a public address (a GitHub Pages file or any static page works). `store/privacy-policy.html` is a ready-to-host copy.
+2. **Run the extension unpacked in Brave and Chrome** and complete the test instructions above yourself. It has never been run as an installed extension; I checked its logic, pages and selectors on live sites but not the permission prompt, background worker or toolbar popup.
+3. **Confirm private-window storage:** hide something in a private window, close it, and see whether it is still hidden in a normal window. The policy says it is. If your test shows otherwise, fix the "Private windows" paragraph.
+4. **Take the screenshots** with mock content.
+5. **Bump the version** from `0.10.0-prerelease` to a release number (and drop `version_name`) when you are ready.
+6. **Expect a closer review:** requests for optional access to all sites and a content script on youtube.com/robots.txt are unusual. The justifications above explain both; keep them as written.
+7. **Do not add** keywords such as "YouTube downloader", "ad blocker" or other site names to the listing text beyond the factual mentions above, and never use site logos.

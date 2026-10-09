@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AddOrHide</title>
+  <link rel="stylesheet" href="pages.css">
+  <style>
+    .site-setting { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0; }
+    .page-details { margin-top: 4px; font-size: 11px; user-select: all; }
+  </style>
+</head>
+<body class="popup">
+  <main>
+    <header class="popup-header">
+      <div class="brand-lockup">
+        <img src="icons/icon32.png" width="32" height="32" alt="">
+        <div>
+          <h1>AddOrHide</h1>
+          <p class="muted">Take control of your feed.</p>
+        </div>
+      </div>
+    </header>
+    <section class="panel site-card" aria-labelledby="site-heading">
+      <div class="card-heading">
+        <div>
+          <p class="eyebrow">Current site</p>
+          <h2 id="site-heading">This site</h2>
+        </div>
+        <span class="section-mark" aria-hidden="true">✦</span>
+      </div>
+      <div id="site-content"></div>
+      <div id="site-status" class="status" role="status" aria-live="polite"></div>
+    </section>
+    <section class="panel hidden-card" aria-labelledby="hidden-heading">
+      <div class="card-heading">
+        <div>
+          <p class="eyebrow">Your quiet corner</p>
+          <h2 id="hidden-heading">Hidden videos <span id="hidden-count" class="count-badge">0</span></h2>
+        </div>
+        <div class="page-actions card-actions">
+          <button id="restore-all-button" class="secondary-button" type="button">Restore all</button>
+          <button id="remove-all-button" class="ghost-button danger-button" type="button">Remove all</button>
+        </div>
+      </div>
+      <div id="popup-list" class="popup-list" aria-live="polite"></div>
+      <p id="popup-empty" class="popup-empty muted" hidden>
+        <span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 32 32" focusable="false"><path d="M4 16s4.6-7 12-7c2.3 0 4.3.5 6 1.3M28 16s-4.6 7-12 7c-2.3 0-4.3-.5-6-1.3M5 5l22 22"/></svg></span>
+        <span>No hidden videos.</span>
+      </p>
+    </section>
+    <div class="popup-footer">
+      <button id="open-added-button" class="primary-button" type="button">Open added page</button>
+      <button id="open-options-button" class="ghost-button" type="button">Options</button>
+    </div>
+    <div id="popup-status" class="status popup-toast" role="status" aria-live="polite"></div>
+  </main>
+  <script src="shared.js"></script>
+  <script src="catalog.js"></script>
+  <script src="sites.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
