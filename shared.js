@@ -411,6 +411,13 @@ var HOA = Object.freeze((() => {
     return SITE_NAMES[hostname] || hostname;
   }
 
+  function hiddenSummaryText(count) {
+    if (!Number.isInteger(count) || count <= 0) {
+      return "No hidden videos.";
+    }
+    return count === 1 ? "There is 1 hidden video." : `There are ${count} hidden videos.`;
+  }
+
   function playerFor(key, title) {
     let url;
     try {
@@ -1265,6 +1272,7 @@ var HOA = Object.freeze((() => {
     parseDate,
     splitGenres,
     siteDisplayName,
+    hiddenSummaryText,
     siteMonogram,
     typeLabel,
     formatDuration,

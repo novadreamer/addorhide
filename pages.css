@@ -79,19 +79,8 @@ input[type="checkbox"][role="switch"]::after { position: absolute; top: 3px; lef
 input[type="checkbox"][role="switch"]:checked { background: var(--accent); }
 input[type="checkbox"][role="switch"]:checked::after { left: 19px; }
 
-.popup-list { max-height: 302px; overflow-y: auto; scrollbar-color: var(--border) transparent; }
-.popup-row { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 62px; max-height: 100px; padding: 10px 0; overflow: hidden; border-top: 1px solid var(--border); }
-.popup-row:first-child { border-top: 0; }
-.popup-row img, .popup-row .hoa-placeholder { display: block; width: 72px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--radius-sm); background: var(--surface-2); }
-.popup-title { display: flex; min-width: 0; gap: 5px; align-items: center; flex-wrap: wrap; }
-.popup-title a { display: -webkit-box; overflow: hidden; flex: 1 1 100%; color: var(--text); font-weight: 600; line-height: 1.3; text-decoration: none; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.popup-title a:hover { color: var(--accent); }
-.popup-kind, .site-chip { display: inline-block; padding: 2px 6px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; font-size: 10px; line-height: 1.25; }
-.popup-kind { color: var(--accent); }
 .video-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-.popup-row button, .video-actions button { min-height: 28px; padding: 3px 8px; font-size: 12px; }
-.popup-row .video-actions button:last-child { color: var(--danger); background: transparent; border-color: transparent; }
-.popup-empty, .empty-state { display: flex; gap: 10px; align-items: center; margin: 14px 0 4px; }
+.empty-state { display: flex; gap: 10px; align-items: center; margin: 14px 0 4px; }
 .empty-icon { display: inline-grid; flex: 0 0 auto; width: 32px; height: 32px; place-items: center; color: var(--accent); background: var(--surface-2); border-radius: 10px; }
 .empty-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .popup-footer { justify-content: space-between; margin-top: 14px; }
@@ -113,8 +102,6 @@ input[type="checkbox"][role="switch"]:checked::after { left: 19px; }
 
 @media (prefers-reduced-motion: no-preference) {
   button, a, .panel { transition: background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out, opacity 160ms ease-out, transform 160ms ease-out, box-shadow 160ms ease-out; }
-  .popup-row { transition: max-height 180ms ease-out, padding 180ms ease-out, opacity 180ms ease-out, transform 180ms ease-out; }
-  .popup-row.is-leaving { max-height: 0; min-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; transform: translateX(8px); overflow: hidden; }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -128,7 +115,7 @@ input[type="checkbox"][role="switch"]:checked::after { left: 19px; }
 }
 
 
-/* Popup compaction: everything must fit the 600px popup; only the hidden list scrolls. */
+/* Popup compaction: everything must fit the 600px popup. */
 body.popup main { display: flex; flex-direction: column; max-height: 576px; min-height: 0; }
 .popup .popup-header { margin-bottom: 8px; padding: 0 0 6px; }
 .popup .brand-lockup img { width: 28px; height: 28px; }
@@ -141,20 +128,15 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 .popup #site-content > p:first-child { font-weight: 600; font-size: 14px; }
 .popup button { min-height: 28px; padding: 4px 10px; font-size: 12.5px; }
 .popup .page-actions { gap: 6px; }
-.popup .hidden-card { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; margin-bottom: 8px; }
-.popup .hidden-card .card-heading { flex: 0 0 auto; margin-bottom: 6px; }
-.popup .hidden-card h2 { font-size: 15px; }
-.popup .popup-list { flex: 1 1 auto; min-height: 96px; max-height: none; overflow-y: auto; scrollbar-width: thin; }
-.popup-row { grid-template-columns: 64px minmax(0, 1fr) 62px; min-height: 52px; gap: 8px; padding: 8px 0; }
-.popup-row img, .popup-row .hoa-placeholder { width: 64px; }
-.popup .popup-row .video-actions { flex-direction: column; align-items: stretch; gap: 2px; }
-.popup .popup-row .video-actions button { min-height: 24px; padding: 2px 6px; font-size: 12px; }
+.popup .hidden-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px; flex: 0 0 auto; }
+.hidden-open-button { min-width: 180px; min-height: 40px; font-size: 16px; }
+.hidden-open-button:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; animation: none; filter: none; }
+.hidden-summary { margin: 0; text-align: center; }
 .popup .popup-footer { flex: 0 0 auto; margin-top: 0; }
 
 /* The [hidden] attribute must win over component display rules (empty states, banners, toasts). */
 [hidden] { display: none !important; }
 .status:empty { display: none; }
-.popup .popup-list { padding-right: 4px; }
 
 /* Options > Sites: name and state pills on the left, actions pinned right. */
 .site-list .site-list-row { justify-content: space-between; align-items: center; flex-wrap: nowrap; }
@@ -210,8 +192,6 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
    everything still cannot fit the 600px popup, the popup scrolls as a whole. */
 body.popup main { overflow-y: auto; scrollbar-width: thin; }
 .popup .site-card, .popup .popup-edge, .popup .popup-footer { flex: 0 0 auto; }
-.popup .hidden-card { overflow: hidden; min-height: 150px; }
-.popup .popup-list { min-height: 62px; }
 .popup .button-controls { gap: 24px; }
 .popup .button-controls .press-button.toggle-button { min-height: 40px; }
 
@@ -221,10 +201,3 @@ body.popup main { overflow-y: auto; scrollbar-width: thin; }
 /* Breathing room under the position arrows (popup footer / end of the options panel). */
 .button-controls { padding-bottom: 14px; }
 .popup .popup-edge { margin-bottom: 14px; }
-/* Hidden videos panel sizes to its content: compact when empty, growing row by row until the popup is full,
-   then its list scrolls. The no-overlap minimum only applies once it actually has rows. */
-.popup .hidden-card { flex: 0 1 auto; min-height: 0; }
-.popup .hidden-card:has(.popup-row) { min-height: 150px; }
-.popup .popup-list { min-height: 0; }
-.popup .popup-list:empty { display: none; }
-.popup .popup-list:not(:empty) { min-height: 62px; }

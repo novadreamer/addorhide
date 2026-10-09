@@ -219,6 +219,11 @@ check("type live", () => assert.equal(HOA.typeOf("https://example.com/live/title
 check("type default", () => assert.equal(HOA.typeOf("https://example.com/watch/title"), "video"));
 check("known site display name", () => assert.equal(HOA.siteDisplayName("www.youtube.com"), "YouTube"));
 check("unknown site display name", () => assert.equal(HOA.siteDisplayName("www.example.com"), "example.com"));
+check("hidden summary empty and invalid", () => assert.deepEqual(
+  [HOA.hiddenSummaryText(0), HOA.hiddenSummaryText(-1), HOA.hiddenSummaryText("1")],
+  ["No hidden videos.", "No hidden videos.", "No hidden videos."]));
+check("hidden summary singular", () => assert.equal(HOA.hiddenSummaryText(1), "There is 1 hidden video."));
+check("hidden summary plural", () => assert.equal(HOA.hiddenSummaryText(3), "There are 3 hidden videos."));
 check("site monogram stable", () => assert.deepEqual(HOA.siteMonogram("example.com"), HOA.siteMonogram("example.com")));
 check("site monogram hue", () => assert.ok(HOA.siteMonogram("example.com").hue >= 0 && HOA.siteMonogram("example.com").hue <= 359));
 check("type labels", () => assert.equal(HOA.typeLabel("tv"), "TV"));

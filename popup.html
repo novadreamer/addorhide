@@ -32,22 +32,9 @@
       <div id="site-content"></div>
       <div id="site-status" class="status" role="status" aria-live="polite"></div>
     </section>
-    <section class="panel hidden-card" aria-labelledby="hidden-heading">
-      <div class="card-heading">
-        <div>
-          <p class="eyebrow">Your quiet corner</p>
-          <h2 id="hidden-heading">Hidden videos <span id="hidden-count" class="count-badge">0</span></h2>
-        </div>
-        <div class="page-actions card-actions">
-          <button id="restore-all-button" class="secondary-button" type="button">Restore all</button>
-          <button id="remove-all-button" class="ghost-button danger-button" type="button">Remove all</button>
-        </div>
-      </div>
-      <div id="popup-list" class="popup-list" aria-live="polite"></div>
-      <p id="popup-empty" class="popup-empty muted" hidden>
-        <span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 32 32" focusable="false"><path d="M4 16s4.6-7 12-7c2.3 0 4.3.5 6 1.3M28 16s-4.6 7-12 7c-2.3 0-4.3-.5-6-1.3M5 5l22 22"/></svg></span>
-        <span>No hidden videos.</span>
-      </p>
+    <section class="panel hidden-card" aria-label="Hidden videos">
+      <button id="open-hidden-button" class="primary-button hidden-open-button press-button" type="button" aria-describedby="hidden-summary">Hidden Videos</button>
+      <p id="hidden-summary" class="hidden-summary muted">No hidden videos.</p>
     </section>
     <div class="popup-edge">
       <div class="button-controls">

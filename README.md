@@ -18,7 +18,7 @@ AddOrHide uses a calm indigo-and-violet interface with warm neutrals, clear cont
 2. Turn on Developer mode.
 3. Choose **Load unpacked** and select this folder.
 
-On a recommendation card, **Hide** removes the video from the feed and provides a six-second Undo. **Add** saves the video while leaving it in the feed; clicking **Added** removes it from the Added list. The popup can Restore a hidden video, which returns it to the normal feed without adding it, or Remove it from the popup list while keeping it hidden.
+On a recommendation card, **Hide** removes the video from the feed and provides a six-second Undo. **Add** saves the video while leaving it in the feed; clicking **Added** removes it from the Added list. The popup has a **Hidden Videos** button and count line; it opens a Hidden videos window grouped by website with collapsible sections, **Restore**/**Remove** per video, and **Restore all**/**Remove all** controls.
 
 The **Added Videos** page contains only videos explicitly added. It groups entries by website with favicon logo tiles (no brand logos are bundled), and each site shows only the sort and group options that would change something for its videos (date added, date published or year, views, votes, rating, duration, A-Z; by type, by genre). Groups follow the chosen sort, and the page keeps its scroll position when you sort, group, collapse or tag. The inline **Tag** editor lets you add or correct a type and comma-separated genres for sites that do not expose those details. The picker can learn up to twelve cumulative card patterns per site (**Teach cards** / **Teach more cards**).
 

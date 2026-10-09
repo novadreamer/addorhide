@@ -1,10 +1,7 @@
 "use strict";
 
-const hiddenCount = document.getElementById("hidden-count");
-const restoreAllButton = document.getElementById("restore-all-button");
-const removeAllButton = document.getElementById("remove-all-button");
-const popupList = document.getElementById("popup-list");
-const popupEmpty = document.getElementById("popup-empty");
+const openHiddenButton = document.getElementById("open-hidden-button");
+const hiddenSummary = document.getElementById("hidden-summary");
 const popupStatus = document.getElementById("popup-status");
 const openAddedButton = document.getElementById("open-added-button");
 const openOptionsButton = document.getElementById("open-options-button");
@@ -12,7 +9,6 @@ const siteContent = document.getElementById("site-content");
 const siteStatus = document.getElementById("site-status");
 
 let hidden = {};
-let removeConfirmTimer = 0;
 let activeTab = null;
 let activeHost = "";
 
@@ -69,13 +65,6 @@ let siteRules = {};
 function setStatus(message, kind = "") {
   popupStatus.textContent = message;
   popupStatus.className = `status ${kind}`.trim();
-}
-
-function placeholder() {
-  const node = document.createElement("div");
-  node.className = "hoa-placeholder";
-  node.setAttribute("aria-hidden", "true");
-  return node;
 }
 
 function button(label, action) {
@@ -278,120 +267,19 @@ function loadSite() {
 }
 
 function render() {
-  while (popupList.firstChild) {
-    popupList.firstChild.remove();
-  }
-  const entries = HOA.listedHidden(hidden);
-  hiddenCount.textContent = entries.length;
-  hiddenCount.setAttribute("aria-label", `Hidden videos (${entries.length})`);
-  restoreAllButton.disabled = entries.length === 0;
-  removeAllButton.disabled = entries.length === 0;
-  popupEmpty.hidden = entries.length !== 0;
-  entries.forEach(([key, entry]) => {
-    const row = document.createElement("div");
-    row.className = "popup-row";
-    if (entry.thumb) {
-      const image = document.createElement("img");
-      image.src = entry.thumb;
-      image.alt = "";
-      image.loading = "lazy";
-      row.appendChild(image);
-    } else {
-      row.appendChild(placeholder());
-    }
-    const titleWrap = document.createElement("span");
-    titleWrap.className = "popup-title";
-    const href = HOA.safeHref(key);
-    if (href) {
-      const link = document.createElement("a");
-      link.href = href;
-      link.textContent = entry.title;
-      link.addEventListener("click", event => {
-        event.preventDefault();
-        openInThisWindow(href);
-      });
-      titleWrap.appendChild(link);
-    } else {
-      titleWrap.textContent = entry.title;
-    }
-    const site = document.createElement("span");
-    site.className = "site-chip";
-    site.textContent = entry.site;
-    titleWrap.appendChild(site);
-    if (entry.kind === "short") {
-      const kind = document.createElement("span");
-      kind.className = "popup-kind";
-      kind.textContent = "Short";
-      titleWrap.appendChild(kind);
-    }
-    row.appendChild(titleWrap);
-    const actions = document.createElement("span");
-    actions.className = "video-actions";
-    const restoreButton = button("Restore", () => restore([key], row));
-    restoreButton.className = "secondary-button";
-    actions.appendChild(restoreButton);
-    const removeButton = button("Remove", () => remove([key], row));
-    removeButton.className = "ghost-button danger-button";
-    actions.appendChild(removeButton);
-    row.appendChild(actions);
-    popupList.appendChild(row);
-  });
+  const count = HOA.listedHidden(hidden).length;
+  openHiddenButton.disabled = count === 0;
+  hiddenSummary.textContent = HOA.hiddenSummaryText(count);
 }
 
-function animateRow(row, action) {
-  const reduced = typeof window.matchMedia === "function"
-    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (!row || reduced) {
-    action();
-    return;
-  }
-  let finished = false;
-  const finish = () => {
-    if (finished) {
-      return;
-    }
-    finished = true;
-    row.removeEventListener("transitionend", onTransitionEnd);
-    action();
-  };
-  const onTransitionEnd = event => {
-    if (event.target === row && (event.propertyName === "opacity" || event.propertyName === "max-height")) {
-      finish();
-    }
-  };
-  row.addEventListener("transitionend", onTransitionEnd);
-  row.classList.add("is-leaving");
-  window.setTimeout(finish, 180);
-}
-
-function restore(keys, row) {
-  animateRow(row, () => {
-    hidden = HOA.restoreKeys(hidden, keys);
-    HOA.writeLists({ hidden }, () => setStatus("Returned to feed."));
-  });
-}
-
-function remove(keys, row) {
-  animateRow(row, () => {
-    hidden = HOA.removeFromList(hidden, keys);
-    HOA.writeLists({ hidden }, () => setStatus("Removed from the list; videos remain hidden."));
-  });
-}
-
-restoreAllButton.addEventListener("click", () => restore(HOA.listedHidden(hidden).map(([key]) => key)));
-removeAllButton.addEventListener("click", () => {
-  if (removeConfirmTimer) {
-    clearTimeout(removeConfirmTimer);
-    removeConfirmTimer = 0;
-    remove(HOA.listedHidden(hidden).map(([key]) => key));
-    removeAllButton.textContent = "Remove all";
-    return;
-  }
-  removeAllButton.textContent = "Confirm remove all?";
-  removeConfirmTimer = window.setTimeout(() => {
-    removeConfirmTimer = 0;
-    removeAllButton.textContent = "Remove all";
-  }, 4000);
+openHiddenButton.addEventListener("click", () => {
+  chrome.windows.getCurrent(win => chrome.runtime.sendMessage({
+    type: "hoa-open-hidden",
+    windowId: win && Number.isInteger(win.id) ? win.id : undefined
+  }, () => {
+    void chrome.runtime.lastError;
+    window.close();
+  }));
 });
 
 function openInThisWindow(url) {

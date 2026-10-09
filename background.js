@@ -120,21 +120,24 @@ function focusPlayerWindow(windowId, sendResponse) {
 
 const PLAYER_WIDTH = 900;
 const PLAYER_HEIGHT = 560;
+const HIDDEN_WINDOW_KEY = "hoaHiddenWindow";
+const HIDDEN_WIDTH = 720;
+const HIDDEN_HEIGHT = 680;
 
 // A new player window opens centred over the browser window the user clicked from (the worker cannot read the
 // screen size). It shrinks to fit a smaller window. A reused window stays wherever the user moved it.
-function centredBounds(sourceWindowId, callback) {
+function centredBounds(sourceWindowId, wantedWidth, wantedHeight, callback) {
   if (!Number.isInteger(sourceWindowId)) {
-    callback({ width: PLAYER_WIDTH, height: PLAYER_HEIGHT });
+    callback({ width: wantedWidth, height: wantedHeight });
     return;
   }
   chrome.windows.get(sourceWindowId, source => {
     if (chrome.runtime.lastError || !source || !Number.isFinite(source.width) || !Number.isFinite(source.height)) {
-      callback({ width: PLAYER_WIDTH, height: PLAYER_HEIGHT });
+      callback({ width: wantedWidth, height: wantedHeight });
       return;
     }
-    const width = Math.max(480, Math.min(PLAYER_WIDTH, source.width - 40));
-    const height = Math.max(300, Math.min(PLAYER_HEIGHT, source.height - 40));
+    const width = Math.max(480, Math.min(wantedWidth, source.width - 40));
+    const height = Math.max(300, Math.min(wantedHeight, source.height - 40));
     callback({
       width,
       height,
@@ -145,7 +148,7 @@ function centredBounds(sourceWindowId, callback) {
 }
 
 function createPlayerWindow(hash, incognito, mode, sourceWindowId, sendResponse) {
-  centredBounds(sourceWindowId, bounds => chrome.windows.create({
+  centredBounds(sourceWindowId, PLAYER_WIDTH, PLAYER_HEIGHT, bounds => chrome.windows.create({
     url: `${HOA.PLAYER_URL}#${hash}`,
     type: "popup",
     ...bounds,
@@ -162,6 +165,47 @@ function createPlayerWindow(hash, incognito, mode, sourceWindowId, sendResponse)
         return;
       }
       sendResponse({ ok: true });
+    });
+  }));
+}
+
+function openHiddenWindow(sourceWindowId, sendResponse) {
+  const url = chrome.runtime.getURL("hidden.html");
+  chrome.storage.session.get({ [HIDDEN_WINDOW_KEY]: null }, result => {
+    if (chrome.runtime.lastError) {
+      sendResponse({ ok: false, error: playerError() });
+      return;
+    }
+    const rememberedId = result[HIDDEN_WINDOW_KEY];
+    if (Number.isInteger(rememberedId)) {
+      chrome.windows.get(rememberedId, existing => {
+        if (!chrome.runtime.lastError && existing && Number.isInteger(existing.id)) {
+          chrome.windows.update(existing.id, { focused: true }, () => {
+            sendResponse(chrome.runtime.lastError ? { ok: false, error: playerError() } : { ok: true });
+          });
+          return;
+        }
+        createHiddenWindow(url, sourceWindowId, sendResponse);
+      });
+      return;
+    }
+    createHiddenWindow(url, sourceWindowId, sendResponse);
+  });
+}
+
+function createHiddenWindow(url, sourceWindowId, sendResponse) {
+  centredBounds(sourceWindowId, HIDDEN_WIDTH, HIDDEN_HEIGHT, bounds => chrome.windows.create({
+    url,
+    type: "popup",
+    ...bounds,
+    focused: true
+  }, created => {
+    if (chrome.runtime.lastError || !created || !Number.isInteger(created.id)) {
+      sendResponse({ ok: false, error: playerError() });
+      return;
+    }
+    chrome.storage.session.set({ [HIDDEN_WINDOW_KEY]: created.id }, () => {
+      sendResponse(chrome.runtime.lastError ? { ok: false, error: playerError() } : { ok: true });
     });
   }));
 }
@@ -211,6 +255,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   const tab = sender && sender.tab;
   openPlayerWindow(message.hash, Boolean(tab && tab.incognito), tab ? tab.windowId : undefined, sendResponse);
+  return true;
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "hoa-open-hidden") {
+    return undefined;
+  }
+  const sourceWindowId = Number.isInteger(message.windowId) ? message.windowId : undefined;
+  openHiddenWindow(sourceWindowId, sendResponse);
   return true;
 });
 
