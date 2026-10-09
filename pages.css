@@ -220,3 +220,10 @@ body.popup main { overflow-y: auto; scrollbar-width: thin; }
 /* Breathing room under the position arrows (popup footer / end of the options panel). */
 .button-controls { padding-bottom: 14px; }
 .popup .popup-edge { margin-bottom: 14px; }
+/* Hidden videos panel sizes to its content: compact when empty, growing row by row until the popup is full,
+   then its list scrolls. The no-overlap minimum only applies once it actually has rows. */
+.popup .hidden-card { flex: 0 1 auto; min-height: 0; }
+.popup .hidden-card:has(.popup-row) { min-height: 150px; }
+.popup .popup-list { min-height: 0; }
+.popup .popup-list:empty { display: none; }
+.popup .popup-list:not(:empty) { min-height: 62px; }
