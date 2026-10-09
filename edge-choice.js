@@ -13,9 +13,14 @@ function bindButtonControls(toggle, edgeGroup) {
     button.classList.add("is-pressed");
   };
   const showEnabled = enabled => {
-    toggle.textContent = enabled ? "Enabled" : "Disabled";
+    toggle.textContent = enabled ? "Enable" : "Disable";
     toggle.setAttribute("aria-pressed", String(enabled));
-    toggle.title = enabled ? "Click to hide the AddOrHide buttons on every site" : "Click to show the AddOrHide buttons again";
+    toggle.title = enabled ? "Click to hide the hover buttons on every site" : "Click to show the hover buttons again";
+    const note = document.getElementById("buttons-toggle-note");
+    if (note) {
+      note.textContent = enabled ? "Enable to show the hover buttons on thumbnails"
+        : "Disable to hide the hover buttons on thumbnails";
+    }
     // Position only matters while the buttons are shown.
     edgeButtons.forEach(button => {
       button.disabled = !enabled;
