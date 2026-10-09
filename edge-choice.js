@@ -1,6 +1,6 @@
 "use strict";
 
-// The AddOrHide buttons controls shared by the popup and the options page: one Enabled/Disabled toggle and the
+// The AddOrHide buttons controls shared by the popup and the options page: one Enable/Disable button and the
 // Top/Bottom position buttons. They apply to every site; open pages follow as soon as a value changes.
 function bindButtonControls(toggle, edgeGroup) {
   if (!toggle || !edgeGroup) {
@@ -13,13 +13,14 @@ function bindButtonControls(toggle, edgeGroup) {
     button.classList.add("is-pressed");
   };
   const showEnabled = enabled => {
-    toggle.textContent = enabled ? "Enable" : "Disable";
-    toggle.setAttribute("aria-pressed", String(enabled));
-    toggle.title = enabled ? "Click to hide the hover buttons on every site" : "Click to show the hover buttons again";
+    // The button names what clicking it does: red Disable while the hover buttons show, green Enable while they
+    // are hidden.
+    toggle.textContent = enabled ? "Disable" : "Enable";
+    toggle.dataset.enabled = String(enabled);
     const note = document.getElementById("buttons-toggle-note");
     if (note) {
-      note.textContent = enabled ? "Enable to show the hover buttons on thumbnails"
-        : "Disable to hide the hover buttons on thumbnails";
+      note.textContent = enabled ? "Disable to hide the hover buttons on thumbnails"
+        : "Enable to show the hover buttons on thumbnails";
     }
     // Position only matters while the buttons are shown.
     edgeButtons.forEach(button => {
@@ -39,7 +40,7 @@ function bindButtonControls(toggle, edgeGroup) {
     showEdge(HOA.buttonEdgeOf(result[HOA.BUTTON_EDGE_KEY]));
   });
   toggle.addEventListener("click", () => {
-    const enabled = toggle.getAttribute("aria-pressed") !== "true";
+    const enabled = toggle.dataset.enabled !== "true";
     press(toggle);
     showEnabled(enabled);
     chrome.storage.local.set({ [HOA.BUTTONS_ENABLED_KEY]: enabled });

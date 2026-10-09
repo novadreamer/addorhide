@@ -184,8 +184,9 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
   box-shadow: 0 2px 0 rgba(0, 0, 0, .18), 0 3px 8px rgba(0, 0, 0, .08);
   transition: transform 90ms ease-out, box-shadow 90ms ease-out, background-color 150ms ease-out;
 }
+/* Action colours: green Enable (buttons hidden now), red Disable (buttons showing now). */
 .button-controls .toggle-button { color: #fff; background: #1f9d55; border: 1px solid #188546; }
-.button-controls .toggle-button[aria-pressed="false"] { background: #d93a49; border-color: #b72f3c; }
+.button-controls .toggle-button[data-enabled="true"] { background: #d93a49; border-color: #b72f3c; }
 .button-controls .edge-button { color: #1d1d27; background: #fff; border: 1px solid #cfcde0; }
 .button-controls .edge-button[aria-pressed="true"] { background: #ffd23f; border-color: #e0b400; }
 .button-controls .edge-button:disabled { opacity: .45; cursor: default; box-shadow: none; }
