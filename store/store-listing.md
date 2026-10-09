@@ -52,6 +52,7 @@ GOOD TO KNOW
 - AddOrHide never hides or changes ads and never downloads videos.
 - Details such as duration, views and genre appear only when the site shows them on the video's card. You can tag the rest yourself.
 - Websites change their layout from time to time, which can occasionally affect the buttons. Please report problems at mybrainnoor@gmail.com.
+- AddOrHide is free, with every feature included. If you find it useful, you can support it at https://ko-fi.com/elbrainnoor (optional).
 
 AddOrHide is an independent project and is not affiliated with, endorsed by or sponsored by YouTube, Google, Tubi or any other streaming service. All product names and trademarks belong to their owners.
 ```

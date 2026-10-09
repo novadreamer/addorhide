@@ -305,6 +305,10 @@ function openAddedPage() {
 
 openAddedButton.addEventListener("click", openAddedPage);
 openOptionsButton.addEventListener("click", () => openInThisWindow(chrome.runtime.getURL("options.html")));
+document.getElementById("support-link").addEventListener("click", event => {
+  event.preventDefault();
+  openInThisWindow(HOA.SUPPORT_URL);
+});
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.ADDED_KEY])) {
     HOA.readLists(lists => { hidden = lists.hidden; render(); });

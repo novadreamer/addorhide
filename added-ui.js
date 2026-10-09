@@ -67,9 +67,20 @@ const HOA_ADDED = (() => {
     intro.appendChild(element("h1", "", "Added Videos"));
     intro.appendChild(element("p", "muted", "Only videos you added are shown here."));
     header.appendChild(intro);
+    const headerActions = element("div", "added-header-actions");
+    const support = element("a", "support-link");
+    const heart = element("span", "", "♥");
+    heart.setAttribute("aria-hidden", "true");
+    support.append(heart, " Support");
+    support.href = HOA.SUPPORT_URL;
+    support.target = "_blank";
+    support.rel = "noopener noreferrer";
+    support.title = "Support AddOrHide on Ko-fi";
+    headerActions.appendChild(support);
     const clearButton = element("button", "ghost-button danger-button", "Clear page");
     clearButton.type = "button";
-    header.appendChild(clearButton);
+    headerActions.appendChild(clearButton);
+    header.appendChild(headerActions);
     rootElement.appendChild(header);
 
     const empty = element("p", "empty-state muted");

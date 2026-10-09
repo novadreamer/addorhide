@@ -19,6 +19,7 @@ body.hoa-added-view main {
 }
 
 .hoa-added-page .added-header h1 { margin-bottom: 4px; }
+.hoa-added-page .added-header-actions { display: flex; flex: none; gap: 14px; align-items: center; }
 .hoa-added-page .added-header .muted { max-width: 540px; margin-bottom: 0; }
 .hoa-added-page .count-badge {
   display: inline-grid;

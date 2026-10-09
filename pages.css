@@ -201,3 +201,10 @@ body.popup main { overflow-y: auto; scrollbar-width: thin; }
 /* Breathing room under the position arrows (popup footer / end of the options panel). */
 .button-controls { padding-bottom: 14px; }
 .popup .popup-edge { margin-bottom: 14px; }
+
+/* Optional Ko-fi tip link: quiet text link, never a button that competes with the real controls. */
+.support-link { color: var(--accent); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; border-radius: 6px; }
+.support-link:hover, .support-link:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+.support-link span { display: inline-block; color: #e0457b; transition: transform 140ms ease-out; }
+.support-link:hover span { transform: scale(1.25); }
+.support-line { margin-top: 6px; font-size: 13px; }

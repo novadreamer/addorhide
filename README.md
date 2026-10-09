@@ -42,6 +42,10 @@ In private windows, the Added Videos page uses the hosted view at `youtube.com/r
 
 Storage is local to this browser and is not synced between devices. Added items are capped at 500 and hidden items at 1000, with the oldest entries evicted first. **Hide the whole feed** toggles for YouTube and Tubi are in Options (and in the popup for the current site) and are reversible from the same toggle.
 
+## Support link
+
+An optional Ko-fi tip link (`HOA.SUPPORT_URL`, https://ko-fi.com/elbrainnoor) appears as a quiet "♥ Support" text link in the popup footer, the Options page header and the Added Videos page header. It only opens the Ko-fi page; no feature depends on it and nothing is sent to Ko-fi.
+
 ## Permissions
 
 - `storage` saves hidden videos, Added videos, and learned site rules locally.
