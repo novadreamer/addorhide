@@ -25,12 +25,16 @@
       <h2 id="edge-heading">AddOrHide buttons</h2>
       <p class="muted">Show or hide the buttons on every site, and choose where they appear. Videos you hid stay hidden either way.</p>
       <div class="button-controls">
-        <span class="control-label">AddOrHide buttons</span>
-        <button id="buttons-toggle" class="toggle-button press-button" type="button" aria-pressed="true">Enabled</button>
-        <span id="position-label" class="control-label">Position</span>
-        <div id="button-edge" class="position-buttons" role="group" aria-labelledby="position-label">
-          <button class="edge-button press-button" type="button" data-edge="top" aria-pressed="false" aria-label="Top" title="Top"><span aria-hidden="true">&#9650;</span></button>
-          <button class="edge-button press-button" type="button" data-edge="bottom" aria-pressed="false" aria-label="Bottom" title="Bottom"><span aria-hidden="true">&#9660;</span></button>
+        <div class="control-row">
+          <span class="control-label">AddOrHide buttons</span>
+          <button id="buttons-toggle" class="toggle-button press-button" type="button" aria-pressed="true">Enabled</button>
+        </div>
+        <div class="control-row position-row">
+          <span id="position-label" class="control-label">Position</span>
+          <div id="button-edge" class="position-buttons" role="group" aria-labelledby="position-label">
+            <button class="edge-button press-button" type="button" data-edge="top" aria-pressed="false" aria-label="Top" title="Top"><span aria-hidden="true">&#9650;</span></button>
+            <button class="edge-button press-button" type="button" data-edge="bottom" aria-pressed="false" aria-label="Bottom" title="Bottom"><span aria-hidden="true">&#9660;</span></button>
+          </div>
         </div>
       </div>
     </section>

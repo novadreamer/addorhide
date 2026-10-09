@@ -165,16 +165,11 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 /* AddOrHide buttons controls (popup and options): one Enabled/Disabled toggle, then the Position label to the
    left of the stacked Top and Bottom buttons, all centred. */
 .popup-edge { margin: 0 0 10px; }
-.button-controls {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 8px 12px;
-  align-items: center;
-  justify-content: center;
-}
-.button-controls .control-label { justify-self: end; font-weight: 600; }
-.position-buttons { display: grid; gap: 6px; margin-top: 8px; }
-.button-controls #position-label { margin-top: 8px; }
+/* Each row is centred on its own, so the shorter "Position" row is not pushed aside by the longer label above. */
+.button-controls { display: grid; gap: 14px; justify-items: center; }
+.control-row { display: flex; gap: 12px; align-items: center; }
+.button-controls .control-label { font-weight: 600; }
+.position-buttons { display: grid; gap: 6px; }
 .button-controls .edge-button { font-size: 15px; line-height: 1; }
 .button-controls .press-button {
   min-width: 112px;
