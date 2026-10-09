@@ -14,6 +14,10 @@ const hiddenStatus = document.getElementById("hidden-status");
 const openAddedButton = document.getElementById("open-added-button");
 const siteList = document.getElementById("site-list");
 const siteEmpty = document.getElementById("site-empty");
+const exportDataButton = document.getElementById("export-data-button");
+const importDataButton = document.getElementById("import-data-button");
+const importDataInput = document.getElementById("import-data-input");
+const dataStatus = document.getElementById("data-status");
 
 let hidden = {};
 let added = {};
@@ -234,6 +238,118 @@ function openAddedPage() {
   });
 }
 openAddedButton.addEventListener("click", openAddedPage);
+
+function storageSnapshot(callback) {
+  chrome.storage.local.get({
+    [HOA.HIDDEN_KEY]: {},
+    [HOA.ADDED_KEY]: {},
+    [HOA.SITES_KEY]: {},
+    [HOA.PREFS_KEY]: {}
+  }, callback);
+}
+
+function exportData() {
+  storageSnapshot(result => {
+    const manifest = chrome.runtime.getManifest ? chrome.runtime.getManifest() : {};
+    const backup = HOA.buildBackup({
+      hidden: result[HOA.HIDDEN_KEY],
+      added: result[HOA.ADDED_KEY],
+      siteRules: result[HOA.SITES_KEY],
+      prefs: result[HOA.PREFS_KEY]
+    }, manifest.version || "", Date.now());
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `addorhide-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 0);
+    setStatus(dataStatus, "Your AddOrHide data was exported.", "success");
+  });
+}
+
+function permissionPattern(host, rule) {
+  return HOA_SITES.matchPattern(host, rule && rule.scheme === "http" ? "http" : "https");
+}
+
+function findMissingPermissions(rules, callback) {
+  const hosts = Object.keys(rules || {}).filter(host => rules[host] && rules[host].enabled === true
+    && !HOA_SITES.isBuiltIn(host));
+  const missing = [];
+  let index = 0;
+  const next = () => {
+    if (index >= hosts.length) {
+      callback(missing);
+      return;
+    }
+    const host = hosts[index++];
+    if (!chrome.permissions || typeof chrome.permissions.contains !== "function") {
+      missing.push(host);
+      next();
+      return;
+    }
+    chrome.permissions.contains({ origins: [permissionPattern(host, rules[host])] }, granted => {
+      if (!granted) {
+        missing.push(host);
+      }
+      next();
+    });
+  };
+  next();
+}
+
+function importDataFile(file) {
+  if (!file || file.size > 5 * 1024 * 1024) {
+    setStatus(dataStatus, "Import failed: choose a JSON file no larger than 5 MB.", "error");
+    return;
+  }
+  file.text().then(text => {
+    const parsed = HOA.parseBackup(text);
+    if (!parsed.ok) {
+      setStatus(dataStatus, `Import failed: ${parsed.error}`, "error");
+      return;
+    }
+    storageSnapshot(current => {
+      const merged = HOA.mergeBackup({
+        hidden: current[HOA.HIDDEN_KEY],
+        added: current[HOA.ADDED_KEY],
+        siteRules: current[HOA.SITES_KEY],
+        prefs: current[HOA.PREFS_KEY]
+      }, parsed.backup);
+      const question = `Add ${merged.counts.added} videos to Added, ${merged.counts.hidden} hidden videos and settings for ${merged.counts.sites} sites? Nothing you already have is deleted.`;
+      if (!window.confirm(question)) {
+        return;
+      }
+      chrome.storage.local.set({
+        [HOA.HIDDEN_KEY]: merged.hidden,
+        [HOA.ADDED_KEY]: merged.added,
+        [HOA.SITES_KEY]: merged.siteRules,
+        [HOA.PREFS_KEY]: merged.prefs
+      }, () => {
+        if (chrome.runtime.lastError) {
+          setStatus(dataStatus, "Import failed: could not save your data.", "error");
+          return;
+        }
+        findMissingPermissions(parsed.backup.siteRules, missing => {
+          const suffix = missing.length ? ` Enable on this site again for: ${missing.join(", ")}.` : "";
+          setStatus(dataStatus, `Imported ${merged.counts.added} added, ${merged.counts.hidden} hidden and ${merged.counts.sites} site settings.${suffix}`, "success");
+          hidden = merged.hidden;
+          added = merged.added;
+          siteRules = merged.siteRules;
+          renderHidden();
+          renderSites();
+        });
+      });
+    });
+  }).catch(() => setStatus(dataStatus, "Import failed: could not read the file.", "error"));
+}
+
+exportDataButton.addEventListener("click", exportData);
+importDataButton.addEventListener("click", () => importDataInput.click());
+importDataInput.addEventListener("change", () => {
+  const file = importDataInput.files && importDataInput.files[0];
+  importDataInput.value = "";
+  importDataFile(file);
+});
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") {

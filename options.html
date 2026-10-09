@@ -48,6 +48,12 @@
       <h2 id="privacy-heading">Your data</h2>
       <p>AddOrHide keeps the videos you hide or add, your site settings and your page preferences in this browser only. Nothing is sent to the developer, and there are no accounts, ads or analytics.</p>
       <p class="muted">When you click <strong>Hide</strong> or <strong>Add</strong>, the extension reads that video's link, title, thumbnail link and any duration, view count, date, rating or genre shown on its card, and stores them on this device. It uses this data only to hide videos and to build your Added Videos page, and it never sells or shares it. Thumbnails and site icons are loaded straight from the sites they come from. You can delete it at any time: Restore or Unhide everything for hidden videos, Remove or Clear page for added videos, Forget for a site's settings, or remove the extension.</p>
+      <div class="page-actions">
+        <button id="export-data-button" class="secondary-button" type="button">Export my data</button>
+        <button id="import-data-button" class="secondary-button" type="button">Import data</button>
+        <input id="import-data-input" type="file" accept=".json,application/json" hidden>
+      </div>
+      <div id="data-status" class="status" role="status" aria-live="polite"></div>
     </section>
   </main>
   <script src="shared.js"></script>

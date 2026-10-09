@@ -215,6 +215,38 @@ window.__hoaLoaded = true;
     return /^(\d{1,2}:){1,2}\d{2}$/.test(text) || /^(live|new|shorts?)$/i.test(text);
   }
 
+  function plausiblePickedTitle(value) {
+    const text = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+    return text.length >= 2 && text.length <= 200 && /[A-Za-z].*[A-Za-z]/.test(text)
+      && !looksLikeBadge(text) && !/^[\d\s\p{P}\p{S}]+$/u.test(text) ? text : "";
+  }
+
+  function pickedTitle(card, link) {
+    const linkLabel = plausiblePickedTitle(link.getAttribute("aria-label"))
+      || plausiblePickedTitle(link.getAttribute("title"));
+    if (linkLabel) {
+      return linkLabel;
+    }
+    let heading;
+    try {
+      heading = card.querySelector('h1, h2, h3, h4, [class*="title" i], [id*="title" i], [itemprop="name"]');
+    } catch (error) {
+      heading = null;
+    }
+    const headingTitle = plausiblePickedTitle(heading && heading.getAttribute("title"));
+    const headingText = plausiblePickedTitle(heading && heading.textContent);
+    if (headingTitle || headingText) {
+      return headingTitle || headingText;
+    }
+    const image = card.querySelector("img[alt]");
+    const alt = plausiblePickedTitle(image && image.getAttribute("alt"));
+    if (alt) {
+      return alt;
+    }
+    return allLeafTexts(card).map(plausiblePickedTitle).filter(Boolean)
+      .sort((left, right) => right.length - left.length)[0] || "";
+  }
+
   function textFrom(element) {
     if (!element) {
       return "";
@@ -257,6 +289,9 @@ window.__hoaLoaded = true;
       if (title) {
         break;
       }
+    }
+    if (!title && rule.userPicked) {
+      title = pickedTitle(card, link);
     }
     title = title || textFrom(link);
     if (!title) {

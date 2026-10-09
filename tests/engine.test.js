@@ -87,25 +87,48 @@ const CASES = [
       assert.strictEqual(entry.type, "movie");
     }
   },
-  ...["imdb-home.html", "imdb-title.html", "imdb-trailers.html"].flatMap((fixture, index) => [
-    {
-      name: `imdb ${fixture} posters`, fixture, url: "https://www.imdb.com/", host: "www.imdb.com",
-      cardSelector: ".ipc-poster-card", cards: 3, optIn: true,
-      expectAdd(key, entry) {
-        assert.ok(/^https:\/\/www\.imdb\.com\/title\/tt\d+$/.test(key), key);
-        assert.ok(entry.title.startsWith(index === 0 ? "Home" : index === 1 ? "Title" : "Film"));
-      }
-    },
-    {
-      name: `imdb ${fixture} slates`, fixture, url: "https://www.imdb.com/", host: "www.imdb.com",
-      cardSelector: ".ipc-slate-card", cards: 3, optIn: true,
-      expectAdd(key, entry) {
-        assert.ok(/^https:\/\/www\.imdb\.com\/video\/vi\d+$/.test(key), key);
-        assert.ok(entry.title);
-        assert.ok(Number.isFinite(entry.duration));
-      }
+  {
+    name: "imdb home posters", fixture: "imdb-home.html", url: "https://www.imdb.com/", host: "www.imdb.com",
+    cardSelector: ".ipc-poster-card", cards: 3, optIn: true,
+    expectAdd(key, entry) {
+      assert.strictEqual(key, "https://www.imdb.com/title/tt6933238");
+      assert.strictEqual(entry.title, "Unabomber");
     }
-  ]),
+  },
+  {
+    name: "imdb home slates", fixture: "imdb-home.html", url: "https://www.imdb.com/", host: "www.imdb.com",
+    cardSelector: ".ipc-slate-card", cards: 3, optIn: true,
+    expectAdd(key, entry) {
+      assert.strictEqual(key, "https://www.imdb.com/video/vi2325400089");
+      assert.strictEqual(entry.title, "Other Mommy");
+      assert.strictEqual(entry.duration, 131);
+    }
+  },
+  {
+    name: "imdb title posters", fixture: "imdb-title.html", url: "https://www.imdb.com/title/tt0111161/", host: "www.imdb.com",
+    cardSelector: ".ipc-poster-card", cards: 3, optIn: true,
+    expectAdd(key, entry) {
+      assert.strictEqual(key, "https://www.imdb.com/title/tt0068646");
+      assert.strictEqual(entry.title, "The Godfather");
+    }
+  },
+  {
+    name: "imdb title slates", fixture: "imdb-title.html", url: "https://www.imdb.com/title/tt0111161/", host: "www.imdb.com",
+    cardSelector: ".ipc-slate-card", cards: 3, optIn: true,
+    expectAdd(key, entry) {
+      assert.strictEqual(key, "https://www.imdb.com/video/vi3877612057");
+      assert.strictEqual(entry.title, "Official Trailer");
+      assert.strictEqual(entry.duration, 131);
+    }
+  },
+  {
+    name: "imdb trailers posters", fixture: "imdb-trailers.html", url: "https://www.imdb.com/trailers/", host: "www.imdb.com",
+    cardSelector: ".ipc-poster-card", cards: 3, optIn: true,
+    expectAdd(key, entry) {
+      assert.strictEqual(key, "https://www.imdb.com/video/vi3400452633");
+      assert.strictEqual(entry.title, "Street Fighter");
+    }
+  },
   {
     name: "tmdb", fixture: "tmdb.html", url: "https://www.themoviedb.org/movie", host: "www.themoviedb.org",
     cardSelector: "#media-list .media-list-results > div[data-object-id]", cards: 3, optIn: true,
@@ -125,6 +148,25 @@ const CASES = [
       assert.ok(/^https:\/\/www\.dailymotion\.com\/video\/[a-z0-9]+$/.test(key), key);
       assert.ok(entry.title.length > 3);
       assert.ok(/^https?:\/\//.test(entry.thumb));
+    }
+  },
+  {
+    name: "dailymotion video cards", fixture: "dailymotion-cards.html", url: "https://www.dailymotion.com/us/search",
+    host: "www.dailymotion.com", cardSelector: '[data-testid="video-card"]', cards: 3, optIn: true,
+    hideTarget: "li",
+    expectAdd(key, entry) {
+      assert.strictEqual(key, "https://www.dailymotion.com/video/xbd3ori");
+      assert.strictEqual(entry.title, "SpaceX Starlink Satellites Deployed In Stunning View From Space");
+      assert.strictEqual(entry.duration, 62);
+    }
+  },
+  {
+    name: "picked anime cards", fixture: "picked-card.html", url: "https://example-anime.test/browse",
+    host: "example-anime.test", cardSelector: ".anime-card", cards: 3, optIn: true,
+    siteRules: { "example-anime.test": { enabled: true, pickedSelectors: [".anime-card"] } },
+    expectAdd(key, entry) {
+      assert.strictEqual(key, "https://example-anime.test/watch/koupen-chan");
+      assert.strictEqual(entry.title, "Koupen-chan");
     }
   },
   {
@@ -186,7 +228,7 @@ const CASES = [
       page.window.close();
     }
     // 3. enabled: buttons on every card, Add/Hide/Undo behaviour on the real markup
-    const rules = { [spec.host]: { enabled: true, cardSelector: "", linkSelector: "", bulkHide: false } };
+    const rules = spec.siteRules || { [spec.host]: { enabled: true, cardSelector: "", linkSelector: "", bulkHide: false } };
     const page = await load({ fixture: spec.fixture, url: spec.url, siteRules: rules });
     const { document, store, window } = page;
     const cards = Array.from(document.querySelectorAll(spec.cardSelector));
@@ -205,6 +247,15 @@ const CASES = [
     await wait(60);
     const [addedKey, addedEntry] = firstEntry(store.addedItems) || [];
     check(`${spec.name}: Add stores the real card data`, () => spec.expectAdd(addedKey, addedEntry));
+    if (spec.name === "picked anime cards") {
+      buttons(cards[2], "add").click();
+      await wait(60);
+      const altKey = "https://example-anime.test/watch/image-only";
+      check(`${spec.name}: image alt is used when no title exists`, () => assert.strictEqual(
+        store.addedItems[altKey].title, "A quiet winter anime scene"));
+      buttons(cards[2], "add").click();
+      await wait(60);
+    }
     check(`${spec.name}: Add button shows the Added state`, () => {
       assert.strictEqual(buttons(firstCard, "add").getAttribute("aria-pressed"), "true");
     });

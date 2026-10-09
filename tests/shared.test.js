@@ -341,6 +341,65 @@ check("reversing the sort reverses the groups", () => assert.deepEqual(
   HOA.orderGroupsBySort(HOA.groupEntries(sortedAsc, "genre"), sortedAsc, "genre").map(group => group.label),
   ["Action", "Drama", "No genre"]));
 
+const backupData = {
+  hidden: { [watch]: { title: "Hidden video", thumb: "", ts: 10, listed: true } },
+  added: { [short]: { title: "Added video", thumb: "", ts: 20 } },
+  siteRules: {
+    "example.com": { enabled: true, scheme: "https", pickedSelectors: ["div.card", "a", "x".repeat(301)] }
+  },
+  prefs: { "example.com": { sort: "title", dir: "asc", group: "genre", collapsed: true } }
+};
+const backup = HOA.buildBackup(backupData, "1.0.0", Date.UTC(2026, 0, 2));
+check("buildBackup has the stable envelope", () => assert.deepEqual(
+  { app: backup.app, format: backup.format, version: backup.version, exportedAt: backup.exportedAt },
+  { app: "AddOrHide", format: 1, version: "1.0.0", exportedAt: "2026-01-02T00:00:00.000Z" }));
+const parsedBackup = HOA.parseBackup(JSON.stringify(backup));
+check("parseBackup round trips the backup", () => assert.equal(parsedBackup.ok, true));
+check("parseBackup keeps sanitized lists", () => assert.deepEqual(parsedBackup.backup.addedItems, backup.addedItems));
+check("parseBackup rejects malformed JSON", () => assert.equal(HOA.parseBackup("{").ok, false));
+check("parseBackup rejects another app", () => assert.equal(HOA.parseBackup(JSON.stringify({ app: "Other", format: 1 })).ok, false));
+check("parseBackup rejects unknown format", () => assert.equal(HOA.parseBackup(JSON.stringify({ app: "AddOrHide", format: 2 })).ok, false));
+check("parseBackup rejects missing objects", () => assert.equal(HOA.parseBackup(JSON.stringify({ app: "AddOrHide", format: 1 })).ok, false));
+const hostile = {
+  app: "AddOrHide", format: 1, hiddenItems: {}, addedItems: {},
+  siteRules: {
+    "bad host": { enabled: true },
+    "safe.example": { pickedSelectors: Array.from({ length: 20 }, (_, index) => `div.card-${index}`), cardSelector: "<script>" }
+  },
+  addedViewPrefs: { "safe.example": { sort: "<script>", collapsed: true } }
+};
+const sanitized = HOA.parseBackup(JSON.stringify(hostile));
+check("parseBackup drops bad hosts and caps picks", () => {
+  assert.deepEqual(Object.keys(sanitized.backup.siteRules), ["safe.example"]);
+  assert.equal(sanitized.backup.siteRules["safe.example"].pickedSelectors.length, 12);
+});
+check("parseBackup keeps hostile text inert", () => assert.equal(
+  sanitized.backup.siteRules["safe.example"].cardSelector, "<script>"));
+const merge = HOA.mergeBackup({
+  hidden: { [watch]: { title: "Old hidden", thumb: "", ts: 1, listed: true } },
+  added: { [short]: { title: "Old added", thumb: "", ts: 10 } },
+  siteRules: { "example.com": { enabled: false, pickedSelectors: ["div.old"] } },
+  prefs: { "example.com": { sort: "added", collapsed: false } }
+}, {
+  hiddenItems: { [watch]: { title: "New hidden", thumb: "", ts: 2, listed: true } },
+  addedItems: {
+    [short]: { title: "New added", thumb: "", ts: 9 },
+    "https://www.dailymotion.com/video/xbd3ori": { title: "New video", thumb: "", ts: 30 }
+  },
+  siteRules: { "example.com": { enabled: true, pickedSelectors: ["div.new"] } },
+  addedViewPrefs: { "example.com": { dir: "asc" } }
+});
+check("mergeBackup keeps newer item conflicts and adds new items", () => {
+  assert.equal(merge.hidden[watch].title, "New hidden");
+  assert.equal(merge.added[short].title, "Old added");
+  assert.ok(merge.added["https://www.dailymotion.com/video/xbd3ori"]);
+});
+check("mergeBackup unions picks and shallow merges prefs", () => {
+  assert.deepEqual(merge.siteRules["example.com"].pickedSelectors, ["div.old", "div.new"]);
+  assert.deepEqual(merge.prefs["example.com"], { sort: "added", collapsed: false, dir: "asc" });
+});
+check("mergeBackup reports changed and new counts", () => assert.deepEqual(merge.counts, { added: 1, hidden: 1, sites: 1 }));
+
 // The popup injects shared.js/catalog.js again into pages that already run them (picker, Enable).
 check("shared.js and catalog.js can be injected twice into one world", () => {
   const vm = require("node:vm");

@@ -1,10 +1,10 @@
 # AddOrHide
 
-AddOrHide is a prerelease browser extension for hiding recommendations or saving videos to an Added Videos list. It includes built-in rules for YouTube and Tubi (tubitv.com), plus one-click and picker support for other websites.
+AddOrHide is a browser extension for hiding recommendations or saving videos to an Added Videos list. It includes built-in rules for YouTube and Tubi (tubitv.com), plus one-click and picker support for other websites.
 
 ## Supported sites
 
-YouTube (home feed, subscriptions and creators' Home/Videos/Shorts/Live tabs) and Tubi are built in. IMDb charts/lists, TMDB lists, the Dailymotion home page and the Twitch directory can be enabled in one click with **Enable on this site**. Any other site can use the card picker. Sites that need a login or show a CAPTCHA or consent wall were not checked and should use the picker.
+YouTube (home feed, subscriptions and creators' Home/Videos/Shorts/Live tabs) and Tubi are built in. IMDb charts/lists, TMDB lists, Dailymotion home, explore, video pages and search, and the Twitch directory can be enabled in one click with **Enable on this site**. Any other site can use the card picker. Sites that need a login or show a CAPTCHA or consent wall were not checked and should use the picker.
 
 The Add/Hide buttons appear centred at the top of a card whenever the mouse is anywhere over it. If the site's own controls sit there, the buttons slide past them; if a site lays its own hover preview over the card (YouTube), the buttons are drawn above it.
 
@@ -63,7 +63,9 @@ JSDOM_PATH=<folder>/node_modules/jsdom node tests/engine.test.js
 
 Regenerating icons: run `python tools/make_icons.py` from this directory.
 
-## Status: prerelease 0.10.0
+Build the Chrome Web Store archive with `python tools/package.py .`. It writes the runtime-only archive to `dist/AddOrHide-1.0.0.zip`.
+
+## Status: 1.0.0 (ready for Chrome Web Store submission)
 
 Used day to day as an unpacked extension in Brave on YouTube (home feed and creator pages), Tubi, IMDb, Twitch and Dailymotion, including private windows.
 
@@ -77,9 +79,13 @@ The popup shows a **Details** line (page script version, cards found, buttons at
 
 Drafts for the Chrome Web Store live in `store/`: `privacy-policy.md` (and a ready-to-host `privacy-policy.html` generated from it) and `store-listing.md` (listing text, permission justifications, data disclosures, reviewer test steps, checklist). Fill the [BRACKETS] before submitting.
 
+## Export and import
+
+The Options page's **Your data** section can export hidden videos, added videos, site rules and Added page preferences as a local JSON backup. **Import data** merges those items with the current browser data; newer entries win, existing data is not deleted, and site permissions are never included.
+
 ## Testing against real site markup
 
-`tests/fixtures/*.html` hold three real cards each, captured from the live YouTube, Tubi, IMDb, TMDB, Dailymotion and Twitch pages and trimmed. The exception is `imdb-home.html`, `imdb-title.html` and `imdb-trailers.html`: they copy IMDb's class names but use made-up titles, so the live-page runs in `tools/e2e-v09.js` are the real evidence for those IMDb page types. `tests/engine.test.js` runs the real `shared.js`, `catalog.js` and `content.js` against them in jsdom (buttons on every card, Add and Hide data, Undo, hidden-stays-hidden, the wrapper that gets hidden). jsdom is not bundled: run `npm install jsdom` in any folder and start the test with `JSDOM_PATH=<that folder>/node_modules/jsdom node tests/engine.test.js`. Without it the test prints SKIPPED. When a site changes its markup, recapture its fixture and the test will show what broke. jsdom has no layout, so button placement and hover visibility are not covered by it.
+`tests/fixtures/*.html` hold three real cards each, captured from the live YouTube, Tubi, IMDb, TMDB, Dailymotion and Twitch pages and trimmed. `tests/engine.test.js` runs the real `shared.js`, `catalog.js` and `content.js` against them in jsdom (buttons on every card, Add and Hide data, Undo, hidden-stays-hidden, the wrapper that gets hidden). jsdom is not bundled: run `npm install jsdom` in any folder and start the test with `JSDOM_PATH=<that folder>/node_modules/jsdom node tests/engine.test.js`. Without it the test prints SKIPPED. When a site changes its markup, recapture its fixture and the test will show what broke. jsdom has no layout, so button placement and hover visibility are not covered by it.
 
 ## Real-browser tests
 

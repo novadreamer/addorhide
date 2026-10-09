@@ -1,5 +1,7 @@
 # AddOrHide: Chrome Web Store submission pack (draft)
 
+Release note: version 1.0.0 is ready for submission. The Options page includes Export my data and Import data for moving local lists and settings between extension installations.
+
 Everything in [BRACKETS] needs your input. Field limits and required assets below come from the current Chrome Web Store documentation, except where marked "(dashboard limit)", which are limits the dashboard enforces that the docs page does not state.
 
 ---
@@ -42,6 +44,9 @@ WORKS ON
 
 PRIVATE BY DESIGN
 Everything stays on your device. AddOrHide has no accounts, no servers, no ads and no analytics, and it never sends your lists to anyone.
+
+BACKUPS
+Use Export my data and Import data in Options to move your hidden videos, Added list, site settings and page preferences between installations. Imports merge with existing data; permissions are never included.
 
 GOOD TO KNOW
 - AddOrHide never hides or changes ads and never downloads videos.

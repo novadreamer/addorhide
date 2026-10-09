@@ -103,7 +103,19 @@ var HOA_CATALOG = Object.freeze((() => {
     Object.freeze({
       id: "dailymotion", name: "Dailymotion", builtIn: false, hosts: Object.freeze(["dailymotion.com"]), subdomains: true,
       cardSelector: 'ul[data-testid="page-layout-grid"] > li', linkSelector: 'a[href^="/video/"]',
-      titleCandidates: Object.freeze(['[class*="HomeVideoInfo__titleContent"]', "h2"])
+      titleCandidates: Object.freeze(['[class*="HomeVideoInfo__titleContent"]', "h2"]),
+      variants: Object.freeze([
+        Object.freeze({
+          cardSelector: '[data-testid="video-card"]',
+          linkSelector: 'a[href^="/video/"]',
+          titleCandidates: Object.freeze(['[class*="VideoCard__videoTitleLink"]', '[class*="VideoCard__videoTitle"]']),
+          meta: Object.freeze({
+            duration: '[class*="videoDuration"]',
+            texts: Object.freeze(['[class*="PubDate"]'])
+          }),
+          removeClimb: true
+        })
+      ])
     }),
     Object.freeze({
       id: "twitch", name: "Twitch", builtIn: false, hosts: Object.freeze(["twitch.tv"]), subdomains: true,

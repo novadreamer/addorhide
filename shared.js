@@ -989,6 +989,176 @@ var HOA = Object.freeze((() => {
     return result;
   }
 
+  function backupHostname(value) {
+    return typeof value === "string" && /^[a-z0-9.-]{1,253}$/i.test(value);
+  }
+
+  function sanitizeBackupRules(value) {
+    const result = {};
+    if (!isObject(value)) {
+      return result;
+    }
+    Object.keys(value).forEach(host => {
+      if (!backupHostname(host) || !isObject(value[host])) {
+        return;
+      }
+      const raw = value[host];
+      const rule = {};
+      ["enabled", "pendingPick", "bulkHide"].forEach(field => {
+        if (typeof raw[field] === "boolean") {
+          rule[field] = raw[field];
+        }
+      });
+      if (raw.scheme === "http" || raw.scheme === "https") {
+        rule.scheme = raw.scheme;
+      }
+      if (typeof raw.cardSelector === "string" && raw.cardSelector.length <= 300) {
+        rule.cardSelector = raw.cardSelector;
+      }
+      if (typeof raw.linkSelector === "string" && raw.linkSelector.length <= 300) {
+        rule.linkSelector = raw.linkSelector;
+      }
+      if (Array.isArray(raw.pickedSelectors)) {
+        rule.pickedSelectors = usablePicks({ pickedSelectors: raw.pickedSelectors })
+          .slice(0, 12);
+      }
+      result[host] = rule;
+    });
+    return result;
+  }
+
+  function sanitizeBackupPrefs(value) {
+    const result = {};
+    if (!isObject(value)) {
+      return result;
+    }
+    Object.keys(value).forEach(site => {
+      if (!backupHostname(site) || !isObject(value[site])) {
+        return;
+      }
+      const raw = value[site];
+      const pref = {};
+      ["sort", "dir", "group"].forEach(field => {
+        if (typeof raw[field] === "string" && raw[field].length <= 20) {
+          pref[field] = raw[field];
+        }
+      });
+      if (typeof raw.collapsed === "boolean") {
+        pref.collapsed = raw.collapsed;
+      }
+      result[site] = pref;
+    });
+    return result;
+  }
+
+  function buildBackup(data, version, nowMs) {
+    const source = isObject(data) ? data : {};
+    const timestamp = Number.isFinite(nowMs) ? nowMs : Date.now();
+    return {
+      app: "AddOrHide",
+      format: 1,
+      version,
+      exportedAt: new Date(timestamp).toISOString(),
+      hiddenItems: normalizeItems(source.hidden, { max: MAX_HIDDEN, withListed: true }),
+      addedItems: normalizeItems(source.added, { max: MAX_ADDED }),
+      siteRules: sanitizeBackupRules(source.siteRules),
+      addedViewPrefs: sanitizeBackupPrefs(source.prefs)
+    };
+  }
+
+  function parseBackup(text) {
+    let value;
+    try {
+      value = JSON.parse(text);
+    } catch (error) {
+      return { ok: false, error: "The backup is not valid JSON." };
+    }
+    if (!isObject(value) || value.app !== "AddOrHide") {
+      return { ok: false, error: "This is not an AddOrHide backup." };
+    }
+    if (value.format !== 1) {
+      return { ok: false, error: "This backup format is not supported." };
+    }
+    const required = ["hiddenItems", "addedItems", "siteRules", "addedViewPrefs"];
+    if (required.some(key => !isObject(value[key]))) {
+      return { ok: false, error: "The backup is missing required data." };
+    }
+    return {
+      ok: true,
+      backup: {
+        app: "AddOrHide",
+        format: 1,
+        version: value.version,
+        exportedAt: value.exportedAt,
+        hiddenItems: normalizeItems(value.hiddenItems, { max: MAX_HIDDEN, withListed: true }),
+        addedItems: normalizeItems(value.addedItems, { max: MAX_ADDED }),
+        siteRules: sanitizeBackupRules(value.siteRules),
+        addedViewPrefs: sanitizeBackupPrefs(value.addedViewPrefs)
+      }
+    };
+  }
+
+  function sameBackupValue(left, right) {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  function mergeBackupItems(current, imported, options) {
+    const currentItems = normalizeItems(current, options);
+    const importedItems = normalizeItems(imported, options);
+    const merged = { ...currentItems };
+    let count = 0;
+    Object.keys(importedItems).forEach(key => {
+      const existing = merged[key];
+      if (!existing || importedItems[key].ts > existing.ts) {
+        merged[key] = importedItems[key];
+        if (!existing || !sameBackupValue(existing, importedItems[key])) {
+          count += 1;
+        }
+      }
+    });
+    return { items: normalizeItems(merged, options), count };
+  }
+
+  function mergeBackup(current, backup) {
+    const source = isObject(current) ? current : {};
+    const imported = isObject(backup) ? backup : {};
+    const hiddenResult = mergeBackupItems(source.hidden, imported.hiddenItems,
+      { max: MAX_HIDDEN, withListed: true });
+    const addedResult = mergeBackupItems(source.added, imported.addedItems,
+      { max: MAX_ADDED, withListed: false });
+    const siteRules = isObject(source.siteRules) ? { ...source.siteRules } : {};
+    let siteCount = 0;
+    const importedRules = sanitizeBackupRules(imported.siteRules);
+    Object.keys(importedRules).forEach(host => {
+      const before = isObject(siteRules[host]) ? siteRules[host] : undefined;
+      const next = { ...(before || {}), ...importedRules[host] };
+      if (Array.isArray(importedRules[host].pickedSelectors)) {
+        const picks = [...(Array.isArray(before && before.pickedSelectors) ? before.pickedSelectors : []),
+          ...importedRules[host].pickedSelectors];
+        next.pickedSelectors = Array.from(new Set(picks.filter(selector => typeof selector === "string"
+          && selector.length <= 300))).slice(0, 12);
+      }
+      siteRules[host] = next;
+      if (!before || !sameBackupValue(before, next)) {
+        siteCount += 1;
+      }
+    });
+    const prefs = isObject(source.prefs) ? { ...source.prefs } : {};
+    const importedPrefs = sanitizeBackupPrefs(imported.addedViewPrefs);
+    Object.keys(importedPrefs).forEach(site => {
+      const before = isObject(prefs[site]) ? prefs[site] : {};
+      const next = { ...before, ...importedPrefs[site] };
+      prefs[site] = next;
+    });
+    return {
+      hidden: hiddenResult.items,
+      added: addedResult.items,
+      siteRules,
+      prefs,
+      counts: { added: addedResult.count, hidden: hiddenResult.count, sites: siteCount }
+    };
+  }
+
   function safeHref(url) {
     return canonicalUrl(url) || null;
   }
@@ -1097,6 +1267,9 @@ var HOA = Object.freeze((() => {
     normalizePrefs,
     youtubeThumb,
     normalizeItems,
+    buildBackup,
+    parseBackup,
+    mergeBackup,
     listedHidden,
     restoreKeys,
     removeFromList,
