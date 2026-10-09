@@ -203,3 +203,13 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
   .button-controls .press-button { transition: none; }
   .button-controls .press-button:active:not(:disabled) { transform: none; }
 }
+
+/* Popup: sections never overlap. The site card and the buttons controls keep their size; the hidden-videos card
+   keeps its contents inside its own box (its list scrolls) and never shrinks below its heading plus one row; if
+   everything still cannot fit the 600px popup, the popup scrolls as a whole. */
+body.popup main { overflow-y: auto; scrollbar-width: thin; }
+.popup .site-card, .popup .popup-edge, .popup .popup-footer { flex: 0 0 auto; }
+.popup .hidden-card { overflow: hidden; min-height: 150px; }
+.popup .popup-list { min-height: 62px; }
+.popup .button-controls { gap: 16px; }
+.popup .button-controls .press-button.toggle-button { min-height: 40px; }
