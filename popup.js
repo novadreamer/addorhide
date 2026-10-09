@@ -47,7 +47,7 @@ function appendPageStatus(container) {
     } else if (!reply.overlays) {
       line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"}, but none got buttons. Reload the page; if it stays like this, send the details below.`;
     } else {
-      line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"} on this page. Move your mouse over one to see Hide and Add.`;
+      line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"} on this page. Move your mouse over one to see Add and Hide.`;
     }
     // One compact line the user can read back when something does not work.
     const details = document.createElement("p");
@@ -190,7 +190,7 @@ function renderSite() {
         if (isCatalog) {
           siteRules = { ...siteRules, [activeHost]: { ...siteRule(activeHost), enabled: true, pendingPick: false, scheme: activeScheme() } };
           renderSite();
-          setSiteStatus("Enabled. Move your mouse over a video to see Hide and Add.", "success");
+          setSiteStatus("Enabled. Move your mouse over a video to see Add and Hide.", "success");
           return;
         }
         HOA_SITES.startPicker(activeTab.id, pickerResult => {

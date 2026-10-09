@@ -233,7 +233,7 @@ const CASES = [
     const { document, store, window } = page;
     const cards = Array.from(document.querySelectorAll(spec.cardSelector));
     check(`${spec.name}: fixture has ${spec.cards} cards`, () => assert.strictEqual(cards.length, spec.cards));
-    check(`${spec.name}: Hide and Add buttons on every card`, () => {
+    check(`${spec.name}: Add and Hide buttons on every card`, () => {
       cards.forEach(card => { assert.ok(buttons(card, "hide") && buttons(card, "add")); });
     });
 

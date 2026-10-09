@@ -6,21 +6,21 @@
 
 ## The short version
 
-AddOrHide does not collect your data. It has no servers, no accounts, no analytics and no ads. The videos you hide or add, and your settings, are stored only in your own browser, on your own device. We never receive them, sell them or share them.
+AddOrHide does not collect your data. It has no servers, no accounts, no analytics and no ads. The videos you add or hide, and your settings, are stored only in your own browser, on your own device. We never receive them, sell them or share them.
 
 ## What AddOrHide stores on your device
 
 The extension stores the following in your browser's local extension storage:
 
-- **Videos you hide or add.** When you click **Hide** or **Add** on a video, the extension saves that video's web address, title, thumbnail address and site name, along with any of these that the video's card shows on the page: duration, view count, publish date or year, rating, genres, and the site's icon address. It also saves the time you took the action and, if you choose to tag a video, the type and genres you enter.
+- **Videos you add or hide.** When you click **Add** or **Hide** on a video, the extension saves that video's web address, title, thumbnail address and site name, along with any of these that the video's card shows on the page: duration, view count, publish date or year, rating, genres, and the site's icon address. It also saves the time you took the action and, if you choose to tag a video, the type and genres you enter.
 - **Site settings.** The sites where you turned the extension on, the card pattern (a CSS selector) learned when you use the card picker, and your "hide the whole feed" switches.
 - **Page preferences.** How you sorted, grouped or collapsed each site on the Added Videos page.
 
-Nothing is saved from a page until you click Hide or Add, except your settings and preferences. On sites where the extension is active, it reads the links and titles of the video cards on the page, on your device only, so it can place its buttons and keep videos you already hid out of view. This information is not stored or sent anywhere.
+Nothing is saved from a page until you click Add or Hide, except your settings and preferences. On sites where the extension is active, it reads the links and titles of the video cards on the page, on your device only, so it can place its buttons and keep videos you already hid out of view. This information is not stored or sent anywhere.
 
 ## How the data is used
 
-Only to provide the extension's single purpose: hiding videos from recommendation feeds and showing the videos you added on your own Added Videos page. It is not used for advertising, profiling, analytics or any other purpose, and it is never sold or transferred to anyone.
+Only to provide the extension's single purpose: showing the videos you added on your own Added Videos page and hiding videos from recommendation feeds. It is not used for advertising, profiling, analytics or any other purpose, and it is never sold or transferred to anyone.
 
 No person reads your data. It never leaves your browser.
 
@@ -37,7 +37,7 @@ You can delete your data at any time:
 
 ## Private windows
 
-If you allow the extension to run in private (incognito) windows, videos you hide or add there are saved in the same extension storage used by your normal windows. They remain after the private window is closed until you delete them as described above. If you do not want this, do not enable the extension in private windows.
+If you allow the extension to run in private (incognito) windows, videos you add or hide there are saved in the same extension storage used by your normal windows. They remain after the private window is closed until you delete them as described above. If you do not want this, do not enable the extension in private windows.
 
 ## Popup player
 

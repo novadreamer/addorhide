@@ -1,6 +1,6 @@
 # AddOrHide
 
-AddOrHide is a browser extension for hiding recommendations or saving videos to an Added Videos list. It includes built-in rules for YouTube and Tubi (tubitv.com), plus one-click and picker support for other websites.
+AddOrHide is a browser extension for saving videos to an Added Videos list or hiding recommendations. It includes built-in rules for YouTube and Tubi (tubitv.com), plus one-click and picker support for other websites.
 
 ## Supported sites
 
@@ -40,7 +40,7 @@ Supported videos can be played in a floating popup window using the site's offic
 
 In private windows, the Added Videos page uses the hosted view at `youtube.com/robots.txt#addorhide-added`, because browsers do not open extension pages there. Turn on **Allow in Incognito** for AddOrHide. The popup and options page keep new tabs in the current window.
 
-Storage is local to this browser and is not synced between devices. Hidden items are capped at 1000 and Added items at 500, with the oldest entries evicted first. **Hide the whole feed** toggles for YouTube and Tubi are in Options (and in the popup for the current site) and are reversible from the same toggle.
+Storage is local to this browser and is not synced between devices. Added items are capped at 500 and hidden items at 1000, with the oldest entries evicted first. **Hide the whole feed** toggles for YouTube and Tubi are in Options (and in the popup for the current site) and are reversible from the same toggle.
 
 ## Permissions
 
@@ -81,7 +81,7 @@ Drafts for the Chrome Web Store live in `store/`: `privacy-policy.md` (and a rea
 
 ## Export and import
 
-The Options page's **Your data** section can export hidden videos, added videos, site rules and Added page preferences as a local JSON backup. **Import data** merges those items with the current browser data; newer entries win, existing data is not deleted, and site permissions are never included.
+The Options page's **Your data** section can export added videos, hidden videos, site rules and Added page preferences as a local JSON backup. **Import data** merges those items with the current browser data; newer entries win, existing data is not deleted, and site permissions are never included.
 
 ## Testing against real site markup
 

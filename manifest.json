@@ -8,7 +8,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "description": "Hide recommendations or save videos to your own Added list on YouTube, Tubi, IMDb, TMDB, Dailymotion, Twitch and any site you choose.",
+  "description": "Save videos to your own Added list or hide recommendations on YouTube, Tubi, IMDb, TMDB, Dailymotion, Twitch and sites you choose.",
   "permissions": [
     "storage",
     "scripting",
