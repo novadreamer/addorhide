@@ -820,12 +820,28 @@ window.__hoaLoaded = true;
     return mutation.target.closest && mutation.target.closest(".hoa-actions, #hoa-toast, #hoa-banner");
   }
 
+  // A site that rewrites a card's class attribute (Tubi does this as its page finishes loading) wipes our
+  // hoa-removed/hoa-host marks without adding or removing any element. Only a mark that went missing counts,
+  // so our own class changes never retrigger apply().
+  const OWN_MARKS = [ACTIVE_CLASS, "hoa-host"];
+  function lostOwnMark(mutation) {
+    if (mutation.type !== "attributes") {
+      return false;
+    }
+    const before = String(mutation.oldValue || "").split(/\s+/);
+    return OWN_MARKS.some(mark => before.includes(mark) && !mutation.target.classList.contains(mark));
+  }
+
+  function needsApply(mutation) {
+    return mutation.type === "attributes" ? lostOwnMark(mutation) : !isOwnMutation(mutation);
+  }
+
   function observeRuleRoot(rule) {
     const selected = rule && rule.gridSelector ? document.querySelector(rule.gridSelector) : null;
     const root = selected || document.body;
     if (root && root !== observedRoot) {
       observer.disconnect();
-      observer.observe(root, { childList: true, subtree: true });
+      observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"], attributeOldValue: true });
       observedRoot = root;
     }
   }
@@ -893,7 +909,7 @@ window.__hoaLoaded = true;
     if (!ensureContext()) {
       return;
     }
-    if (mutations.some(mutation => !isOwnMutation(mutation))) {
+    if (mutations.some(needsApply)) {
       scheduleApply();
     }
   });

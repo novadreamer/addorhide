@@ -310,6 +310,13 @@ const CASES = [
     check(`${spec.name}: a hidden video (even one removed from the list) stays hidden`, () => {
       assert.strictEqual(reload.document.querySelectorAll(".hoa-removed").length, 1);
     });
+    // Tubi rewrites a tile's class attribute after load; the hidden mark must come straight back.
+    const wiped = reload.document.querySelector(".hoa-removed");
+    wiped.className = wiped.className.replace(/\s*\bhoa-removed\b/, "");
+    await wait(120);
+    check(`${spec.name}: a hidden video stays hidden when the site rewrites its class`, () => {
+      assert.ok(wiped.classList.contains("hoa-removed"));
+    });
     reload.window.close();
     window.close();
   }
