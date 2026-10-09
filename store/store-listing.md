@@ -59,14 +59,14 @@ AddOrHide is an independent project and is not affiliated with, endorsed by or s
 **Graphic assets** (current requirements: store icon 128x128; at least 1 screenshot at 1280x800, up to 5; small promo tile 440x280 PNG or JPEG; marquee 1400x560 optional)
 
 - **Store icon (128x128):** done, `icons/icon128.png`.
-- **Screenshots (1280x800), suggested set.** Use mock or your own videos, not other people's thumbnails and not real YouTube or Tubi pages:
-  1. *Add what you like, hide what you don't.* A feed grid with the Add and Hide buttons on one card.
-  2. *Save videos to your own list.* A card showing the "Added" state next to the Added Videos page.
-  3. *Every site, neatly grouped.* The Added Videos page with logo-tiled groups.
-  4. *Sort and group your way.* One site group with the Sort by and Group by controls open.
-  5. *Restore anytime.* The Hidden Videos window, grouped by website, with Restore and Remove all.
-- **Small promo tile (440x280):** the icon, the name AddOrHide and the line "Hide it. Or add it."
-- **Marquee (1400x560), optional:** same artwork, wider.
+- **Screenshots (1280x800):** done, in `store/assets/` (mock sites and drawn thumbnails only), upload in this order:
+  1. `screenshot-1-add-or-hide.png`: *Add what you like. Hide what you don't.*
+  2. `screenshot-2-added-page.png`: *Your own list of saved videos*
+  3. `screenshot-3-sort-group.png`: *Sort and group your way*
+  4. `screenshot-4-hidden.png`: *Changed your mind? Restore anytime*
+  5. `screenshot-5-any-site.png`: *Works on the sites you watch*
+- **Small promo tile (440x280):** done, `store/assets/promo-small-440x280.png` ("Add it. Or hide it.").
+- **Marquee (1400x560), optional:** done, `store/assets/promo-marquee-1400x560.png`.
 
 **Privacy policy URL:** https://novadreamer.github.io/addorhide-player/privacy.html
 
@@ -129,7 +129,7 @@ Note: browsers cannot open extension pages in private windows, so in a private w
 1. **Fill the brackets** in the listing, the policy and the test instructions, and host the policy at a public address (a GitHub Pages file or any static page works). `store/privacy-policy.html` is a ready-to-host copy.
 2. **Run the extension unpacked in Brave and Chrome** and complete the test instructions above yourself. Automation cannot click the browser's own permission prompt, so try **Enable on this site** once by hand.
 3. **Confirm private-window storage:** hide something in a private window, close it, and see whether it is still hidden in a normal window. The policy says it is. If your test shows otherwise, fix the "Private windows" paragraph.
-4. **Take the screenshots** with mock content.
+4. **Screenshots and promo images:** done, in `store/assets/`.
 5. **Version:** already 1.0.0. Upload `dist/AddOrHide-1.0.0.zip` (rebuild it with `python tools/package.py` after any change).
 6. **Expect a closer review:** requests for optional access to all sites and a content script on youtube.com/robots.txt are unusual. The justifications above explain both; keep them as written.
 7. **Do not add** keywords such as "YouTube downloader", "ad blocker" or other site names to the listing text beyond the factual mentions above, and never use site logos.
