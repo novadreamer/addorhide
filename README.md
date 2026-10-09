@@ -77,7 +77,7 @@ The popup shows a **Details** line (page script version, cards found, buttons at
 
 ## Store submission
 
-Drafts for the Chrome Web Store live in `store/`: `privacy-policy.md` (and a ready-to-host `privacy-policy.html` generated from it) and `store-listing.md` (listing text, permission justifications, data disclosures, reviewer test steps, checklist). Fill the [BRACKETS] before submitting.
+Drafts for the Chrome Web Store live in `store/`: `privacy-policy.md` (and a ready-to-host `privacy-policy.html` generated from it) and `store-listing.md` (listing text, permission justifications, data disclosures, reviewer test steps, checklist). The policy is hosted at https://novadreamer.github.io/addorhide-player/privacy.html.
 
 ## Export and import
 

@@ -1,8 +1,8 @@
 # AddOrHide Privacy Policy
 
-**Effective date:** [DATE]
-**Developer:** [YOUR NAME OR COMPANY]
-**Contact:** [SUPPORT EMAIL]
+**Effective date:** October 9, 2026
+**Developer:** NovaDreamer
+**Contact:** mybrainnoor@gmail.com
 
 ## The short version
 
@@ -79,4 +79,4 @@ AddOrHide is an independent project. It is not affiliated with, endorsed by or s
 
 ## Contact
 
-Questions about this policy: [SUPPORT EMAIL]
+Questions about this policy: mybrainnoor@gmail.com

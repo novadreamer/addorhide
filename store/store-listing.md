@@ -2,7 +2,7 @@
 
 Release note: version 1.0.0 is ready for submission. The Options page includes Export my data and Import data for moving local lists and settings between extension installations.
 
-Everything in [BRACKETS] needs your input. Field limits and required assets below come from the current Chrome Web Store documentation, except where marked "(dashboard limit)", which are limits the dashboard enforces that the docs page does not state.
+All the placeholders have been filled in. Field limits and required assets below come from the current Chrome Web Store documentation, except where marked "(dashboard limit)", which are limits the dashboard enforces that the docs page does not state.
 
 ---
 
@@ -51,7 +51,7 @@ Use Export my data and Import data in Options to move your Added list, hidden vi
 GOOD TO KNOW
 - AddOrHide never hides or changes ads and never downloads videos.
 - Details such as duration, views and genre appear only when the site shows them on the video's card. You can tag the rest yourself.
-- Websites change their layout from time to time, which can occasionally affect the buttons. Please report problems at [SUPPORT URL OR EMAIL].
+- Websites change their layout from time to time, which can occasionally affect the buttons. Please report problems at mybrainnoor@gmail.com.
 
 AddOrHide is an independent project and is not affiliated with, endorsed by or sponsored by YouTube, Google, Tubi or any other streaming service. All product names and trademarks belong to their owners.
 ```
@@ -68,7 +68,9 @@ AddOrHide is an independent project and is not affiliated with, endorsed by or s
 - **Small promo tile (440x280):** the icon, the name AddOrHide and the line "Hide it. Or add it."
 - **Marquee (1400x560), optional:** same artwork, wider.
 
-**Optional fields:** Homepage URL [URL], Support URL [URL], leave "mature content" unchecked.
+**Privacy policy URL:** https://novadreamer.github.io/addorhide-player/privacy.html
+
+**Optional fields:** leave Homepage URL and Support URL empty (support is by email: mybrainnoor@gmail.com); leave "mature content" unchecked.
 
 ---
 
