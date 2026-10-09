@@ -1,7 +1,7 @@
 # AddOrHide Privacy Policy
 
 **Effective date:** October 9, 2026
-**Developer:** NovaDreamer
+**Developer:** Ashraf Mustafa
 **Contact:** mybrainnoor@gmail.com
 
 ## The short version
