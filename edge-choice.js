@@ -14,6 +14,11 @@ function bindButtonChoices(enabledGroup, edgeGroup) {
     if (edgeGroup) {
       edgeGroup.disabled = !enabled;
     }
+    // The popup's own icon greys out like the toolbar icon while the buttons are off.
+    const brand = document.querySelector(".brand-lockup img");
+    if (brand) {
+      brand.src = enabled ? "icons/icon32.png" : "icons/icon-off32.png";
+    }
   };
   chrome.storage.local.get({ [HOA.BUTTONS_ENABLED_KEY]: true, [HOA.BUTTON_EDGE_KEY]: "top" }, result => {
     showEnabled(HOA.buttonsEnabledOf(result[HOA.BUTTONS_ENABLED_KEY]));

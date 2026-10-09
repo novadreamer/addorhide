@@ -213,3 +213,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   openPlayerWindow(message.hash, Boolean(tab && tab.incognito), tab ? tab.windowId : undefined, sendResponse);
   return true;
 });
+
+// The toolbar icon shows whether the AddOrHide buttons are on: grey with an OFF badge while they are disabled.
+const ICONS_ON = { 16: "icons/icon16.png", 32: "icons/icon32.png", 48: "icons/icon48.png", 128: "icons/icon128.png" };
+const ICONS_OFF = { 16: "icons/icon-off16.png", 32: "icons/icon-off32.png", 48: "icons/icon-off48.png", 128: "icons/icon-off128.png" };
+
+function showButtonsState() {
+  chrome.storage.local.get({ [HOA.BUTTONS_ENABLED_KEY]: true }, result => {
+    const enabled = HOA.buttonsEnabledOf(result[HOA.BUTTONS_ENABLED_KEY]);
+    chrome.action.setIcon({ path: enabled ? ICONS_ON : ICONS_OFF }, () => void chrome.runtime.lastError);
+    chrome.action.setBadgeText({ text: enabled ? "" : "OFF" });
+    chrome.action.setBadgeBackgroundColor({ color: "#55555f" });
+    chrome.action.setTitle({ title: enabled ? "AddOrHide" : "AddOrHide: buttons are disabled" });
+  });
+}
+
+chrome.runtime.onInstalled.addListener(showButtonsState);
+chrome.runtime.onStartup.addListener(showButtonsState);
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "local" && changes[HOA.BUTTONS_ENABLED_KEY]) {
+    showButtonsState();
+  }
+});
+showButtonsState();
