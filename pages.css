@@ -173,7 +173,9 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
   justify-content: center;
 }
 .button-controls .control-label { justify-self: end; font-weight: 600; }
-.position-buttons { display: grid; gap: 6px; }
+.position-buttons { display: grid; gap: 6px; margin-top: 8px; }
+.button-controls #position-label { margin-top: 8px; }
+.button-controls .edge-button { font-size: 15px; line-height: 1; }
 .button-controls .press-button {
   min-width: 112px;
   min-height: 32px;
