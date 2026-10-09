@@ -118,12 +118,37 @@ function focusPlayerWindow(windowId, sendResponse) {
   });
 }
 
-function createPlayerWindow(hash, incognito, mode, sendResponse) {
-  chrome.windows.create({
+const PLAYER_WIDTH = 900;
+const PLAYER_HEIGHT = 560;
+
+// A new player window opens centred over the browser window the user clicked from (the worker cannot read the
+// screen size). It shrinks to fit a smaller window. A reused window stays wherever the user moved it.
+function centredBounds(sourceWindowId, callback) {
+  if (!Number.isInteger(sourceWindowId)) {
+    callback({ width: PLAYER_WIDTH, height: PLAYER_HEIGHT });
+    return;
+  }
+  chrome.windows.get(sourceWindowId, source => {
+    if (chrome.runtime.lastError || !source || !Number.isFinite(source.width) || !Number.isFinite(source.height)) {
+      callback({ width: PLAYER_WIDTH, height: PLAYER_HEIGHT });
+      return;
+    }
+    const width = Math.max(480, Math.min(PLAYER_WIDTH, source.width - 40));
+    const height = Math.max(300, Math.min(PLAYER_HEIGHT, source.height - 40));
+    callback({
+      width,
+      height,
+      left: Math.round((source.left || 0) + (source.width - width) / 2),
+      top: Math.round((source.top || 0) + (source.height - height) / 2)
+    });
+  });
+}
+
+function createPlayerWindow(hash, incognito, mode, sourceWindowId, sendResponse) {
+  centredBounds(sourceWindowId, bounds => chrome.windows.create({
     url: `${HOA.PLAYER_URL}#${hash}`,
     type: "popup",
-    width: 900,
-    height: 560,
+    ...bounds,
     focused: true,
     incognito: Boolean(incognito)
   }, created => {
@@ -138,10 +163,10 @@ function createPlayerWindow(hash, incognito, mode, sendResponse) {
       }
       sendResponse({ ok: true });
     });
-  });
+  }));
 }
 
-function openPlayerWindow(hash, incognito, sendResponse) {
+function openPlayerWindow(hash, incognito, sourceWindowId, sendResponse) {
   const mode = playerWindowMode(incognito);
   chrome.storage.session.get({ [PLAYER_WINDOWS_KEY]: {} }, result => {
     if (chrome.runtime.lastError) {
@@ -152,17 +177,17 @@ function openPlayerWindow(hash, incognito, sendResponse) {
       ? result[PLAYER_WINDOWS_KEY] : {};
     const rememberedId = windows[mode];
     if (!Number.isInteger(rememberedId)) {
-      createPlayerWindow(hash, incognito, mode, sendResponse);
+      createPlayerWindow(hash, incognito, mode, sourceWindowId, sendResponse);
       return;
     }
     chrome.windows.get(rememberedId, { populate: true }, existing => {
       if (chrome.runtime.lastError || !existing) {
-        createPlayerWindow(hash, incognito, mode, sendResponse);
+        createPlayerWindow(hash, incognito, mode, sourceWindowId, sendResponse);
         return;
       }
       const tab = Array.isArray(existing.tabs) ? existing.tabs.find(item => Number.isInteger(item.id)) : null;
       if (!tab) {
-        createPlayerWindow(hash, incognito, mode, sendResponse);
+        createPlayerWindow(hash, incognito, mode, sourceWindowId, sendResponse);
         return;
       }
       chrome.tabs.update(tab.id, { url: `${HOA.PLAYER_URL}#${hash}` }, () => {
@@ -184,6 +209,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ ok: false, error: "Invalid player request" });
     return true;
   }
-  openPlayerWindow(message.hash, Boolean(sender && sender.tab && sender.tab.incognito), sendResponse);
+  const tab = sender && sender.tab;
+  openPlayerWindow(message.hash, Boolean(tab && tab.incognito), tab ? tab.windowId : undefined, sendResponse);
   return true;
 });
