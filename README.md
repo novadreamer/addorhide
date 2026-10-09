@@ -44,7 +44,7 @@ Storage is local to this browser and is not synced between devices. Added items 
 
 ## Support link
 
-An optional Ko-fi tip link (`HOA.SUPPORT_URL`, https://ko-fi.com/elbrainnoor) appears as a quiet "♥ Support" text link in the popup footer, the Options page header and the Added Videos page header. It only opens the Ko-fi page; no feature depends on it and nothing is sent to Ko-fi.
+An optional Ko-fi tip link (`HOA.SUPPORT_URL`, https://ko-fi.com/ashmustafa) appears as a quiet "♥ Support" text link in the popup footer, the Options page header and the Added Videos page header. It only opens the Ko-fi page; no feature depends on it and nothing is sent to Ko-fi.
 
 ## Permissions
 

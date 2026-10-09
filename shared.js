@@ -13,7 +13,7 @@ var HOA = Object.freeze((() => {
   const HOSTED_ADDED_URL = "https://www.youtube.com/robots.txt#addorhide-added";
   const PLAYER_URL = "https://novadreamer.github.io/addorhide-player/";
   // Optional tip jar. Nothing in the extension depends on it.
-  const SUPPORT_URL = "https://ko-fi.com/elbrainnoor";
+  const SUPPORT_URL = "https://ko-fi.com/ashmustafa";
   const PREFS_KEY = "addedViewPrefs";
   // Where the Add/Hide bar sits on every site: "top" (default) or "bottom" of the video picture.
   const BUTTON_EDGE_KEY = "buttonEdge";
