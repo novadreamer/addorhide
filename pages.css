@@ -166,7 +166,7 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
    left of the stacked Top and Bottom buttons, all centred. */
 .popup-edge { margin: 0 0 10px; }
 /* Each row is centred on its own, so the shorter "Position" row is not pushed aside by the longer label above. */
-.button-controls { display: grid; gap: 26px; justify-items: center; }
+.button-controls { display: grid; gap: 34px; justify-items: center; }
 .toggle-row { display: grid; gap: 6px; justify-items: center; }
 .toggle-note { margin: 0; font-size: 12px; text-align: center; }
 .control-row { display: flex; gap: 12px; align-items: center; }
@@ -211,5 +211,9 @@ body.popup main { overflow-y: auto; scrollbar-width: thin; }
 .popup .site-card, .popup .popup-edge, .popup .popup-footer { flex: 0 0 auto; }
 .popup .hidden-card { overflow: hidden; min-height: 150px; }
 .popup .popup-list { min-height: 62px; }
-.popup .button-controls { gap: 16px; }
+.popup .button-controls { gap: 24px; }
 .popup .button-controls .press-button.toggle-button { min-height: 40px; }
+
+/* The arrow buttons sit on the centre line (under Enable); "Position" hangs to their left. */
+.button-controls .position-row { display: grid; grid-template-columns: 1fr auto 1fr; justify-self: stretch; }
+.button-controls .position-row #position-label { justify-self: end; }
