@@ -16,7 +16,6 @@
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
-    "https://i.ytimg.com/*",
     "https://tubitv.com/*",
     "https://www.tubitv.com/*"
   ],

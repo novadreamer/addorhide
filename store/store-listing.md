@@ -23,7 +23,7 @@ AddOrHide puts you in charge of the video recommendations on the sites you use. 
 
 HOW IT WORKS
 Hover over a video on a supported site and two small buttons appear:
-- Hide removes the video from the feed. Changed your mind? Tap Undo, or restore it from the extension popup.
+- Hide removes the video from the feed. Changed your mind? Tap Undo, or restore it from the Hidden Videos window in the extension popup.
 - Add saves the video to your Added Videos page. The video stays where it is, and the button turns into "Added".
 
 YOUR ADDED VIDEOS PAGE
@@ -35,7 +35,7 @@ YOUR ADDED VIDEOS PAGE
 - Works in private windows too, if you allow the extension there.
 
 THE HIDDEN LIST
-The toolbar popup lists every video you hid. Restore one or all of them, or remove a row to keep the video hidden without cluttering the list.
+The toolbar popup shows how many videos you hid. Its Hidden Videos button opens a window listing them by website, with thumbnails. Restore one or all of them, or remove a row to keep the video hidden without cluttering the list.
 
 WORKS ON
 - YouTube and Tubi, built in.
@@ -64,7 +64,7 @@ AddOrHide is an independent project and is not affiliated with, endorsed by or s
   2. *Save videos to your own list.* A card showing the "Added" state next to the Added Videos page.
   3. *Every site, neatly grouped.* The Added Videos page with logo-tiled groups.
   4. *Sort and group your way.* One site group with the Sort by and Group by controls open.
-  5. *Restore anytime.* The popup with the hidden list, Restore and Remove all.
+  5. *Restore anytime.* The Hidden Videos window, grouped by website, with Restore and Remove all.
 - **Small promo tile (440x280):** the icon, the name AddOrHide and the line "Hide it. Or add it."
 - **Marquee (1400x560), optional:** same artwork, wider.
 
@@ -85,7 +85,6 @@ AddOrHide is an independent project and is not affiliated with, endorsed by or s
 | `scripting` | Injects the extension's content script and, where needed, its card picker into a site the user has turned the extension on for, so the Add and Hide buttons appear without a page reload, and re-registers that script for the site after a restart. |
 | `activeTab` | When the user opens the popup on a page, lets the extension read that tab's address to show the right controls and to start setup or the card picker on it. |
 | Host permissions: `https://www.youtube.com/*`, `https://tubitv.com/*`, `https://www.tubitv.com/*` | Built-in support for these two sites: the extension adds its buttons to video cards there and hides cards the user previously hid. On YouTube it also builds the Added Videos page for private windows (see Test instructions). |
-| Host permission: `https://i.ytimg.com/*` | Shows YouTube thumbnails for added and hidden videos. |
 | Optional host permissions: `https://*/*`, `http://*/*` | Requested one site at a time, only when the user chooses "Enable on this site" in the popup, to run the extension on a site the user picks or to enable one-click support for IMDb, TMDB, Dailymotion or Twitch. They are never requested in bulk, are always user initiated, and the user can revoke each one with "Disable on this site". |
 | Remote code | **No, I am not using remote code.** All scripts are packaged with the extension. |
 
@@ -126,9 +125,9 @@ Note: browsers cannot open extension pages in private windows, so in a private w
 ## 4. Before you submit
 
 1. **Fill the brackets** in the listing, the policy and the test instructions, and host the policy at a public address (a GitHub Pages file or any static page works). `store/privacy-policy.html` is a ready-to-host copy.
-2. **Run the extension unpacked in Brave and Chrome** and complete the test instructions above yourself. It has never been run as an installed extension; I checked its logic, pages and selectors on live sites but not the permission prompt, background worker or toolbar popup.
+2. **Run the extension unpacked in Brave and Chrome** and complete the test instructions above yourself. Automation cannot click the browser's own permission prompt, so try **Enable on this site** once by hand.
 3. **Confirm private-window storage:** hide something in a private window, close it, and see whether it is still hidden in a normal window. The policy says it is. If your test shows otherwise, fix the "Private windows" paragraph.
 4. **Take the screenshots** with mock content.
-5. **Bump the version** from `0.10.0-prerelease` to a release number (and drop `version_name`) when you are ready.
+5. **Version:** already 1.0.0. Upload `dist/AddOrHide-1.0.0.zip` (rebuild it with `python tools/package.py` after any change).
 6. **Expect a closer review:** requests for optional access to all sites and a content script on youtube.com/robots.txt are unusual. The justifications above explain both; keep them as written.
 7. **Do not add** keywords such as "YouTube downloader", "ad blocker" or other site names to the listing text beyond the factual mentions above, and never use site logos.

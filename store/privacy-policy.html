@@ -39,7 +39,7 @@ a { color:var(--accent); } code { background:var(--bg); padding:1px 5px; border-
 <p>The data is kept in the extension's local storage in your browser profile. It is <strong>not</strong> sent to our servers and it is not synced across devices by the extension. Your browser or operating system may include it in its own profile backups, according to your settings.</p>
 <p>You can delete your data at any time:</p>
 <ul>
-<li><strong>Hidden videos:</strong> <strong>Restore</strong> in the extension popup deletes a video's record and brings the video back to the feed. <strong>Unhide everything</strong> in Options deletes all hidden-video records. (<strong>Remove</strong> in the popup only takes a video off the list while keeping it hidden, so its record stays until you restore it or use Unhide everything.)</li>
+<li><strong>Hidden videos:</strong> <strong>Restore</strong> in the Hidden Videos window (opened from the extension popup) deletes a video's record and brings the video back to the feed. <strong>Unhide everything</strong> in Options deletes all hidden-video records. (<strong>Remove</strong> in that window only takes a video off the list while keeping it hidden, so its record stays until you restore it or use Unhide everything.)</li>
 <li><strong>Added videos:</strong> <strong>Remove</strong> on a card deletes that video's record, and <strong>Clear page</strong> deletes all of them.</li>
 <li><strong>Site settings:</strong> <strong>Forget</strong> in Options deletes a site's saved settings. (<strong>Disable</strong> turns the extension off for the site but keeps the saved settings.)</li>
 <li><strong>Everything:</strong> removing the extension deletes all the data it stored.</li>
@@ -51,7 +51,7 @@ a { color:var(--accent); } code { background:var(--bg); padding:1px 5px; border-
   <h2>Network requests the extension makes</h2>
 <p>The extension does not send your data to the developer. These requests happen directly between your browser and the sites involved, as they would for any web page:</p>
 <ul>
-<li><strong>Images.</strong> The Added Videos page and popup show thumbnails and site icons by loading them from the site they came from (for example i.ytimg.com or a site's own favicon). Those sites can see that your browser requested the image, as they would for any image.</li>
+<li><strong>Images.</strong> The Added Videos page and the Hidden Videos window show thumbnails and site icons by loading them from the site they came from (for example i.ytimg.com or a site's own favicon). Those sites can see that your browser requested the image, as they would for any image.</li>
 <li><strong>Adding a video by link.</strong> If you add a YouTube link from the Options page, the extension asks YouTube's public oEmbed service for the video's title, sending the link you typed.</li>
 <li><strong>Private-window Added page.</strong> Browsers cannot show an extension's own pages in private windows, so in a private window the extension builds the Added Videos page on an address on youtube.com (youtube.com/robots.txt). Loading that address contacts YouTube, but the contents of your list are shown by the extension on your device and are not sent to YouTube.</li>
 <li><strong>The sites you visit.</strong> Your use of YouTube, Tubi and any other site is between you and that site and is covered by their own policies.</li>

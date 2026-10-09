@@ -30,7 +30,7 @@ The data is kept in the extension's local storage in your browser profile. It is
 
 You can delete your data at any time:
 
-- **Hidden videos:** **Restore** in the extension popup deletes a video's record and brings the video back to the feed. **Unhide everything** in Options deletes all hidden-video records. (**Remove** in the popup only takes a video off the list while keeping it hidden, so its record stays until you restore it or use Unhide everything.)
+- **Hidden videos:** **Restore** in the Hidden Videos window (opened from the extension popup) deletes a video's record and brings the video back to the feed. **Unhide everything** in Options deletes all hidden-video records. (**Remove** in that window only takes a video off the list while keeping it hidden, so its record stays until you restore it or use Unhide everything.)
 - **Added videos:** **Remove** on a card deletes that video's record, and **Clear page** deletes all of them.
 - **Site settings:** **Forget** in Options deletes a site's saved settings. (**Disable** turns the extension off for the site but keeps the saved settings.)
 - **Everything:** removing the extension deletes all the data it stored.
@@ -47,7 +47,7 @@ On the Added Videos page, clicking the picture of a video marked **Popup player*
 
 The extension does not send your data to the developer. These requests happen directly between your browser and the sites involved, as they would for any web page:
 
-- **Images.** The Added Videos page and popup show thumbnails and site icons by loading them from the site they came from (for example i.ytimg.com or a site's own favicon). Those sites can see that your browser requested the image, as they would for any image.
+- **Images.** The Added Videos page and the Hidden Videos window show thumbnails and site icons by loading them from the site they came from (for example i.ytimg.com or a site's own favicon). Those sites can see that your browser requested the image, as they would for any image.
 - **Adding a video by link.** If you add a YouTube link from the Options page, the extension asks YouTube's public oEmbed service for the video's title, sending the link you typed.
 - **Private-window Added page.** Browsers cannot show an extension's own pages in private windows, so in a private window the extension builds the Added Videos page on an address on youtube.com (youtube.com/robots.txt). Loading that address contacts YouTube, but the contents of your list are shown by the extension on your device and are not sent to YouTube.
 - **The sites you visit.** Your use of YouTube, Tubi and any other site is between you and that site and is covered by their own policies.
