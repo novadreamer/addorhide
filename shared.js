@@ -11,8 +11,16 @@ var HOA = Object.freeze((() => {
   const MAX_TITLE = 200;
   const MAX_URL = 2048;
   const HOSTED_ADDED_URL = "https://www.youtube.com/robots.txt#addorhide-added";
+  const PLAYER_URL = "https://novadreamer.github.io/addorhide-player/";
   const PREFS_KEY = "addedViewPrefs";
   const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+  const TWITCH_CHANNEL_RE = /^[A-Za-z0-9_]{2,25}$/;
+  const TWITCH_SLUG_RE = /^[A-Za-z0-9_-]{2,100}$/;
+  const TWITCH_RESERVED = new Set([
+    "directory", "videos", "settings", "search", "downloads", "jobs", "p", "turbo",
+    "prime", "subscriptions", "inventory", "wallet", "drops", "friends", "messages",
+    "following", "login", "signup"
+  ]);
   const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com"]);
   const YOUTUBE_MEDIA_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"]);
   const TRACKING_PARAMS = new Set(["fbclid", "gclid", "igshid", "si", "pp", "feature", "ab_channel"]);
@@ -30,12 +38,16 @@ var HOA = Object.freeze((() => {
   });
   const SITE_NAMES = Object.freeze({
     "youtube.com": "YouTube",
+    "youtu.be": "YouTube",
     "tubitv.com": "Tubi",
+    "imdb.com": "IMDb",
+    "themoviedb.org": "TMDB",
     "netflix.com": "Netflix",
     "primevideo.com": "Prime Video",
     "hulu.com": "Hulu",
     "disneyplus.com": "Disney+",
     "twitch.tv": "Twitch",
+    "clips.twitch.tv": "Twitch",
     "vimeo.com": "Vimeo",
     "max.com": "Max",
     "peacocktv.com": "Peacock",
@@ -385,6 +397,93 @@ var HOA = Object.freeze((() => {
   function siteDisplayName(site) {
     const hostname = siteHostname(site);
     return SITE_NAMES[hostname] || hostname;
+  }
+
+  function playerFor(key, title) {
+    let url;
+    try {
+      url = new URL(key);
+    } catch (error) {
+      return null;
+    }
+    if (url.protocol !== "https:") {
+      return null;
+    }
+
+    let site;
+    let parameter;
+    let value;
+    const host = url.hostname.toLowerCase();
+    const segments = url.pathname.split("/").filter(Boolean);
+    if (host === "www.youtube.com" && url.pathname === "/watch"
+      && url.searchParams.size === 1 && url.searchParams.has("v")) {
+      value = url.searchParams.get("v");
+      if (VIDEO_ID_RE.test(value)) {
+        site = "youtube";
+        parameter = "id";
+      }
+    } else if (host === "www.youtube.com" && segments.length === 2 && segments[0] === "shorts"
+      && url.pathname === `/shorts/${segments[1]}`
+      && !url.search) {
+      value = segments[1];
+      if (VIDEO_ID_RE.test(value)) {
+        site = "youtube";
+        parameter = "id";
+      }
+    } else if (host === "www.twitch.tv" && segments.length === 1 && url.pathname === `/${segments[0]}` && !url.search
+      && TWITCH_CHANNEL_RE.test(segments[0]) && !TWITCH_RESERVED.has(segments[0].toLowerCase())) {
+      site = "twitch";
+      parameter = "channel";
+      value = segments[0];
+    } else if (host === "www.twitch.tv" && segments.length === 2 && segments[0] === "videos"
+      && url.pathname === `/videos/${segments[1]}`
+      && /^\d+$/.test(segments[1]) && !url.search) {
+      site = "twitchvideo";
+      parameter = "video";
+      value = segments[1];
+    } else if (host === "clips.twitch.tv" && segments.length === 1 && url.pathname === `/${segments[0]}` && !url.search
+      && TWITCH_SLUG_RE.test(segments[0])) {
+      site = "twitchclip";
+      parameter = "clip";
+      value = segments[0];
+    } else if (host === "www.twitch.tv" && segments.length === 3 && segments[1] === "clip"
+      && url.pathname === `/${segments[0]}/clip/${segments[2]}`
+      && !url.search && TWITCH_CHANNEL_RE.test(segments[0])
+      && !TWITCH_RESERVED.has(segments[0].toLowerCase()) && TWITCH_SLUG_RE.test(segments[2])) {
+      site = "twitchclip";
+      parameter = "clip";
+      value = segments[2];
+    } else if (host === "www.imdb.com" && segments.length === 2 && segments[0] === "video"
+      && url.pathname === `/video/${segments[1]}`
+      && /^vi\d+$/.test(segments[1]) && !url.search) {
+      site = "imdb";
+      parameter = "id";
+      value = segments[1];
+    }
+    if (!site) {
+      return null;
+    }
+
+    const params = new URLSearchParams();
+    params.set("site", site);
+    params.set(parameter, value);
+    if (typeof title === "string") {
+      const trimmedTitle = title.trim().slice(0, 120);
+      if (trimmedTitle) {
+        params.set("title", trimmedTitle);
+      }
+    }
+    const siteName = site === "twitch" || site === "twitchvideo" || site === "twitchclip"
+      ? "Twitch" : siteDisplayName(host);
+    return { hash: params.toString(), siteName };
+  }
+
+  function playerSiteName(key) {
+    let hostname = siteOf(key);
+    if (!hostname) {
+      hostname = siteHostname(key);
+    }
+    return siteDisplayName(hostname);
   }
 
   function siteMonogram(site) {
@@ -964,7 +1063,10 @@ var HOA = Object.freeze((() => {
     MAX_TITLE,
     MAX_URL,
     HOSTED_ADDED_URL,
+    PLAYER_URL,
     canonicalUrl,
+    playerFor,
+    playerSiteName,
     siteOf,
     kindOf,
     typeOf,

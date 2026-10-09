@@ -34,3 +34,156 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     reconcileSites();
   }
 });
+
+const PLAYER_WINDOWS_KEY = "hoaPlayerWindows";
+const PLAYER_SITES = new Set(["youtube", "twitch", "twitchvideo", "twitchclip", "imdb"]);
+const PLAYER_VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+const PLAYER_CHANNEL_RE = /^[A-Za-z0-9_]{2,25}$/;
+const PLAYER_SLUG_RE = /^[A-Za-z0-9_-]{2,100}$/;
+const PLAYER_RESERVED_CHANNELS = new Set([
+  "directory", "videos", "settings", "search", "downloads", "jobs", "p", "turbo", "prime",
+  "subscriptions", "inventory", "wallet", "drops", "friends", "messages", "following", "login", "signup"
+]);
+
+function validPlayerHash(hash) {
+  if (typeof hash !== "string" || !hash || hash.includes("#")) {
+    return false;
+  }
+  const params = new URLSearchParams(hash);
+  const entries = Array.from(params.entries());
+  const siteEntries = entries.filter(([key]) => key === "site");
+  const titleEntries = entries.filter(([key]) => key === "title");
+  if (siteEntries.length !== 1 || titleEntries.length > 1 || params.size < 2 || params.size > 3) {
+    return false;
+  }
+  if (titleEntries.length && (!titleEntries[0][1].trim() || titleEntries[0][1].length > 120)) {
+    return false;
+  }
+  const site = params.get("site");
+  if (!PLAYER_SITES.has(site)) {
+    return false;
+  }
+  const expected = site === "youtube" || site === "imdb" ? "id"
+    : site === "twitch" ? "channel" : site === "twitchvideo" ? "video" : "clip";
+  if (entries.filter(([key]) => key === expected).length !== 1
+    || entries.some(([key]) => key !== "site" && key !== expected && key !== "title")) {
+    return false;
+  }
+  const value = params.get(expected);
+  if (site === "youtube" && !PLAYER_VIDEO_ID_RE.test(value)) {
+    return false;
+  }
+  if (site === "imdb" && !/^vi\d+$/.test(value)) {
+    return false;
+  }
+  if (site === "twitch" && (!PLAYER_CHANNEL_RE.test(value) || PLAYER_RESERVED_CHANNELS.has(value.toLowerCase()))) {
+    return false;
+  }
+  if (site === "twitchvideo" && !/^\d+$/.test(value)) {
+    return false;
+  }
+  return site !== "twitchclip" || PLAYER_SLUG_RE.test(value);
+}
+
+function playerWindowMode(incognito) {
+  return incognito ? "incognito" : "normal";
+}
+
+function playerError() {
+  return chrome.runtime.lastError ? chrome.runtime.lastError.message : "Unknown browser error";
+}
+
+function rememberPlayerWindow(mode, windowId, callback) {
+  chrome.storage.session.get({ [PLAYER_WINDOWS_KEY]: {} }, result => {
+    if (chrome.runtime.lastError) {
+      callback(playerError());
+      return;
+    }
+    const windows = result[PLAYER_WINDOWS_KEY] && typeof result[PLAYER_WINDOWS_KEY] === "object"
+      ? result[PLAYER_WINDOWS_KEY] : {};
+    windows[mode] = windowId;
+    chrome.storage.session.set({ [PLAYER_WINDOWS_KEY]: windows }, () => {
+      callback(chrome.runtime.lastError ? playerError() : null);
+    });
+  });
+}
+
+function focusPlayerWindow(windowId, sendResponse) {
+  chrome.windows.update(windowId, { focused: true }, () => {
+    if (chrome.runtime.lastError) {
+      sendResponse({ ok: false, error: playerError() });
+      return;
+    }
+    sendResponse({ ok: true });
+  });
+}
+
+function createPlayerWindow(hash, incognito, mode, sendResponse) {
+  chrome.windows.create({
+    url: `${HOA.PLAYER_URL}#${hash}`,
+    type: "popup",
+    width: 900,
+    height: 560,
+    focused: true,
+    incognito: Boolean(incognito)
+  }, created => {
+    if (chrome.runtime.lastError || !created || !Number.isInteger(created.id)) {
+      sendResponse({ ok: false, error: playerError() });
+      return;
+    }
+    rememberPlayerWindow(mode, created.id, error => {
+      if (error) {
+        sendResponse({ ok: false, error });
+        return;
+      }
+      sendResponse({ ok: true });
+    });
+  });
+}
+
+function openPlayerWindow(hash, incognito, sendResponse) {
+  const mode = playerWindowMode(incognito);
+  chrome.storage.session.get({ [PLAYER_WINDOWS_KEY]: {} }, result => {
+    if (chrome.runtime.lastError) {
+      sendResponse({ ok: false, error: playerError() });
+      return;
+    }
+    const windows = result[PLAYER_WINDOWS_KEY] && typeof result[PLAYER_WINDOWS_KEY] === "object"
+      ? result[PLAYER_WINDOWS_KEY] : {};
+    const rememberedId = windows[mode];
+    if (!Number.isInteger(rememberedId)) {
+      createPlayerWindow(hash, incognito, mode, sendResponse);
+      return;
+    }
+    chrome.windows.get(rememberedId, { populate: true }, existing => {
+      if (chrome.runtime.lastError || !existing) {
+        createPlayerWindow(hash, incognito, mode, sendResponse);
+        return;
+      }
+      const tab = Array.isArray(existing.tabs) ? existing.tabs.find(item => Number.isInteger(item.id)) : null;
+      if (!tab) {
+        createPlayerWindow(hash, incognito, mode, sendResponse);
+        return;
+      }
+      chrome.tabs.update(tab.id, { url: `${HOA.PLAYER_URL}#${hash}` }, () => {
+        if (chrome.runtime.lastError) {
+          sendResponse({ ok: false, error: playerError() });
+          return;
+        }
+        focusPlayerWindow(existing.id, sendResponse);
+      });
+    });
+  });
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "hoa-play") {
+    return undefined;
+  }
+  if (!validPlayerHash(message.hash)) {
+    sendResponse({ ok: false, error: "Invalid player request" });
+    return true;
+  }
+  openPlayerWindow(message.hash, Boolean(sender && sender.tab && sender.tab.incognito), sendResponse);
+  return true;
+});

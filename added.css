@@ -79,8 +79,9 @@ body.hoa-added-view main {
   border-radius: 7px;
   font-weight: 700;
 }
-.hoa-added-page .site-identity { display: flex; gap: 9px; min-width: 0; align-items: center; }
+.hoa-added-page .site-identity { display: flex; gap: 9px; min-width: 0; align-items: center; flex-wrap: wrap; }
 .hoa-added-page .site-identity h2 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hoa-added-page .player-site-note { font-size: 12px; white-space: nowrap; }
 .hoa-added-page .site-controls { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
 .hoa-added-page .site-controls select,
 .hoa-added-page .tag-editor select,
@@ -129,6 +130,19 @@ body.hoa-added-view main {
   box-shadow: 0 5px 16px rgba(42, 39, 91, .08);
 }
 .hoa-added-page .card-media { position: relative; }
+.hoa-added-page .card-play,
+.hoa-added-page .card-external {
+  display: block;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  text-align: inherit;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  cursor: pointer;
+}
 .hoa-added-page .card-media img,
 .hoa-added-page .card-media .hoa-placeholder {
   display: block;
@@ -136,6 +150,61 @@ body.hoa-added-view main {
   aspect-ratio: 16 / 9;
   object-fit: cover;
   background: var(--surface-2);
+}
+.hoa-added-page .player-corner-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  max-width: calc(100% - 16px);
+  padding: 3px 6px;
+  overflow: hidden;
+  color: #fff;
+  background: rgba(0, 0, 0, .68);
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.hoa-added-page .card-play::after {
+  /* \FE0E keeps ▶ a text glyph (not an emoji); the white ring and shadow keep it visible on dark and bright
+     thumbnails alike. */
+  content: "\25B6\FE0E";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  display: grid;
+  width: 52px;
+  height: 52px;
+  padding-left: 4px;
+  box-sizing: border-box;
+  place-items: center;
+  color: #fff;
+  background: #5b5bf0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .45);
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.92);
+  pointer-events: none;
+}
+.hoa-added-page .card-play:hover::after,
+.hoa-added-page .card-play:focus-visible::after { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.hoa-added-page .card-play:focus-visible,
+.hoa-added-page .card-external:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+.hoa-added-page .card-play-error {
+  display: block;
+  padding: 6px 12px 0;
+  color: var(--danger, #d93a49);
+  font-size: 12px;
 }
 .hoa-added-page .short-grid .card-media img,
 .hoa-added-page .short-grid .card-media .hoa-placeholder { aspect-ratio: 9 / 16; }
@@ -215,6 +284,7 @@ body.hoa-added-view main {
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .hoa-added-page .card-play::after { transition: opacity 150ms ease-out, transform 150ms ease-out; }
   .hoa-added-page button,
   .hoa-added-page a,
   .hoa-added-page select,

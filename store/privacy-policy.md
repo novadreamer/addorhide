@@ -39,6 +39,10 @@ You can delete your data at any time:
 
 If you allow the extension to run in private (incognito) windows, videos you hide or add there are saved in the same extension storage used by your normal windows. They remain after the private window is closed until you delete them as described above. If you do not want this, do not enable the extension in private windows.
 
+## Popup player
+
+On the Added Videos page, clicking the picture of a video marked **Popup player** opens a window on novadreamer.github.io (GitHub Pages), a page that only hosts the site's official embed player. The video's id and title are passed after `#` in the address, a part browsers never send to the server, so GitHub does not learn what you play. The official player (YouTube, Twitch, IMDb) then loads from that site under its own privacy policy, with its own ads and cookies, exactly like an embedded video on any website.
+
 ## Network requests the extension makes
 
 The extension does not send your data to the developer. These requests happen directly between your browser and the sites involved, as they would for any web page:

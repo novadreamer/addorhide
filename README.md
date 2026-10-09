@@ -27,6 +27,17 @@ The **Added Videos** page contains only videos explicitly added. It groups entri
 On a catalog-supported site, choose **Enable on this site** and AddOrHide uses its built-in card rule. On any other site, choose **Enable on this site**, then choose a video or card in the page picker and press **Save**. AddOrHide learns a CSS pattern and adds **Hide** and **Add** buttons to similar cards. Card detection is heuristic, so a picker can fail on some sites; try a different part of the card. The site permission is requested only for the site you enable and can be revoked with **Disable**. AddOrHide never touches DRM or streaming playback.
 The browser may close the popup when it asks for permission; AddOrHide finishes picker setup in the background only for sites that need it.
 
+## Popup player
+
+Supported videos can be played in a floating popup window using the site's official embed player. The player window is reused for later videos in the same normal or private browsing mode.
+
+| Site | Popup player supports | Other saved entries |
+| --- | --- | --- |
+| YouTube | Videos and Shorts | — |
+| Twitch | Live channels, videos and clips | — |
+| IMDb | Video pages, including trailers | Title pages open on IMDb |
+| Tubi, Dailymotion, TMDB | — | Open on the original site |
+
 In private windows, the Added Videos page uses the hosted view at `youtube.com/robots.txt#addorhide-added`, because browsers do not open extension pages there. Turn on **Allow in Incognito** for AddOrHide. The popup and options page keep new tabs in the current window.
 
 Storage is local to this browser and is not synced between devices. Hidden items are capped at 1000 and Added items at 500, with the oldest entries evicted first. **Hide the whole feed** toggles for YouTube and Tubi are in Options (and in the popup for the current site) and are reversible from the same toggle.

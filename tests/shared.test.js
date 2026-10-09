@@ -27,6 +27,59 @@ check("canonical IMDb non-title URL", () => assert.equal(HOA.canonicalUrl("https
 check("canonical ref tracking params", () => assert.equal(HOA.canonicalUrl("https://example.com/path?ref_=x&pf_rd_i=y&ref_source=z&keep=1"), "https://example.com/path?keep=1"));
 check("reject unsafe URL", () => assert.equal(HOA.canonicalUrl("javascript:alert(1)"), null));
 check("reject invalid YouTube id", () => assert.equal(HOA.canonicalUrl("https://www.youtube.com/watch?v=bad"), null));
+check("player maps YouTube watch", () => assert.deepEqual(HOA.playerFor(watch), {
+  hash: `site=youtube&id=${id}`, siteName: "YouTube"
+}));
+check("player maps YouTube short", () => assert.deepEqual(HOA.playerFor(short), {
+  hash: `site=youtube&id=${id2}`, siteName: "YouTube"
+}));
+check("player maps Twitch channel", () => assert.deepEqual(HOA.playerFor("https://www.twitch.tv/Some_Channel"), {
+  hash: "site=twitch&channel=Some_Channel", siteName: "Twitch"
+}));
+check("player maps Twitch video", () => assert.deepEqual(HOA.playerFor("https://www.twitch.tv/videos/123456789"), {
+  hash: "site=twitchvideo&video=123456789", siteName: "Twitch"
+}));
+check("player maps Twitch clips host", () => assert.deepEqual(HOA.playerFor("https://clips.twitch.tv/Clip_Slug-123"), {
+  hash: "site=twitchclip&clip=Clip_Slug-123", siteName: "Twitch"
+}));
+check("player maps Twitch channel clip", () => assert.deepEqual(HOA.playerFor("https://www.twitch.tv/channel_name/clip/Clip_Slug-123"), {
+  hash: "site=twitchclip&clip=Clip_Slug-123", siteName: "Twitch"
+}));
+check("player maps IMDb video", () => assert.deepEqual(HOA.playerFor("https://www.imdb.com/video/vi123456789"), {
+  hash: "site=imdb&id=vi123456789", siteName: "IMDb"
+}));
+check("player encodes and trims title", () => {
+  const result = HOA.playerFor(watch, `  A & B / ${"x".repeat(200)}  `);
+  const params = new URLSearchParams(result.hash);
+  assert.equal(params.get("title"), `A & B / ${"x".repeat(200)}`.slice(0, 120));
+  assert.match(result.hash, /title=A\+%26\+B\+%2F/);
+});
+[
+  "directory", "videos", "settings", "search", "downloads", "jobs", "p", "turbo", "prime",
+  "subscriptions", "inventory", "wallet", "drops", "friends", "messages", "following", "login", "signup"
+].forEach(reserved => check(`player rejects Twitch reserved word ${reserved}`, () => assert.equal(
+  HOA.playerFor(`https://www.twitch.tv/${reserved}`), null)));
+[
+  "https://www.youtube.com/watch?v=short",
+  "https://www.youtube.com/watch?v=123456789012",
+  "https://www.youtube.com/shorts/not-an-id",
+  "https://www.twitch.tv/a",
+  "https://www.twitch.tv/videos/not-digits",
+  "https://clips.twitch.tv/x",
+  `https://clips.twitch.tv/${"x".repeat(101)}`,
+  "https://www.imdb.com/video/tt1234567"
+].forEach(key => check(`player rejects bad id ${key}`, () => assert.equal(HOA.playerFor(key), null)));
+check("player rejects IMDb title page", () => assert.equal(HOA.playerFor("https://www.imdb.com/title/tt1234567"), null));
+check("player rejects Dailymotion", () => assert.equal(HOA.playerFor("https://www.dailymotion.com/video/x123456"), null));
+check("player rejects Tubi", () => assert.equal(HOA.playerFor("https://tubitv.com/movies/123"), null));
+check("player site names", () => assert.deepEqual([
+  HOA.playerSiteName("https://www.imdb.com/title/tt1234567"),
+  HOA.playerSiteName("https://www.dailymotion.com/video/x123456"),
+  HOA.playerSiteName("https://tubitv.com/movies/123"),
+  HOA.playerSiteName("https://www.themoviedb.org/movie/123"),
+  HOA.playerSiteName("https://www.twitch.tv/directory"),
+  HOA.playerSiteName(watch)
+], ["IMDb", "Dailymotion", "Tubi", "TMDB", "Twitch", "YouTube"]));
 check("kind short", () => assert.equal(HOA.kindOf(short), "short"));
 check("kind video", () => assert.equal(HOA.kindOf(watch), "video"));
 

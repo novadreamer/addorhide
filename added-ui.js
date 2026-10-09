@@ -288,7 +288,18 @@ const HOA_ADDED = (() => {
         return null;
       }
       const card = element("article", "added-card");
-      const media = element("div", "card-media");
+      const player = HOA.playerFor(key, entry.title);
+      const siteName = HOA.playerSiteName(key);
+      const media = element(player ? "button" : "a", `card-media ${player ? "card-play" : "card-external"}`);
+      if (player) {
+        media.type = "button";
+        media.setAttribute("aria-label", `Play ${entry.title} in the popup player`);
+      } else {
+        media.href = href;
+        media.target = "_blank";
+        media.rel = "noopener noreferrer";
+        media.setAttribute("aria-label", `Open ${entry.title} on ${siteName}`);
+      }
       if (entry.thumb) {
         const image = document.createElement("img");
         image.src = HOA.safeHref(entry.thumb) || "";
@@ -304,7 +315,38 @@ const HOA_ADDED = (() => {
           media.appendChild(duration);
         }
       }
-      card.appendChild(media);
+      media.appendChild(element("span", "player-corner-label", player
+        ? "▶ Popup player" : `↗ Opens on ${siteName}`));
+      if (player) {
+        const playError = element("span", "card-play-error");
+        playError.hidden = true;
+        let playErrorTimer;
+        const showPlayError = message => {
+          playError.textContent = message || "Could not open popup player.";
+          playError.hidden = false;
+          clearTimeout(playErrorTimer);
+          playErrorTimer = setTimeout(() => {
+            playError.hidden = true;
+          }, 4000);
+        };
+        media.addEventListener("click", event => {
+          event.preventDefault();
+          try {
+            chrome.runtime.sendMessage({ type: "hoa-play", hash: player.hash }, response => {
+              const runtimeError = chrome.runtime.lastError;
+              if (runtimeError || !response || !response.ok) {
+                showPlayError(runtimeError ? runtimeError.message : response && response.error);
+              }
+            });
+          } catch (error) {
+            showPlayError();
+          }
+        });
+        card.appendChild(media);
+        card.appendChild(playError);
+      } else {
+        card.appendChild(media);
+      }
       const body = element("div", "added-card-body");
       const title = element("h3");
       const titleLink = element("a", "added-title", entry.title);
@@ -412,6 +454,11 @@ const HOA_ADDED = (() => {
       const name = element("h2", "", group.name);
       identity.appendChild(name);
       identity.appendChild(element("span", "count-badge", String(group.entries.length)));
+      const hasPlayable = group.entries.some(([key, entry]) => HOA.playerFor(key, entry && entry.title));
+      if (!hasPlayable) {
+        identity.appendChild(element("span", "muted player-site-note",
+          `No popup player · opens on ${HOA.playerSiteName(group.site)}`));
+      }
       heading.appendChild(identity);
       const controls = element("div", "site-controls");
       // Only controls that change something for this website are shown (see HOA.availableSorts/Groups).

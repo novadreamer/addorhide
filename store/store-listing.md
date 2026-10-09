@@ -29,6 +29,7 @@ YOUR ADDED VIDEOS PAGE
 - Sort each site's videos by date added, date published, views, duration, year or A-Z.
 - Group them by type (video, short, movie, TV, live, music, sport) or by genre where the site shows one.
 - Tag any video with your own type and genres.
+- Click **Play** on supported YouTube, Twitch or IMDb videos to open the site's official player in a popup window; other saved videos open on their original site.
 - Works in private windows too, if you allow the extension there.
 
 THE HIDDEN LIST
@@ -100,10 +101,11 @@ No account or login is needed.
 1. Open https://tubitv.com/ (works logged out) and hover over any movie or TV tile: Hide and Add buttons appear at the top-right of the tile.
 2. Click Add on a tile (it shows "Added"), then Hide on another tile (it disappears; an Undo message appears).
 3. Click the AddOrHide toolbar icon: the hidden video is listed with Restore and Remove buttons. Click "Open added page" to see the added video, grouped under Tubi. Use the Sort by control and the Tag button there.
-4. YouTube is also supported: the home feed (shown only to signed-in users) and any creator's page (for example `https://www.youtube.com/@NASA`, Home, Videos, Shorts and Live tabs), which works signed out.
-5. Open https://www.imdb.com/chart/moviemeter/, open the popup and choose "Enable on this site". After the single-site permission prompt, Hide and Add buttons appear on the chart rows without using the picker.
-6. Any other site: open the popup on it and click "Enable on this site". The browser asks for permission for that single site, then a picker asks you to click one video tile.
-Note: browsers cannot open extension pages in private windows, so in a private window "Open added page" opens https://www.youtube.com/robots.txt#addorhide-added. The extension's content script (restricted to that exact address) draws the Added Videos page there from the local list. It reads nothing from YouTube and sends nothing to it.
+4. On a saved YouTube video or Short, click the **Play** thumbnail button. It opens the official player in one popup window; click another supported video to confirm the same window is reused. Twitch channels, videos and clips, and IMDb videos work the same way.
+5. YouTube is also supported: the home feed (shown only to signed-in users) and any creator's page (for example `https://www.youtube.com/@NASA`, Home, Videos, Shorts and Live tabs), which works signed out.
+6. Open https://www.imdb.com/chart/moviemeter/, open the popup and choose "Enable on this site". After the single-site permission prompt, Hide and Add buttons appear on the chart rows without using the picker.
+7. Any other site: open the popup on it and click "Enable on this site". The browser asks for permission for that single site, then a picker asks you to click one video tile.
+Note: browsers cannot open extension pages in private windows, so in a private window "Open added page" opens https://www.youtube.com/robots.txt#addorhide-added. The extension's content script (restricted to that exact address) draws the Added Videos page there from the local list. It reads nothing from YouTube and sends nothing to it. IMDb title pages, Dailymotion, Tubi and TMDB entries do not have the popup player; their thumbnail labels open the original site.
 ```
 
 ---
