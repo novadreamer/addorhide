@@ -161,3 +161,11 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 .site-list .site-list-row > span:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .site-list .site-list-row > span:first-child strong { flex: 0 0 100%; }
 .site-list .site-list-row > .page-actions { flex: 0 0 auto; flex-wrap: nowrap; }
+
+/* Top/Bottom choice for the Add/Hide buttons (popup and options). */
+.edge-choice { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; padding: 0; border: 0; }
+.edge-choice legend { float: left; margin-right: 8px; padding: 0; font-weight: 600; }
+.edge-choice label { display: inline-flex; gap: 6px; align-items: center; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; }
+.edge-choice label:has(input:checked) { color: var(--accent); background: var(--surface-2); border-color: var(--accent); font-weight: 600; }
+.edge-choice input { accent-color: var(--accent); margin: 0; }
+.popup-edge { margin: 0 0 10px; }

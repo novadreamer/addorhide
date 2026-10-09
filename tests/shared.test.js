@@ -400,6 +400,8 @@ check("mergeBackup unions picks and shallow merges prefs", () => {
 });
 check("mergeBackup reports changed and new counts", () => assert.deepEqual(merge.counts, { added: 1, hidden: 1, sites: 1 }));
 
+check("button edge defaults to top", () => assert.deepEqual([HOA.buttonEdgeOf("bottom"), HOA.buttonEdgeOf("top"), HOA.buttonEdgeOf(undefined), HOA.buttonEdgeOf("left")], ["bottom", "top", "top", "top"]));
+
 // The popup injects shared.js/catalog.js again into pages that already run them (picker, Enable).
 check("shared.js and catalog.js can be injected twice into one world", () => {
   const vm = require("node:vm");

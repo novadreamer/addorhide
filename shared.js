@@ -13,6 +13,12 @@ var HOA = Object.freeze((() => {
   const HOSTED_ADDED_URL = "https://www.youtube.com/robots.txt#addorhide-added";
   const PLAYER_URL = "https://novadreamer.github.io/addorhide-player/";
   const PREFS_KEY = "addedViewPrefs";
+  // Where the Add/Hide bar sits on every site: "top" (default) or "bottom" of the video picture.
+  const BUTTON_EDGE_KEY = "buttonEdge";
+
+  function buttonEdgeOf(value) {
+    return value === "bottom" ? "bottom" : "top";
+  }
   const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
   const TWITCH_CHANNEL_RE = /^[A-Za-z0-9_]{2,25}$/;
   const TWITCH_SLUG_RE = /^[A-Za-z0-9_-]{2,100}$/;
@@ -1228,6 +1234,8 @@ var HOA = Object.freeze((() => {
     ADDED_KEY,
     SITES_KEY,
     PREFS_KEY,
+    BUTTON_EDGE_KEY,
+    buttonEdgeOf,
     MAX_HIDDEN,
     MAX_ADDED,
     MAX_TITLE,

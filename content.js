@@ -21,6 +21,7 @@ window.__hoaLoaded = true;
   let lastRule = null;
   let observedRoot = null;
   let retired = false;
+  let buttonEdge = "top";
 
   function contextAlive() {
     try {
@@ -508,6 +509,35 @@ window.__hoaLoaded = true;
   // Buttons always sit centred on the top edge. When the site's own controls are there
   // (IMDb's watchlist ribbon and info button), slide sideways past them, or just below them near the top,
   // instead of jumping to the bottom of the card.
+  // The card's video picture: the largest image or video at least 40% as wide as the card; an element named
+  // "thumbnail" only when there is none (YouTube wraps whole cards in elements with that word in the class).
+  function videoPictureBox(card, cardRect, originX, originY) {
+    const largest = selector => {
+      let best = null;
+      let bestArea = 0;
+      card.querySelectorAll(selector).forEach(element => {
+        if (element.closest(".hoa-actions")) {
+          return;
+        }
+        const rect = element.getBoundingClientRect();
+        const area = rect.width * rect.height;
+        if (rect.width >= cardRect.width * 0.4 && rect.height < cardRect.height * 0.98 && area > bestArea) {
+          best = rect;
+          bestArea = area;
+        }
+      });
+      return best;
+    };
+    const best = largest("img, video") || largest("picture, [class*=\"thumbnail\" i]");
+    if (!best) {
+      return { top: 0, bottom: cardRect.height };
+    }
+    return {
+      top: Math.max(0, best.top - originY),
+      bottom: Math.min(cardRect.height, best.bottom - originY)
+    };
+  }
+
   function placeActions(card, actions, rule) {
     const cardRect = card.getBoundingClientRect();
     const size = `${Math.round(cardRect.width)}x${Math.round(cardRect.height)}`;
@@ -553,11 +583,22 @@ window.__hoaLoaded = true;
     };
     let x = null;
     let y = margin;
-    const rows = [margin, ...controls.map(rect => rect.bottom + 6).filter(top => top > margin)].sort((a, b) => a - b);
+    let rows;
+    let fallbackY = margin;
+    if (buttonEdge === "bottom") {
+      // Bottom means the bottom edge of the video picture, not of the whole card (YouTube cards continue with
+      // the title and channel below it). Blocked rows move up, but stay in the lower half of the picture.
+      const media = videoPictureBox(card, cardRect, originX, originY);
+      const lowest = Math.max(margin, media.bottom - height - margin);
+      const highest = Math.max(margin, media.top + (media.bottom - media.top) / 2 - height / 2);
+      fallbackY = lowest;
+      rows = [lowest, ...controls.map(rect => rect.top - 6 - height).filter(top => top < lowest)]
+        .filter(top => top >= highest).sort((a, b) => b - a);
+    } else {
+      rows = [margin, ...controls.map(rect => rect.bottom + 6).filter(top => top > margin)].sort((a, b) => a - b)
+        .filter(row => row + height <= Math.max(cardRect.height / 2, margin + height));
+    }
     for (const row of rows) {
-      if (row + height > Math.max(cardRect.height / 2, margin + height)) {
-        break;
-      }
       x = tryRow(row);
       if (x !== null) {
         y = row;
@@ -566,7 +607,7 @@ window.__hoaLoaded = true;
     }
     if (x === null) {
       x = clampX(preferredX);
-      y = margin;
+      y = fallbackY;
     }
     Object.assign(actions.style, { top: `${Math.round(y)}px`, left: `${Math.round(x)}px` });
     actions.style.visibility = previousVisibility;
@@ -811,8 +852,27 @@ window.__hoaLoaded = true;
       siteRules = changes[HOA.SITES_KEY].newValue && typeof changes[HOA.SITES_KEY].newValue === "object"
         ? changes[HOA.SITES_KEY].newValue : {};
     }
+    if (changes[HOA.BUTTON_EDGE_KEY]) {
+      setButtonEdge(changes[HOA.BUTTON_EDGE_KEY].newValue);
+    }
     scheduleApply();
   });
+
+  // Re-place every bar this script owns when the Top/Bottom choice changes.
+  function setButtonEdge(value) {
+    const next = HOA.buttonEdgeOf(value);
+    if (next === buttonEdge) {
+      return;
+    }
+    buttonEdge = next;
+    document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"]:not(.hoa-float)`).forEach(actions => {
+      actions.hoaPlacementSize = null;
+      if (actions.hoaCard && actions.hoaCard.isConnected) {
+        placeActions(actions.hoaCard, actions, actions.hoaRule || {});
+      }
+    });
+  }
+  chrome.storage.local.get({ [HOA.BUTTON_EDGE_KEY]: "top" }, result => setButtonEdge(result[HOA.BUTTON_EDGE_KEY]));
 
   const observer = new MutationObserver(mutations => {
     if (!ensureContext()) {

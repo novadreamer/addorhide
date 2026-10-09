@@ -49,6 +49,13 @@
         <span>No hidden videos.</span>
       </p>
     </section>
+    <div class="popup-edge">
+      <fieldset id="button-edge" class="edge-choice">
+        <legend>Buttons on videos</legend>
+        <label><input type="radio" name="button-edge" value="top"> <span>Top</span></label>
+        <label><input type="radio" name="button-edge" value="bottom"> <span>Bottom</span></label>
+      </fieldset>
+    </div>
     <div class="popup-footer">
       <button id="open-added-button" class="primary-button" type="button">Open added page</button>
       <button id="open-options-button" class="ghost-button" type="button">Options</button>
@@ -56,6 +63,7 @@
     <div id="popup-status" class="status popup-toast" role="status" aria-live="polite"></div>
   </main>
   <script src="shared.js"></script>
+  <script src="edge-choice.js"></script>
   <script src="catalog.js"></script>
   <script src="sites.js"></script>
   <script src="popup.js"></script>

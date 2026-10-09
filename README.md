@@ -6,7 +6,7 @@ AddOrHide is a browser extension for hiding recommendations or saving videos to 
 
 YouTube (home feed, subscriptions and creators' Home/Videos/Shorts/Live tabs) and Tubi are built in. IMDb charts/lists, TMDB lists, Dailymotion home, explore, video pages and search, and the Twitch directory can be enabled in one click with **Enable on this site**. Any other site can use the card picker. Sites that need a login or show a CAPTCHA or consent wall were not checked and should use the picker.
 
-The Add/Hide buttons appear centred at the top of a card whenever the mouse is anywhere over it. If the site's own controls sit there, the buttons slide past them; if a site lays its own hover preview over the card (YouTube), the buttons are drawn above it.
+The Add/Hide buttons appear centred at the top of a card (or at the bottom of its video picture, chosen under **Buttons on videos** in the popup or Options) whenever the mouse is anywhere over it. If the site's own controls sit there, the buttons slide past them; if a site lays its own hover preview over the card (YouTube), the buttons are drawn above it.
 
 ## Look and feel
 

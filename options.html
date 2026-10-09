@@ -21,6 +21,15 @@
       <div id="site-list" class="site-list"></div>
       <p id="site-empty" class="empty-state muted" hidden>No other sites yet. Open the AddOrHide popup on a site and choose Enable on this site.</p>
     </section>
+    <section class="panel" aria-labelledby="edge-heading">
+      <h2 id="edge-heading">Add and Hide buttons</h2>
+      <p class="muted">Where the buttons appear on every video, on every site.</p>
+      <fieldset id="button-edge" class="edge-choice">
+        <legend>Buttons on videos</legend>
+        <label><input type="radio" name="button-edge" value="top"> <span>Top</span></label>
+        <label><input type="radio" name="button-edge" value="bottom"> <span>Bottom</span></label>
+      </fieldset>
+    </section>
     <section class="panel" aria-labelledby="feed-heading">
       <h2 id="feed-heading">Hide whole feeds</h2>
       <label class="switch-row"><input id="bulk-hide" type="checkbox" role="switch"> <span>Hide every recommendation on YouTube</span></label>
@@ -57,6 +66,7 @@
     </section>
   </main>
   <script src="shared.js"></script>
+  <script src="edge-choice.js"></script>
   <script src="catalog.js"></script>
   <script src="sites.js"></script>
   <script src="options.js"></script>
