@@ -50,8 +50,9 @@ var HOA_CATALOG = Object.freeze((() => {
           titleCandidates: YOUTUBE_TITLES
         }),
         Object.freeze({
-          cardSelector: "ytm-shorts-lockup-view-model-v2",
-          pathPattern: "^/(@|channel/|c/|user/)",
+          // Shorts shelves on a creator's page and in the watch-page sidebar.
+          cardSelector: "ytm-shorts-lockup-view-model-v2, ytm-shorts-lockup-view-model",
+          pathPattern: "^/(@|channel/|c/|user/|watch)",
           linkSelector: 'a[href*="/shorts/"]',
           titleCandidates: Object.freeze(["h3", "[aria-label]"])
         })

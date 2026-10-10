@@ -214,6 +214,15 @@ const CASES = [
       assert.ok(entry.title.length > 5 && !/^(\d{1,2}:)+\d{2}$/.test(entry.title), "title: " + entry.title);
       assert.ok(Number.isFinite(entry.duration) && entry.duration > 0, "duration");
     }
+  },
+  {
+    name: "youtube watch sidebar shorts", fixture: "youtube-watch-shorts.html", url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ", host: "www.youtube.com",
+    cardSelector: "ytm-shorts-lockup-view-model-v2", cards: 3, optIn: false,
+    expectAdd(key, entry) {
+      assert.strictEqual(key, "https://www.youtube.com/shorts/aBcDeFgHiJ1");
+      assert.strictEqual(entry.kind, "short");
+      assert.strictEqual(entry.title, "Tiny robot learns to walk");
+    }
   }
 ];
 
