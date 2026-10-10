@@ -1,4 +1,4 @@
-# AddOrHide: Chrome Web Store submission pack (draft)
+# AddOrHide: Chrome Web Store submission pack
 
 Release note: version 1.0.0 is ready for submission. The Options page includes Export my data and Import data for moving local lists and settings between extension installations.
 
@@ -99,7 +99,7 @@ AddOrHide is an independent project and is not affiliated with, endorsed by or s
 
 **Certifications:** tick all three: not sold or transferred to third parties outside approved uses, not used for purposes unrelated to the single purpose, not used to determine creditworthiness or for lending. Certify compliance with the Limited Use policy.
 
-**Privacy policy URL:** [HOSTED URL OF store/privacy-policy.html]. It must be reachable without signing in.
+**Privacy policy URL:** https://novadreamer.github.io/addorhide-player/privacy.html
 
 **Test instructions for reviewers** (paste into the Distribution/test instructions field):
 
@@ -107,8 +107,8 @@ AddOrHide is an independent project and is not affiliated with, endorsed by or s
 No account or login is needed.
 1. Open https://tubitv.com/ (works logged out) and hover over any movie or TV tile: Add and Hide buttons appear centred at the top of the tile.
 2. Click Add on a tile (it shows "Added"), then Hide on another tile (it disappears; an Undo message appears).
-3. Click the AddOrHide toolbar icon: the hidden video is listed with Restore and Remove buttons. Click "Open added page" to see the added video, grouped under Tubi. Use the Sort by control and the Tag button there.
-4. On a saved YouTube video or Short, click the **Play** thumbnail button. It opens the official player in one popup window; click another supported video to confirm the same window is reused. Twitch channels, videos and clips, and IMDb videos work the same way.
+3. Click the AddOrHide toolbar icon. Click "Hidden Videos": a window lists the hidden video under Tubi with Restore and Remove. Back in the popup, click "Open added page" to see the added video, grouped under Tubi. Use the Sort by control and the Tag button there.
+4. Add a YouTube video (step 5), then on the Added Videos page click its thumbnail marked "Popup player". It opens the official YouTube player, with its normal ads, in one popup window; click another supported video to confirm the same window is reused. Twitch channels, videos and clips, and IMDb videos work the same way.
 5. YouTube is also supported: the home feed (shown only to signed-in users) and any creator's page (for example `https://www.youtube.com/@NASA`, Home, Videos, Shorts and Live tabs), which works signed out.
 6. Open https://www.imdb.com/chart/moviemeter/, open the popup and choose "Enable on this site". After the single-site permission prompt, Add and Hide buttons appear on the chart rows without using the picker.
 7. Any other site: open the popup on it and click "Enable on this site". The browser asks for permission for that single site, then a picker asks you to click one video tile.
@@ -121,7 +121,8 @@ Note: browsers cannot open extension pages in private windows, so in a private w
 
 - **Visibility:** Public (or Unlisted for a beta first).
 - **Regions:** all.
-- **Trader status (EU):** if this is a free hobby project with no commercial activity you can usually declare non-trader. If you charge or run it as a business, you must declare trader status and publish contact details. Check the dashboard wording.
+- **Trader status (EU):** Non-trader (individual, free extension, optional tips only). Switch to trader if you ever charge or run it as a business.
+- **Publisher display name:** Ashraf Mustafa
 
 ---
 
