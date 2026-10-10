@@ -182,8 +182,8 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 .control-row { display: flex; gap: 12px; align-items: center; }
 .button-controls .control-label { font-weight: 600; }
 .position-buttons { display: grid; gap: 6px; }
-.button-controls .press-button.toggle-button { min-width: 180px; min-height: 44px; padding: 8px 24px; font-size: 17px; }
-.button-controls .press-button.edge-button { min-width: 72px; min-height: 26px; padding: 3px 10px; font-size: 12px; line-height: 1; }
+.button-controls .press-button.toggle-button { min-width: 136px; min-height: 34px; padding: 5px 18px; font-size: 15px; }
+.button-controls .press-button.edge-button { min-width: 54px; min-height: 21px; padding: 2px 8px; font-size: 10px; line-height: 1; }
 .button-controls .press-button {
   min-width: 112px;
   min-height: 32px;
@@ -221,7 +221,7 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 body.popup main { overflow-y: auto; scrollbar-width: thin; }
 .popup .site-card, .popup .popup-edge, .popup .popup-footer { flex: 0 0 auto; }
 .popup .button-controls { gap: 24px; }
-.popup .button-controls .press-button.toggle-button { min-height: 40px; }
+.popup .button-controls .press-button.toggle-button { min-height: 32px; }
 
 /* The arrow buttons sit on the centre line (under Enable); "Position" hangs to their left. */
 .button-controls .position-row { display: grid; grid-template-columns: 1fr auto 1fr; justify-self: stretch; }
