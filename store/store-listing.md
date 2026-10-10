@@ -13,7 +13,7 @@ All the placeholders have been filled in. Field limits and required assets below
 **Summary** (dashboard limit 132):
 `Save videos you like to your own list and hide ones you don't want on YouTube, Tubi, IMDb, Dailymotion, Twitch and more.`
 
-**Category:** Productivity
+**Category:** Entertainment (the dashboard no longer has "Productivity"; "Functionality & UI" is the alternative)
 **Language:** English
 
 **Detailed description**
@@ -59,7 +59,7 @@ AddOrHide is an independent project and is not affiliated with, endorsed by or s
 
 **Graphic assets** (current requirements: store icon 128x128; at least 1 screenshot at 1280x800, up to 5; small promo tile 440x280 PNG or JPEG; marquee 1400x560 optional)
 
-- **Store icon (128x128):** done, `icons/icon128.png`.
+- **Store icon (128x128):** `store/assets/store-icon-128.png` (96x96 artwork with 16px transparent padding, per Google's icon guidelines).
 - **Screenshots (1280x800):** done, in `store/assets/` (mock sites and drawn thumbnails only), upload in this order:
   1. `screenshot-1-add-or-hide.png`: *Add what you like. Hide what you don't.*
   2. `screenshot-2-added-page.png`: *Your own list of saved videos*
