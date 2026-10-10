@@ -24,8 +24,8 @@ AddOrHide puts you in charge of the video recommendations on the sites you use. 
 
 HOW IT WORKS
 Hover over a video on a supported site and two small buttons appear:
-- Hide removes the video from the feed. Changed your mind? Tap Undo, or restore it from the Hidden Videos window in the extension popup.
 - Add saves the video to your Added Videos page. The video stays where it is, and the button turns into "Added".
+- Hide removes the video from the feed. Changed your mind? Tap Undo, or restore it from the Hidden Videos window in the extension popup.
 
 YOUR ADDED VIDEOS PAGE
 - Videos are grouped by website, each with its own logo tile.
