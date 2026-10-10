@@ -194,7 +194,7 @@ function frameHtml({ title, sub, shots }) {
   await shoot("screenshot-3-sort-group.png", { title: "Sort and group your way", sub: "Sort by views, length or date, and group by type or genre for each website.", shots: [{ file: path.join(RAW, "added-grouped.png"), w: 1100, label: "Added Videos" }] });
   await shoot("screenshot-4-hidden.png", { title: "Changed your mind? Restore anytime", sub: "Hidden videos stay listed by website, ready to bring back.", shots: [{ file: path.join(RAW, "hidden.png"), w: 1000, label: "Hidden Videos" }] });
   const pw = Math.round(400 * 575 / global.POPUP_H);
-  await shoot("screenshot-5-any-site.png", { title: "Works on the sites you watch", sub: "Built in for YouTube and Tubi, one click for IMDb, Twitch, Dailymotion and TMDB, or teach it any site.", shots: [{ file: path.join(RAW, "feed.png"), w: 1060 - pw, label: "lumaclips.tv" }, { file: path.join(RAW, "popup.png"), w: pw, label: "AddOrHide" }] });
+  await shoot("screenshot-5-any-site.png", { title: "Works on the sites you watch", sub: "Built in for YouTube, one click on popular movie and streaming sites, or teach it any site.", shots: [{ file: path.join(RAW, "feed.png"), w: 1060 - pw, label: "lumaclips.tv" }, { file: path.join(RAW, "popup.png"), w: pw, label: "AddOrHide" }] });
 
   // Promo tile and marquee.
   const promo = (w, h, big) => `<!doctype html><html><head><meta charset="utf-8"><style>

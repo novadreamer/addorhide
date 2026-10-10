@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
   "name": "AddOrHide",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "description": "Save videos to your own Added list or hide recommendations on YouTube, Tubi, IMDb, TMDB, Dailymotion, Twitch and sites you choose.",
+  "description": "Save videos you like to your own list and hide the recommendations you don't want, on YouTube and other video sites you choose.",
   "permissions": [
     "storage",
     "scripting",

@@ -1,6 +1,6 @@
 # AddOrHide: Chrome Web Store submission pack
 
-Release note: version 1.0.0 is ready for submission. The Options page includes Export my data and Import data for moving local lists and settings between extension installations.
+Release note: version 1.0.1 is ready for submission. The Options page includes Export my data and Import data for moving local lists and settings between extension installations.
 
 All the placeholders have been filled in. Field limits and required assets below come from the current Chrome Web Store documentation, except where marked "(dashboard limit)", which are limits the dashboard enforces that the docs page does not state.
 
@@ -11,7 +11,8 @@ All the placeholders have been filled in. Field limits and required assets below
 **Name** (dashboard limit 75): `AddOrHide`
 
 **Summary** (dashboard limit 132):
-`Save videos you like to your own list and hide ones you don't want on YouTube, Tubi, IMDb, Dailymotion, Twitch and more.`
+Comes from the package (manifest description), nothing to type:
+`Save videos you like to your own list and hide the recommendations you don't want, on YouTube and other video sites you choose.`
 
 **Category:** Entertainment (the dashboard no longer has "Productivity"; "Functionality & UI" is the alternative)
 **Language:** English
@@ -31,15 +32,15 @@ YOUR ADDED VIDEOS PAGE
 - Sort each site's videos by date added, date published, views, duration, year or A-Z.
 - Group them by type (video, short, movie, TV, live, music, sport) or by genre where the site shows one.
 - Tag any video with your own type and genres.
-- Click **Play** on supported YouTube, Twitch or IMDb videos to open the site's official player in a popup window; other saved videos open on their original site.
+- Click a video marked Popup player to watch it in a small floating window using the site's own official player, ads included; other saved videos open on their original site.
 - Works in private windows too, if you allow the extension there.
 
 THE HIDDEN LIST
 The toolbar popup shows how many videos you hid. Its Hidden Videos button opens a window listing them by website, with thumbnails. Restore one or all of them, or remove a row to keep the video hidden without cluttering the list.
 
 WORKS ON
-- YouTube and Tubi, built in.
-- IMDb charts/lists, TMDB lists, Dailymotion home and Twitch directory: choose Enable on this site for one-click support.
+- YouTube, built in, with no setup.
+- Several popular movie and streaming sites with one click: open the popup there and choose Enable on this site.
 - Any other site you choose. Turn it on for that site, click one video tile to show the extension what a video looks like, and the buttons appear on every similar tile. The browser asks for permission one site at a time, and you can take it back whenever you like.
 
 PRIVATE BY DESIGN
@@ -54,7 +55,7 @@ GOOD TO KNOW
 - Websites change their layout from time to time, which can occasionally affect the buttons. Please report problems at mybrainnoor@gmail.com.
 - AddOrHide is free, with every feature included. If you find it useful, you can support it at https://ko-fi.com/ashmustafa (optional).
 
-AddOrHide is an independent project and is not affiliated with, endorsed by or sponsored by YouTube, Google, Tubi or any other streaming service. All product names and trademarks belong to their owners.
+AddOrHide is an independent project and is not affiliated with, endorsed by or sponsored by any of the websites it works on. All product names and trademarks belong to their owners.
 ```
 
 **Graphic assets** (current requirements: store icon 128x128; at least 1 screenshot at 1280x800, up to 5; small promo tile 440x280 PNG or JPEG; marquee 1400x560 optional)
@@ -132,6 +133,6 @@ Note: browsers cannot open extension pages in private windows, so in a private w
 2. **Run the extension unpacked in Brave and Chrome** and complete the test instructions above yourself. Automation cannot click the browser's own permission prompt, so try **Enable on this site** once by hand.
 3. **Confirm private-window storage:** hide something in a private window, close it, and see whether it is still hidden in a normal window. The policy says it is. If your test shows otherwise, fix the "Private windows" paragraph.
 4. **Screenshots and promo images:** done, in `store/assets/`.
-5. **Version:** already 1.0.0. Upload `dist/AddOrHide-1.0.0.zip` (rebuild it with `python tools/package.py` after any change).
+5. **Version:** 1.0.1 (1.0.0 was rejected for listing too many site names in the description, "Yellow Argon"; name at most one or two sites). Upload `dist/AddOrHide-1.0.1.zip` (rebuild it with `python tools/package.py` after any change).
 6. **Expect a closer review:** requests for optional access to all sites and a content script on youtube.com/robots.txt are unusual. The justifications above explain both; keep them as written.
 7. **Do not add** keywords such as "YouTube downloader", "ad blocker" or other site names to the listing text beyond the factual mentions above, and never use site logos.
