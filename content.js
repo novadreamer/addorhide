@@ -522,7 +522,10 @@ window.__hoaLoaded = true;
         }
         const rect = element.getBoundingClientRect();
         const area = rect.width * rect.height;
-        if (rect.width >= cardRect.width * 0.4 && rect.height < cardRect.height * 0.98 && area > bestArea) {
+        // Skip only something that covers the whole card (its own wrapper). A side-by-side thumbnail is often
+        // exactly as tall as the card.
+        const coversCard = rect.width >= cardRect.width * 0.98 && rect.height >= cardRect.height * 0.98;
+        if (rect.width >= cardRect.width * 0.3 && !coversCard && area > bestArea) {
           best = rect;
           bestArea = area;
         }
@@ -531,11 +534,13 @@ window.__hoaLoaded = true;
     };
     const best = largest("img, video") || largest("picture, [class*=\"thumbnail\" i]");
     if (!best) {
-      return { top: 0, bottom: cardRect.height };
+      return { top: 0, bottom: cardRect.height, left: 0, right: cardRect.width };
     }
     return {
       top: Math.max(0, best.top - originY),
-      bottom: Math.min(cardRect.height, best.bottom - originY)
+      bottom: Math.min(cardRect.height, best.bottom - originY),
+      left: Math.max(0, best.left - originX),
+      right: Math.min(cardRect.width, best.right - originX)
     };
   }
 
@@ -556,7 +561,13 @@ window.__hoaLoaded = true;
     const height = box.height;
     const margin = 8;
     const maxX = Math.max(margin, cardRect.width - width - margin);
-    const preferredX = (cardRect.width - width) / 2;
+    // Centre on the video picture. In a card laid out side by side (thumbnail left, text right, like YouTube's
+    // watch-page sidebar) that is the thumbnail, not the middle of the whole card.
+    const picture = videoPictureBox(card, cardRect, originX, originY);
+    const pictureWidth = picture.right - picture.left;
+    const preferredX = pictureWidth < cardRect.width * 0.8 && pictureWidth >= width + 2 * margin
+      ? picture.left + (pictureWidth - width) / 2
+      : (cardRect.width - width) / 2;
     const controls = Array.from(card.querySelectorAll("button, [role=\"button\"], input, select, textarea, a[aria-label][role]"))
       .filter(element => !element.closest(".hoa-actions, #hoa-toast, #hoa-banner"))
       .map(element => element.getBoundingClientRect())
@@ -589,7 +600,7 @@ window.__hoaLoaded = true;
     if (buttonEdge === "bottom") {
       // Bottom means the bottom edge of the video picture, not of the whole card (YouTube cards continue with
       // the title and channel below it). Blocked rows move up, but stay in the lower half of the picture.
-      const media = videoPictureBox(card, cardRect, originX, originY);
+      const media = picture;
       const lowest = Math.max(margin, media.bottom - height - margin);
       const highest = Math.max(margin, media.top + (media.bottom - media.top) / 2 - height / 2);
       fallbackY = lowest;
@@ -929,8 +940,10 @@ window.__hoaLoaded = true;
               .map(variant => variant.cardSelector)];
             const union = selectors.join(", ");
             // A card nested inside another matched card (YouTube lockup inside its grid item) is one video.
+            // Only cards that are on screen count: YouTube keeps the previous page (the home feed) in the DOM,
+            // hidden, after you open a video.
             cards = Array.from(document.querySelectorAll(union))
-              .filter(card => !(card.parentElement && card.parentElement.closest(union))).length;
+              .filter(card => !(card.parentElement && card.parentElement.closest(union)) && card.getClientRects().length).length;
           }
         } catch (error) {
           cards = 0;
@@ -944,7 +957,8 @@ window.__hoaLoaded = true;
         }
         sendResponse({
           active: Boolean(rule), cards, pathMatched, version,
-          overlays: document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"]:not(.hoa-float)`).length,
+          overlays: Array.from(document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"]:not(.hoa-float)`))
+            .filter(actions => actions.parentElement && actions.parentElement.getClientRects().length).length,
           staleOverlays: document.querySelectorAll(`.hoa-actions:not([data-hoa-owner="${ownInstance}"])`).length,
           hiddenHere: document.querySelectorAll(`.${ACTIVE_CLASS}`).length
         });

@@ -41,6 +41,14 @@ var HOA_CATALOG = Object.freeze((() => {
           linkSelector: YOUTUBE_LINK,
           titleCandidates: YOUTUBE_TITLES
         }),
+        // The recommendations beside (or, in narrow windows, below) the player on a watch page: bare lockups,
+        // or ytd-compact-video-renderer in the older layout. Playlists and mixes are left alone.
+        Object.freeze({
+          cardSelector: 'yt-lockup-view-model:has(a[href*="/watch?v="]):not(:has(yt-collection-thumbnail-view-model)), ytd-compact-video-renderer',
+          pathPattern: "^/watch",
+          linkSelector: YOUTUBE_LINK,
+          titleCandidates: YOUTUBE_TITLES
+        }),
         Object.freeze({
           cardSelector: "ytm-shorts-lockup-view-model-v2",
           pathPattern: "^/(@|channel/|c/|user/)",

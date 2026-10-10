@@ -75,7 +75,7 @@ Build the Chrome Web Store archive with `python tools/package.py .`. It writes t
 
 Used day to day as an unpacked extension in Brave on YouTube (home feed and creator pages), Tubi, IMDb, Twitch and Dailymotion, including private windows.
 
-Checked in a real browser (Brave with Playwright, see below) on live pages: Enable on this site, Add/Hide/Undo on YouTube creator pages, Tubi, IMDb (home, charts, title, trailers, search, video gallery), Twitch and Dailymotion; the card picker on PBS and Twitch; button placement and hover visibility, including a layer covering the card; the Added page sorting, grouping and scroll position; the popup's page Details line.
+Checked in a real browser (Brave with Playwright, see below) on live pages, plus the YouTube watch-page sidebar on a styled copy of its markup: Enable on this site, Add/Hide/Undo on YouTube creator pages, Tubi, IMDb (home, charts, title, trailers, search, video gallery), Twitch and Dailymotion; the card picker on PBS and Twitch; button placement and hover visibility, including a layer covering the card; the Added page sorting, grouping and scroll position; the popup's page Details line.
 
 Not checked by automation: the browser's own permission prompt (it cannot be clicked by automation), the signed-in YouTube home feed and its inline preview player (checked by hand only), and the private-window Added page on `youtube.com/robots.txt`.
 
