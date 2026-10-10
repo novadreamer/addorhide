@@ -382,7 +382,11 @@ window.__hoaLoaded = true;
         return;
       }
       try {
-        card.querySelectorAll(selector).forEach(element => texts.push(elementText(element)));
+        // A line such as "Horror · 1987 · 1 hr 34 min" also counts part by part.
+        card.querySelectorAll(selector).forEach(element => {
+          const text = elementText(element);
+          texts.push(text, ...(text.includes("·") ? text.split(/\s*·\s*/).filter(Boolean) : []));
+        });
       } catch (error) {
         // Ignore malformed optional selectors.
       }
@@ -560,14 +564,15 @@ window.__hoaLoaded = true;
     const width = box.width;
     const height = box.height;
     const margin = 8;
-    const maxX = Math.max(margin, cardRect.width - width - margin);
     // Centre on the video picture. In a card laid out side by side (thumbnail left, text right, like YouTube's
     // watch-page sidebar) that is the thumbnail, not the middle of the whole card.
     const picture = videoPictureBox(card, cardRect, originX, originY);
     const pictureWidth = picture.right - picture.left;
-    const preferredX = pictureWidth < cardRect.width * 0.8 && pictureWidth >= width + 2 * margin
-      ? picture.left + (pictureWidth - width) / 2
-      : (cardRect.width - width) / 2;
+    const sidePicture = pictureWidth < cardRect.width * 0.8 && pictureWidth >= width + 2 * margin;
+    const preferredX = sidePicture ? picture.left + (pictureWidth - width) / 2 : (cardRect.width - width) / 2;
+    // Sliding past the site's own controls stays within the thumbnail when it sits beside the text.
+    const minX = sidePicture ? picture.left + margin : margin;
+    const maxX = sidePicture ? picture.right - width - margin : Math.max(margin, cardRect.width - width - margin);
     const controls = Array.from(card.querySelectorAll("button, [role=\"button\"], input, select, textarea, a[aria-label][role]"))
       .filter(element => !element.closest(".hoa-actions, #hoa-toast, #hoa-banner"))
       .map(element => element.getBoundingClientRect())
@@ -575,7 +580,7 @@ window.__hoaLoaded = true;
       .map(rect => ({ left: rect.left - originX, right: rect.right - originX, top: rect.top - originY, bottom: rect.bottom - originY }));
     const blocker = (x, y) => controls.find(rect => x < rect.right + 4 && x + width > rect.left - 4
       && y < rect.bottom + 4 && y + height > rect.top - 4);
-    const clampX = x => Math.min(maxX, Math.max(margin, x));
+    const clampX = x => Math.min(maxX, Math.max(minX, x));
     const tryRow = y => {
       for (const direction of [-1, 1]) {
         let x = clampX(preferredX);

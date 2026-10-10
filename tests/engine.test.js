@@ -130,6 +130,28 @@ const CASES = [
     }
   },
   {
+    name: "tmdb recommendations", fixture: "tmdb-detail.html", url: "https://www.themoviedb.org/movie/550-fight-club", host: "www.themoviedb.org",
+    cardSelector: "#recommendation_scroller div.item", cards: 3, optIn: true,
+    expectAdd(key, entry) {
+      assert.ok(/^https:\/\/www\.themoviedb\.org\/movie\/\d+/.test(key), key);
+      assert.ok(entry.title && entry.title.length > 2, entry.title);
+      assert.ok(Number.isInteger(entry.year), "year from the numeric release date");
+      assert.strictEqual(entry.type, "movie");
+      assert.ok(/^https?:\/\//.test(entry.thumb));
+    }
+  },
+  {
+    name: "tubi you may also like", fixture: "tubi-detail.html", url: "https://tubitv.com/movies/100065059/r-l-stine-s-pumpkinhead-2", host: "tubitv.com",
+    cardSelector: 'a[href^="/movies/"]:has(h3)', cards: 3, optIn: false,
+    expectAdd(key, entry) {
+      assert.ok(/^https:\/\/tubitv\.com\/(movies|series)\/\d+/.test(key), key);
+      assert.ok(entry.title && entry.title.length > 2 && !/·/.test(entry.title), entry.title);
+      assert.ok(Number.isInteger(entry.year), "year from the · line");
+      assert.ok(Number.isFinite(entry.duration) && entry.duration > 600, "duration from the · line");
+      assert.strictEqual(entry.type, "movie");
+    }
+  },
+  {
     name: "tmdb", fixture: "tmdb.html", url: "https://www.themoviedb.org/movie", host: "www.themoviedb.org",
     cardSelector: "#media-list .media-list-results > div[data-object-id]", cards: 3, optIn: true,
     expectAdd(key, entry) {

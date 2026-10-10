@@ -331,8 +331,10 @@ var HOA = Object.freeze((() => {
       return null;
     }
     const value = text.trim();
+    // A numeric date such as 10/06/2000 gives only its year: day and month order depends on the site's locale.
     const match = value.match(/^(\d{4})(?:\s*[-–]\s*(?:\d{4})?)?$/)
-      || value.match(/^\(\s*(\d{4})(?:\s*[-–]\s*(?:\d{4})?)?\s*\)$/);
+      || value.match(/^\(\s*(\d{4})(?:\s*[-–]\s*(?:\d{4})?)?\s*\)$/)
+      || value.match(/^\d{1,2}[/.]\d{1,2}[/.](\d{4})$/);
     const year = match && Number(match[1]);
     return year >= 1870 && year <= 2100 ? year : null;
   }

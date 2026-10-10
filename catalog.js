@@ -77,7 +77,19 @@ var HOA_CATALOG = Object.freeze((() => {
         genres: ".web-content-tile__tags"
       }),
       removeClosest: '[data-test-id="web-ui-grid-item"]',
-      gridSelector: ""
+      gridSelector: "",
+      variants: Object.freeze([
+        // "You may also like" on a movie or series page: each poster is a link card in the page's grid.
+        Object.freeze({
+          cardSelector: '[data-test-id="web-ui-grid-container"] a[href^="/movies/"]:has(img):has(h3), [data-test-id="web-ui-grid-container"] a[href^="/series/"]:has(img):has(h3)',
+          pathPattern: "^/(movies|series)/",
+          linkSelector: 'a[href^="/movies/"], a[href^="/series/"]',
+          titleCandidates: Object.freeze(["h3"]),
+          meta: Object.freeze({ texts: Object.freeze([".web-attributes__year-duration"]), rating: ".web-attributes__rating-badge" }),
+          removeClosest: "",
+          removeClimb: true
+        })
+      ])
     }),
     Object.freeze({
       id: "imdb", name: "IMDb", builtIn: false, hosts: Object.freeze(["imdb.com"]), subdomains: true,
@@ -107,7 +119,17 @@ var HOA_CATALOG = Object.freeze((() => {
       id: "tmdb", name: "TMDB", builtIn: false, hosts: Object.freeze(["themoviedb.org"]), subdomains: true,
       cardSelector: "#media-list .media-list-results > div[data-object-id]",
       linkSelector: 'a[href^="/movie/"], a[href^="/tv/"]', titleCandidates: Object.freeze(["h2"]),
-      meta: Object.freeze({ date: ".release_date" })
+      meta: Object.freeze({ date: ".release_date" }),
+      variants: Object.freeze([
+        // The Recommendations row on a movie or TV page.
+        Object.freeze({
+          cardSelector: "#recommendation_scroller div.item",
+          pathPattern: "^/(movie|tv)/",
+          linkSelector: 'a[href^="/movie/"], a[href^="/tv/"]',
+          titleCandidates: Object.freeze(["a.title", "a[title]"]),
+          meta: Object.freeze({ year: ".release_date" })
+        })
+      ])
     }),
     Object.freeze({
       id: "dailymotion", name: "Dailymotion", builtIn: false, hosts: Object.freeze(["dailymotion.com"]), subdomains: true,

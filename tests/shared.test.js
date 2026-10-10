@@ -189,6 +189,8 @@ check("relative rejects other text", () => assert.equal(HOA.parseRelativeAge("ye
 
 check("year plain", () => assert.equal(HOA.parseYear("1976"), 1976));
 check("year parenthesized", () => assert.equal(HOA.parseYear("(2011)"), 2011));
+check("year from a numeric date", () => assert.equal(HOA.parseYear("10/06/2000"), 2000));
+check("numeric date is not a full date", () => assert.equal(HOA.parseDate("10/06/2000"), null));
 check("year en dash range", () => assert.equal(HOA.parseYear("2012–2020"), 2012));
 check("year hyphen range", () => assert.equal(HOA.parseYear("2012-2020"), 2012));
 check("year open range", () => assert.equal(HOA.parseYear("2012–"), 2012));
