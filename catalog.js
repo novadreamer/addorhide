@@ -51,10 +51,9 @@ var HOA_CATALOG = Object.freeze((() => {
           removeClimb: true
         })
       ]),
-      // "Hide the whole feed" covers the recommendations: the home feed and the sidebar beside a video. Search
-      // results and a creator's page are things the user asked for, so they stay.
-      bulkHidePattern: "^/(watch)?$",
-      bulkExtraSelector: "yt-lockup-view-model"
+      // "Hide the whole feed" clears every video and Short on every YouTube page (the banner's Show brings them
+      // back), plus what would be left as empty frames: playlists, podcasts and courses, and the shelves.
+      bulkExtraSelector: "yt-lockup-view-model, grid-shelf-view-model, ytd-reel-shelf-renderer, ytd-rich-section-renderer, ytd-shelf-renderer"
     }),
     Object.freeze({
       id: "tubi",

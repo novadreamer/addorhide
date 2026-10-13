@@ -8,9 +8,43 @@ window.__hoaLoaded = true;
 {
   const ownInstance = Math.random().toString(36).slice(2) + Date.now().toString(36);
   const rootElement = document.documentElement;
-  rootElement.dataset.hoaInstance = ownInstance;
-  document.querySelectorAll(".hoa-actions, #hoa-toast, #hoa-banner").forEach(node => node.remove());
-  document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-show"));
+  const ownExtension = (() => {
+    try {
+      return chrome.runtime.id || "";
+    } catch (error) {
+      return "";
+    }
+  })();
+  const ownVersion = (() => {
+    try {
+      return chrome.runtime.getManifest().version || "0";
+    } catch (error) {
+      return "0";
+    }
+  })();
+  const versionParts = value => String(value || "0").split(".").map(part => Number(part) || 0);
+  const compareVersions = (left, right) => {
+    const a = versionParts(left);
+    const b = versionParts(right);
+    for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+      if ((a[index] || 0) !== (b[index] || 0)) {
+        return (a[index] || 0) - (b[index] || 0);
+      }
+    }
+    return 0;
+  };
+  // Two installed copies of AddOrHide (say the store version and an unpacked one) both run on a page, each with
+  // its own settings and lists. The newest copy takes the page; an older or equal copy that arrives later stands
+  // aside, and its popup says so (see the hoa-status reply below).
+  const otherCopyFirst = rootElement.dataset.hoaExtension && rootElement.dataset.hoaExtension !== ownExtension
+    && compareVersions(rootElement.dataset.hoaVersion, ownVersion) >= 0;
+  if (!otherCopyFirst) {
+    rootElement.dataset.hoaInstance = ownInstance;
+    rootElement.dataset.hoaExtension = ownExtension;
+    rootElement.dataset.hoaVersion = ownVersion;
+    document.querySelectorAll(".hoa-actions, #hoa-toast, #hoa-banner").forEach(node => node.remove());
+    document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-show"));
+  }
 
   const ACTIVE_CLASS = "hoa-removed";
   let hidden = {};
@@ -946,6 +980,12 @@ window.__hoaLoaded = true;
   // The popup asks this to show how many videos the active rule recognised on the current page.
   if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      // Another installed copy of AddOrHide controls this page: tell this copy's popup.
+      if (message && message.type === "hoa-status" && !ownContext() && rootElement.dataset.hoaExtension
+        && rootElement.dataset.hoaExtension !== ownExtension) {
+        sendResponse({ otherCopy: true, otherVersion: rootElement.dataset.hoaVersion || "" });
+        return;
+      }
       // A replaced (retired) copy of this script stays registered as a listener; only the live one answers.
       if (message && message.type === "hoa-status" && !retired) {
         const rule = hostnameRule();
@@ -974,7 +1014,7 @@ window.__hoaLoaded = true;
           version = "";
         }
         sendResponse({
-          active: Boolean(rule), cards, pathMatched, version,
+          active: Boolean(rule), cards, pathMatched, version, bulk: bulkApplied,
           overlays: Array.from(document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"]:not(.hoa-float)`))
             .filter(actions => actions.parentElement && actions.parentElement.getClientRects().length).length,
           staleOverlays: document.querySelectorAll(`.hoa-actions:not([data-hoa-owner="${ownInstance}"])`).length,

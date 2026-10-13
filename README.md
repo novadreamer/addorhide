@@ -69,9 +69,9 @@ JSDOM_PATH=<folder>/node_modules/jsdom node tests/engine.test.js
 
 Regenerating icons: run `python tools/make_icons.py` from this directory.
 
-Build the Chrome Web Store archive with `python tools/package.py .`. It writes the runtime-only archive to `dist/AddOrHide-1.0.3.zip`.
+Build the Chrome Web Store archive with `python tools/package.py .`. It writes the runtime-only archive to `dist/AddOrHide-1.0.4.zip`.
 
-## Status: 1.0.3 (1.0.1 is live on the Chrome Web Store; 1.0.3 adds YouTube search results, Shorts and new layouts everywhere, gap-free hiding of Shorts, and Hide the whole feed on the watch-page sidebar)
+## Status: 1.0.4 (1.0.1 is live on the Chrome Web Store; 1.0.4 adds YouTube search results, Shorts and new layouts everywhere, gap-free hiding of Shorts, Hide the whole feed on every YouTube page, and two installed copies no longer fight: the newest runs the page and the other one's popup says so)
 
 Used day to day as an unpacked extension in Brave on YouTube (home feed and creator pages), Tubi, IMDb, Twitch and Dailymotion, including private windows.
 

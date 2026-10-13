@@ -37,6 +37,13 @@ function appendPageStatus(container) {
         reload.className = "secondary-button";
         line.appendChild(reload);
       }
+    } else if (reply.otherCopy) {
+      line.textContent = `Another copy of AddOrHide${reply.otherVersion ? ` (version ${reply.otherVersion})` : ""} is running on this page, `
+        + "so this copy's settings and lists don't apply here. Keep only one copy: remove the other one on your browser's Extensions page.";
+      line.className = "status error";
+      return;
+    } else if (reply.bulk) {
+      line.textContent = "The whole feed is hidden on this page. Turn off Hide the whole feed to see it again.";
     } else if (!reply.active) {
       line.textContent = "AddOrHide is off on this page.";
     } else if (!reply.cards) {
