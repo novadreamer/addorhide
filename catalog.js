@@ -1,7 +1,7 @@
 "use strict";
 
 // Rule fields: id, name, builtIn, hosts, subdomains, cardSelector, linkSelector,
-// titleCandidates, adMarkers, pathEquals, bulkHidePath, gridSelector, removeClosest, removeClimb,
+// titleCandidates, adMarkers, pathEquals, bulkHidePattern, bulkExtraSelector, gridSelector, removeClosest, removeClimb,
 // variants[{cardSelector, pathPattern, linkSelector, titleCandidates,
 // meta, typeByPath, typeByText, typeFixed, removeClosest, removeClimb}], and
 // meta{duration, texts, year, rating, genres, score, votes, date, metaTexts}.
@@ -40,16 +40,21 @@ var HOA_CATALOG = Object.freeze((() => {
         Object.freeze({
           cardSelector: 'yt-lockup-view-model:has(a[href*="/watch?v="]):not(:has(yt-collection-thumbnail-view-model)), ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer',
           linkSelector: YOUTUBE_LINK,
-          titleCandidates: YOUTUBE_TITLES
+          titleCandidates: YOUTUBE_TITLES,
+          // Hide the card's own slot too (a wrapper holding only this card), so the row closes the gap.
+          removeClimb: true
         }),
         Object.freeze({
           cardSelector: "ytm-shorts-lockup-view-model-v2, ytm-shorts-lockup-view-model, ytd-reel-item-renderer",
           linkSelector: 'a[href*="/shorts/"]',
-          titleCandidates: Object.freeze(["h3", "[aria-label]"])
+          titleCandidates: Object.freeze(["h3", "[aria-label]"]),
+          removeClimb: true
         })
       ]),
-      // "Hide every recommendation" is about the home feed only, never a creator's page.
-      bulkHidePath: "/"
+      // "Hide the whole feed" covers the recommendations: the home feed and the sidebar beside a video. Search
+      // results and a creator's page are things the user asked for, so they stay.
+      bulkHidePattern: "^/(watch)?$",
+      bulkExtraSelector: "yt-lockup-view-model"
     }),
     Object.freeze({
       id: "tubi",

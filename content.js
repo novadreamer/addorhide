@@ -21,6 +21,7 @@ window.__hoaLoaded = true;
   let lastRule = null;
   let observedRoot = null;
   let retired = false;
+  let bulkApplied = false;
   let buttonEdge = "top";
   let buttonsEnabled = true;
 
@@ -790,15 +791,26 @@ window.__hoaLoaded = true;
     }))];
     const handled = new Set();
     const alreadyHandled = card => Array.from(handled).some(parent => parent !== card && parent.contains(card));
-    if (rule.bulkHide && (!rule.bulkHidePath || location.pathname === rule.bulkHidePath)) {
-      variants.flatMap(variant => Array.from(document.querySelectorAll(variant.cardSelector))).forEach(card => {
+    if (rule.bulkHide && (!rule.bulkHidePattern || new RegExp(rule.bulkHidePattern).test(location.pathname))) {
+      // Whole-feed mode also takes cards that never get buttons (YouTube playlists, podcasts, courses).
+      const bulkCards = variants.map(variant => [variant.cardSelector, variant]);
+      if (rule.bulkExtraSelector) {
+        bulkCards.push([rule.bulkExtraSelector, rule]);
+      }
+      bulkCards.forEach(([selector, variant]) => Array.from(document.querySelectorAll(selector)).forEach(card => {
         if (!isAd(card, rule)) {
           removeActions(card);
-          removalTarget(card, rule).classList.add(ACTIVE_CLASS);
+          removalTarget(card, variant).classList.add(ACTIVE_CLASS);
         }
-      });
+      }));
       showBulkBanner(rule);
+      bulkApplied = true;
       return;
+    }
+    if (bulkApplied) {
+      // Leaving whole-feed mode: un-hide everything it hid; videos the user hid one by one are hidden again below.
+      document.querySelectorAll(`.${ACTIVE_CLASS}`).forEach(node => node.classList.remove(ACTIVE_CLASS));
+      bulkApplied = false;
     }
     removeBanner();
     variants.forEach(variant => Array.from(document.querySelectorAll(variant.cardSelector)).forEach(card => {
