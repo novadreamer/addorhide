@@ -26,33 +26,24 @@ var HOA_CATALOG = Object.freeze((() => {
       titleCandidates: YOUTUBE_TITLES,
       adMarkers: Object.freeze([
         "ytd-ad-slot-renderer", "ytd-in-feed-ad-layout-renderer",
-        "ytd-display-ad-renderer", "ytd-promoted-sparkles-web-renderer"
+        "ytd-display-ad-renderer", "ytd-promoted-sparkles-web-renderer", "ytd-search-pyv-renderer"
       ]),
       meta: Object.freeze({
         duration: Object.freeze([".ytBadgeShapeText", "ytd-thumbnail-overlay-time-status-renderer #text", "span.ytd-thumbnail-overlay-time-status-renderer"]),
         metaTexts: Object.freeze([".ytContentMetadataViewModelMetadataText", "#metadata-line span"])
       }),
       // Cards everywhere ytd-rich-item-renderer is used (home, subscriptions, a creator's Videos/Shorts/Live
-      // tabs); a creator's Home tab uses bare lockups in shelves. Playlist lockups are left alone.
+      // tabs). Everywhere else YouTube uses the card types below, on every page (home layouts YouTube is testing,
+      // search, a creator's Home tab, the watch-page sidebar, history). Playlists and mixes are left alone; a card
+      // inside ytd-rich-item-renderer is handled once, through that wrapper.
       variants: Object.freeze([
         Object.freeze({
-          cardSelector: 'yt-lockup-view-model:has(a[href*="/watch?v="]):not(:has(yt-collection-thumbnail-view-model))',
-          pathPattern: "^/(@|channel/|c/|user/)",
-          linkSelector: YOUTUBE_LINK,
-          titleCandidates: YOUTUBE_TITLES
-        }),
-        // The recommendations beside (or, in narrow windows, below) the player on a watch page: bare lockups,
-        // or ytd-compact-video-renderer in the older layout. Playlists and mixes are left alone.
-        Object.freeze({
-          cardSelector: 'yt-lockup-view-model:has(a[href*="/watch?v="]):not(:has(yt-collection-thumbnail-view-model)), ytd-compact-video-renderer',
-          pathPattern: "^/watch",
+          cardSelector: 'yt-lockup-view-model:has(a[href*="/watch?v="]):not(:has(yt-collection-thumbnail-view-model)), ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer',
           linkSelector: YOUTUBE_LINK,
           titleCandidates: YOUTUBE_TITLES
         }),
         Object.freeze({
-          // Shorts shelves on a creator's page and in the watch-page sidebar.
-          cardSelector: "ytm-shorts-lockup-view-model-v2, ytm-shorts-lockup-view-model",
-          pathPattern: "^/(@|channel/|c/|user/|watch)",
+          cardSelector: "ytm-shorts-lockup-view-model-v2, ytm-shorts-lockup-view-model, ytd-reel-item-renderer",
           linkSelector: 'a[href*="/shorts/"]',
           titleCandidates: Object.freeze(["h3", "[aria-label]"])
         })

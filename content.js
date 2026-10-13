@@ -167,7 +167,8 @@ window.__hoaLoaded = true;
 
   function isAd(card, rule) {
     // Catalog rules only list adMarkers when a site needs them (YouTube).
-    return (rule.adMarkers || []).some(marker => card.matches(marker) || card.querySelector(marker));
+    // A card is an ad when it is, contains or sits inside an ad container (search ads wrap normal-looking cards).
+    return (rule.adMarkers || []).some(marker => card.matches(marker) || card.querySelector(marker) || card.closest(marker));
   }
 
   function removalTarget(card, rule) {
