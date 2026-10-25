@@ -427,6 +427,14 @@ var HOA = Object.freeze((() => {
     return count === 1 ? "There is 1 hidden video." : `There are ${count} hidden videos.`;
   }
 
+  // The popup's line under Added Videos, worded like the one under Hidden Videos.
+  function addedCountText(count) {
+    if (!Number.isInteger(count) || count <= 0) {
+      return "No added videos.";
+    }
+    return count === 1 ? "There is 1 added video." : `There are ${count} added videos.`;
+  }
+
   function addedSummaryText(videoCount, siteCount) {
     const videos = Number.isInteger(videoCount) && videoCount >= 0 ? videoCount : 0;
     const sites = Number.isInteger(siteCount) && siteCount >= 0 ? siteCount : 0;
@@ -1297,6 +1305,7 @@ var HOA = Object.freeze((() => {
     splitGenres,
     siteDisplayName,
     hiddenSummaryText,
+    addedCountText,
     addedSummaryText,
     siteMonogram,
     typeLabel,

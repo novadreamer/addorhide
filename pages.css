@@ -156,10 +156,19 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 .popup .popup-header .theme-toggle { min-height: 34px; width: 34px; height: 34px; padding: 4px; font-size: inherit; }
 .popup button { min-height: 28px; padding: 4px 10px; font-size: 12.5px; }
 .popup .page-actions { gap: 6px; }
-.popup .hidden-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px; flex: 0 0 auto; }
-.hidden-open-button { min-width: 180px; min-height: 40px; font-size: 16px; }
-.hidden-open-button:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; animation: none; filter: none; }
-.hidden-summary { margin: 0; text-align: center; }
+/* Added Videos (green) | Hidden Videos (red), side by side with a line between; each is off while its list is
+   empty, with its count underneath. */
+.popup .lists-card { display: flex; align-items: stretch; gap: 0; padding: 14px 8px; flex: 0 0 auto; }
+.lists-card .list-column { display: flex; flex: 1 1 0; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+.lists-card .list-divider { flex: 0 0 1px; margin: 2px 10px; background: var(--border); }
+.popup .list-open-button { min-width: 132px; min-height: 38px; padding: 6px 14px; color: #fff; font-size: 15px; border: 1px solid transparent; }
+.popup .added-open-button { background: #1f9d55; border-color: #188546; }
+.popup .hidden-open-button { background: #d93a49; border-color: #b72f3c; }
+.popup .list-open-button:hover:not(:disabled) { filter: brightness(1.06); }
+.popup .list-open-button:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; animation: none; filter: none; }
+.list-summary { margin: 0; font-size: 12px; text-align: center; }
+/* The footer keeps the room "Open added page" used (123 px) empty for now. */
+.popup .footer-slot { display: block; flex: 0 0 123px; width: 123px; min-height: 32px; }
 .popup .popup-footer { flex: 0 0 auto; margin-top: 0; }
 
 /* The [hidden] attribute must win over component display rules (empty states, banners, toasts). */
@@ -182,7 +191,28 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 .control-row { display: flex; gap: 12px; align-items: center; }
 .button-controls .control-label { font-weight: 600; }
 .position-buttons { display: grid; gap: 6px; }
-.button-controls .press-button.toggle-button { min-width: 136px; min-height: 34px; padding: 5px 18px; font-size: 15px; }
+/* Enable/Disable: a round power button, raised like a real key (a darker rim underneath, a light top edge),
+   green while the hover buttons are off, red while they show. It sinks into its rim while pressed. */
+.button-controls .press-button.toggle-button {
+  display: grid; place-items: center; width: 56px; height: 56px; min-width: 0; min-height: 0; margin-bottom: 6px; padding: 0;
+  border-radius: 50%; font-size: 0;
+  background: radial-gradient(circle at 50% 30%, #34c072 0%, #1f9d55 62%, #1a8a4a 100%); border: 1px solid #188546;
+  box-shadow: 0 5px 0 #136b39, 0 9px 14px rgba(0, 0, 0, .28), inset 0 2px 1px rgba(255, 255, 255, .4), inset 0 -3px 4px rgba(0, 0, 0, .15);
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out, filter 150ms ease-out;
+}
+.button-controls .press-button.toggle-button[data-enabled="true"] {
+  background: radial-gradient(circle at 50% 30%, #ef5a68 0%, #d93a49 62%, #c3303e 100%); border-color: #b72f3c;
+  box-shadow: 0 5px 0 #96222e, 0 9px 14px rgba(0, 0, 0, .28), inset 0 2px 1px rgba(255, 255, 255, .4), inset 0 -3px 4px rgba(0, 0, 0, .15);
+}
+.button-controls .press-button.toggle-button svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .3)); }
+.button-controls .press-button.toggle-button:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #136b39, 0 3px 6px rgba(0, 0, 0, .25), inset 0 2px 4px rgba(0, 0, 0, .2);
+}
+.button-controls .press-button.toggle-button[data-enabled="true"]:active:not(:disabled) {
+  box-shadow: 0 1px 0 #96222e, 0 3px 6px rgba(0, 0, 0, .25), inset 0 2px 4px rgba(0, 0, 0, .2);
+}
 .button-controls .press-button.edge-button { min-width: 54px; min-height: 21px; padding: 2px 8px; font-size: 10px; line-height: 1; }
 .button-controls .press-button {
   min-width: 112px;
@@ -221,7 +251,7 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 body.popup main { overflow-y: auto; scrollbar-width: thin; }
 .popup .site-card, .popup .popup-edge, .popup .popup-footer { flex: 0 0 auto; }
 .popup .button-controls { gap: 24px; }
-.popup .button-controls .press-button.toggle-button { min-height: 32px; }
+.popup .button-controls .press-button.toggle-button { min-height: 0; }
 
 /* The arrow buttons sit on the centre line (under Enable); "Position" hangs to their left. */
 .button-controls .position-row { display: grid; grid-template-columns: 1fr auto 1fr; justify-self: stretch; }

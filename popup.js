@@ -4,12 +4,14 @@ const openHiddenButton = document.getElementById("open-hidden-button");
 const hiddenSummary = document.getElementById("hidden-summary");
 const popupStatus = document.getElementById("popup-status");
 const openAddedButton = document.getElementById("open-added-button");
+const addedSummary = document.getElementById("added-summary");
 const openOptionsButton = document.getElementById("open-options-button");
 const siteContent = document.getElementById("site-content");
 const siteStatus = document.getElementById("site-status");
 const themeToggle = document.getElementById("theme-toggle");
 
 let hidden = {};
+let added = {};
 let activeTab = null;
 let activeHost = "";
 
@@ -300,6 +302,10 @@ function render() {
   const count = HOA.listedHidden(hidden).length;
   openHiddenButton.disabled = count === 0;
   hiddenSummary.textContent = HOA.hiddenSummaryText(count);
+  // Added Videos works the same way: off while nothing is added, with the count underneath.
+  const addedCount = Object.keys(added || {}).length;
+  openAddedButton.disabled = addedCount === 0;
+  addedSummary.textContent = HOA.addedCountText(addedCount);
 }
 
 openHiddenButton.addEventListener("click", () => {
@@ -358,7 +364,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     refreshThemeToggle();
   }
   if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.ADDED_KEY])) {
-    HOA.readLists(lists => { hidden = lists.hidden; render(); });
+    HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; render(); });
   }
   if (areaName === "local" && changes[HOA.SITES_KEY]) {
     siteRules = changes[HOA.SITES_KEY].newValue && typeof changes[HOA.SITES_KEY].newValue === "object"
@@ -366,5 +372,5 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     renderSite();
   }
 });
-HOA.readLists(lists => { hidden = lists.hidden; render(); });
+HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; render(); });
 loadSite();

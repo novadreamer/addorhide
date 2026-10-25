@@ -226,6 +226,10 @@ check("hidden summary empty and invalid", () => assert.deepEqual(
   ["No hidden videos.", "No hidden videos.", "No hidden videos."]));
 check("hidden summary singular", () => assert.equal(HOA.hiddenSummaryText(1), "There is 1 hidden video."));
 check("hidden summary plural", () => assert.equal(HOA.hiddenSummaryText(3), "There are 3 hidden videos."));
+check("added count empty", () => assert.deepEqual([HOA.addedCountText(0), HOA.addedCountText(-1), HOA.addedCountText("1")],
+  ["No added videos.", "No added videos.", "No added videos."]));
+check("added count singular", () => assert.equal(HOA.addedCountText(1), "There is 1 added video."));
+check("added count plural", () => assert.equal(HOA.addedCountText(4), "There are 4 added videos."));
 check("site monogram stable", () => assert.deepEqual(HOA.siteMonogram("example.com"), HOA.siteMonogram("example.com")));
 check("site monogram hue", () => assert.ok(HOA.siteMonogram("example.com").hue >= 0 && HOA.siteMonogram("example.com").hue <= 359));
 check("type labels", () => assert.equal(HOA.typeLabel("tv"), "TV"));

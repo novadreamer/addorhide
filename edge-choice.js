@@ -15,7 +15,12 @@ function bindButtonControls(toggle, edgeGroup) {
   const showEnabled = enabled => {
     // The button names what clicking it does: red Disable while the hover buttons show, green Enable while they
     // are hidden.
-    toggle.textContent = enabled ? "Disable" : "Enable";
+    // A round power button: the icon stays, its name (Disable / Enable) is in the tooltip and for screen readers.
+    if (!toggle.querySelector("svg")) {
+      toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8"/><path d="M6.6 7.2a7.5 7.5 0 1 0 10.8 0"/></svg>';
+    }
+    toggle.setAttribute("aria-label", enabled ? "Disable" : "Enable");
+    toggle.title = enabled ? "Disable: hide the hover buttons on thumbnails" : "Enable: show the hover buttons on thumbnails";
     toggle.dataset.enabled = String(enabled);
     const note = document.getElementById("buttons-toggle-note");
     if (note) {

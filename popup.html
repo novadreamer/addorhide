@@ -45,9 +45,16 @@
       <div id="site-content"></div>
       <div id="site-status" class="status" role="status" aria-live="polite"></div>
     </section>
-    <section class="panel hidden-card" aria-label="Hidden videos">
-      <button id="open-hidden-button" class="primary-button hidden-open-button press-button" type="button" aria-describedby="hidden-summary">Hidden Videos</button>
-      <p id="hidden-summary" class="hidden-summary muted">No hidden videos.</p>
+    <section class="panel lists-card" aria-label="Your videos">
+      <div class="list-column">
+        <button id="open-added-button" class="list-open-button added-open-button press-button" type="button" aria-describedby="added-summary">Added Videos</button>
+        <p id="added-summary" class="list-summary muted">No added videos.</p>
+      </div>
+      <div class="list-divider" aria-hidden="true"></div>
+      <div class="list-column">
+        <button id="open-hidden-button" class="list-open-button hidden-open-button press-button" type="button" aria-describedby="hidden-summary">Hidden Videos</button>
+        <p id="hidden-summary" class="list-summary muted">No hidden videos.</p>
+      </div>
     </section>
     <div class="popup-edge">
       <div class="button-controls">
@@ -65,7 +72,8 @@
       </div>
     </div>
     <div class="popup-footer">
-      <button id="open-added-button" class="primary-button" type="button">Open added page</button>
+      <!-- Kept empty on purpose: a placeholder where "Open added page" was, for a future control. -->
+      <span class="footer-slot" aria-hidden="true"></span>
       <a id="support-link" class="support-link" href="https://ko-fi.com/ashmustafa" target="_blank" rel="noopener noreferrer" title="Support AddOrHide on Ko-fi"><span aria-hidden="true">&#9829;</span> Support</a>
       <button id="open-options-button" class="ghost-button" type="button">Options</button>
     </div>

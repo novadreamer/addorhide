@@ -36,7 +36,7 @@ YOUR ADDED VIDEOS PAGE
 - Works in private windows too, if you allow the extension there.
 
 THE HIDDEN LIST
-The toolbar popup shows how many videos you hid. Its Hidden Videos button opens a window listing them by website, with thumbnails. Restore one or all of them, or remove a row to keep the video hidden without cluttering the list.
+The toolbar popup shows how many videos you added and hid. Its Added Videos button opens your saved videos, and its Hidden Videos button opens a window listing them by website, with thumbnails. Restore one or all of them, or remove a row to keep the video hidden without cluttering the list.
 
 WORKS ON
 - YouTube, built in, with no setup.
@@ -108,12 +108,12 @@ AddOrHide is an independent project and is not affiliated with, endorsed by or s
 No account or login is needed.
 1. Open https://tubitv.com/ (works logged out) and hover over any movie or TV tile: Add and Hide buttons appear centred at the top of the tile.
 2. Click Add on a tile (it shows "Added"), then Hide on another tile (it disappears; an Undo message appears).
-3. Click the AddOrHide toolbar icon. Click "Hidden Videos": a window lists the hidden video under Tubi with Restore and Remove. Back in the popup, click "Open added page" to see the added video, grouped under Tubi. Use the Sort by control and the Tag button there.
+3. Click the AddOrHide toolbar icon. Click "Hidden Videos": a window lists the hidden video under Tubi with Restore and Remove. Back in the popup, click "Added Videos" to see the added video, grouped under Tubi. Use the Sort by control and the Tag button there.
 4. Add a YouTube video (step 5), then on the Added Videos page click its thumbnail marked "Popup player". It opens the official YouTube player, with its normal ads, in one popup window; click another supported video to confirm the same window is reused. Twitch channels, videos and clips, and IMDb videos work the same way.
 5. YouTube is also supported: the home feed (shown only to signed-in users) and any creator's page (for example `https://www.youtube.com/@NASA`, Home, Videos, Shorts and Live tabs), which works signed out.
 6. Open https://www.imdb.com/chart/moviemeter/, open the popup and choose "Enable on this site". After the single-site permission prompt, Add and Hide buttons appear on the chart rows without using the picker.
 7. Any other site: open the popup on it and click "Enable on this site". The browser asks for permission for that single site, then a picker asks you to click one video tile.
-Note: browsers cannot open extension pages in private windows, so in a private window "Open added page" opens https://www.youtube.com/robots.txt#addorhide-added. The extension's content script (restricted to that exact address) draws the Added Videos page there from the local list. It reads nothing from YouTube and sends nothing to it. IMDb title pages, Dailymotion, Tubi and TMDB entries do not have the popup player; their thumbnail labels open the original site.
+Note: browsers cannot open extension pages in private windows, so in a private window "Added Videos" opens https://www.youtube.com/robots.txt#addorhide-added. The extension's content script (restricted to that exact address) draws the Added Videos page there from the local list. It reads nothing from YouTube and sends nothing to it. IMDb title pages, Dailymotion, Tubi and TMDB entries do not have the popup player; their thumbnail labels open the original site.
 ```
 
 ---
