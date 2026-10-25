@@ -84,6 +84,9 @@ body.hoa-added-view main {
 .hoa-added-page .site-identity h2 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hoa-added-page .player-site-note { font-size: 12px; white-space: nowrap; }
 .hoa-added-page .site-controls { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.hoa-added-page .site-delete-all { min-height: 28px; padding: 3px 8px; color: #b32e3d; font-size: 12px; white-space: nowrap; }
+.hoa-added-page .site-delete-all:hover:not(:disabled),
+.hoa-added-page .site-delete-all:focus-visible { color: #fff; background: #d93a49; box-shadow: 0 0 0 2px rgba(217, 58, 73, .24); }
 .hoa-added-page .site-controls select,
 .hoa-added-page .tag-editor select,
 .hoa-added-page .tag-editor input {

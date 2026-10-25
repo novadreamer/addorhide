@@ -16,6 +16,7 @@ const HOA_ADDED = (() => {
     ["video", "Video"], ["short", "Short"], ["movie", "Movie"], ["tv", "TV"],
     ["live", "Live"], ["music", "Music"], ["sport", "Sport"], ["other", "Other"]
   ];
+  const siteDeleteConfirmations = new Map();
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -510,6 +511,35 @@ const HOA_ADDED = (() => {
         controls.appendChild(labelFor("Group by", groupSelect));
         controls.appendChild(groupSelect);
       }
+      const deleteAll = element("button", "ghost-button danger-button site-delete-all",
+        siteDeleteConfirmations.has(group.site) ? "Delete all?" : "Delete all");
+      deleteAll.type = "button";
+      deleteAll.id = `added-delete-all-${slug}`;
+      deleteAll.title = `Delete every ${group.name} video from this page`;
+      deleteAll.addEventListener("click", () => {
+        if (siteDeleteConfirmations.has(group.site)) {
+          const pendingTimer = siteDeleteConfirmations.get(group.site);
+          clearTimeout(pendingTimer);
+          siteDeleteConfirmations.delete(group.site);
+          const keys = group.entries.map(([key]) => key);
+          if (keys.includes(editingKey)) {
+            editingKey = "";
+          }
+          HOA.readLists(lists => {
+            const nextAdded = { ...lists.added };
+            keys.forEach(key => delete nextAdded[key]);
+            HOA.writeLists({ added: nextAdded }, refresh);
+          });
+          return;
+        }
+        const timer = window.setTimeout(() => {
+          siteDeleteConfirmations.delete(group.site);
+          render();
+        }, 4000);
+        siteDeleteConfirmations.set(group.site, timer);
+        render();
+      });
+      controls.appendChild(deleteAll);
       heading.appendChild(controls);
       section.appendChild(heading);
       if (!sitePrefs.collapsed) {

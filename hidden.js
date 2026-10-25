@@ -8,6 +8,7 @@
   let pageStatusText = "";
   let removeAllTimer = 0;
   let removeAllButton = null;
+  const siteRemoveConfirmations = new Map();
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -204,6 +205,28 @@
     identity.appendChild(name);
     identity.appendChild(element("span", "count-badge", String(group.entries.length)));
     heading.appendChild(identity);
+    const removeAll = element("button", "ghost-button danger-button site-remove-all",
+      siteRemoveConfirmations.has(group.site) ? "Remove all?" : "Remove all");
+    removeAll.type = "button";
+    removeAll.id = `hidden-remove-all-${slug}-${groupIndex}`;
+    removeAll.title = `Remove every ${group.name} video from this list (they stay hidden)`;
+    removeAll.addEventListener("click", () => {
+      if (siteRemoveConfirmations.has(group.site)) {
+        const pendingTimer = siteRemoveConfirmations.get(group.site);
+        clearTimeout(pendingTimer);
+        siteRemoveConfirmations.delete(group.site);
+        const keys = group.entries.map(([key]) => key);
+        writeHidden(HOA.removeFromList(hidden, keys), "Removed from the list; videos remain hidden.");
+        return;
+      }
+      const timer = window.setTimeout(() => {
+        siteRemoveConfirmations.delete(group.site);
+        render();
+      }, 4000);
+      siteRemoveConfirmations.set(group.site, timer);
+      render();
+    });
+    heading.appendChild(removeAll);
     section.appendChild(heading);
     if (!collapsed) {
       const body = element("div", "site-group-body");

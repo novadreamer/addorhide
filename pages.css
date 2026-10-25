@@ -191,29 +191,48 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 .control-row { display: flex; gap: 12px; align-items: center; }
 .button-controls .control-label { font-weight: 600; }
 .position-buttons { display: grid; gap: 6px; }
-/* Enable/Disable: a round power button, raised like a real key (a darker rim underneath, a light top edge),
-   green while the hover buttons are off, red while they show. It sinks into its rim while pressed. */
+/* Enable/Disable: a top-lit, convex dome with a diffuse contact shadow rather than a hard lower rim. */
 .button-controls .press-button.toggle-button {
-  display: grid; place-items: center; width: 56px; height: 56px; min-width: 0; min-height: 0; margin-bottom: 6px; padding: 0;
-  border-radius: 50%; font-size: 0;
-  background: radial-gradient(circle at 50% 30%, #34c072 0%, #1f9d55 62%, #1a8a4a 100%); border: 1px solid #188546;
-  box-shadow: 0 5px 0 #136b39, 0 9px 14px rgba(0, 0, 0, .28), inset 0 2px 1px rgba(255, 255, 255, .4), inset 0 -3px 4px rgba(0, 0, 0, .15);
-  transition: transform 90ms ease-out, box-shadow 90ms ease-out, filter 150ms ease-out;
+  position: relative; isolation: isolate; display: grid; place-items: center; width: 56px; height: 56px; min-width: 0; min-height: 0; margin-bottom: 6px; padding: 0;
+  border: 1px solid #188546; border-radius: 50%; color: #fff; font-size: 0;
+  background: radial-gradient(circle at 50% 18%, rgba(255, 255, 255, .6) 0 2%, transparent 25%), radial-gradient(circle at 50% 32%, #40cb7b 0%, #1f9d55 58%, #157b42 100%);
+  box-shadow: 0 7px 13px rgba(18, 42, 28, .28), 0 2px 4px rgba(0, 0, 0, .2), inset 0 1px 1px rgba(255, 255, 255, .82), inset 0 -4px 6px rgba(6, 72, 35, .32), inset 2px 0 3px rgba(255, 255, 255, .12);
+  transition: transform 100ms ease-out, box-shadow 100ms ease-out, filter 150ms ease-out;
+}
+.button-controls .press-button.toggle-button::before {
+  position: absolute; z-index: -1; top: 5px; right: 9px; left: 9px; height: 18px; content: ""; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 0, rgba(255, 255, 255, .62), rgba(255, 255, 255, 0) 70%); border-radius: 50%;
 }
 .button-controls .press-button.toggle-button[data-enabled="true"] {
-  background: radial-gradient(circle at 50% 30%, #ef5a68 0%, #d93a49 62%, #c3303e 100%); border-color: #b72f3c;
-  box-shadow: 0 5px 0 #96222e, 0 9px 14px rgba(0, 0, 0, .28), inset 0 2px 1px rgba(255, 255, 255, .4), inset 0 -3px 4px rgba(0, 0, 0, .15);
+  border-color: #b72f3c;
+  background: radial-gradient(circle at 50% 18%, rgba(255, 255, 255, .58) 0 2%, transparent 25%), radial-gradient(circle at 50% 32%, #f26470 0%, #d93a49 58%, #ad2432 100%);
+  box-shadow: 0 7px 13px rgba(65, 15, 22, .3), 0 2px 4px rgba(0, 0, 0, .2), inset 0 1px 1px rgba(255, 255, 255, .82), inset 0 -4px 6px rgba(100, 14, 25, .34), inset 2px 0 3px rgba(255, 255, 255, .12);
 }
 .button-controls .press-button.toggle-button svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .3)); }
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .32)); }
+.button-controls .press-button.toggle-button:hover:not(:disabled) { filter: brightness(1.06) saturate(1.03); }
+.button-controls .press-button.toggle-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 75%, #fff); outline-offset: 3px; }
 .button-controls .press-button.toggle-button:active:not(:disabled) {
-  transform: translateY(4px);
-  box-shadow: 0 1px 0 #136b39, 0 3px 6px rgba(0, 0, 0, .25), inset 0 2px 4px rgba(0, 0, 0, .2);
+  transform: translateY(2px) scale(.98);
+  box-shadow: 0 3px 7px rgba(18, 42, 28, .24), inset 0 3px 7px rgba(6, 72, 35, .34), inset 0 1px 1px rgba(255, 255, 255, .32);
 }
 .button-controls .press-button.toggle-button[data-enabled="true"]:active:not(:disabled) {
-  box-shadow: 0 1px 0 #96222e, 0 3px 6px rgba(0, 0, 0, .25), inset 0 2px 4px rgba(0, 0, 0, .2);
+  box-shadow: 0 3px 7px rgba(65, 15, 22, .26), inset 0 3px 7px rgba(100, 14, 25, .36), inset 0 1px 1px rgba(255, 255, 255, .3);
 }
-.button-controls .press-button.edge-button { min-width: 54px; min-height: 21px; padding: 2px 8px; font-size: 10px; line-height: 1; }
+.button-controls .press-button.edge-button {
+  --edge-top: #fff; --edge-bottom: #c9cbd3;
+  display: grid; width: 46px; min-width: 46px; min-height: 30px; padding: 0; place-items: center;
+  color: #1d1d27; background: transparent; border-color: transparent; box-shadow: none; line-height: 1;
+}
+.button-controls .press-button.edge-button svg { display: block; width: 46px; height: 30px; overflow: visible; filter: drop-shadow(0 2px 1px rgba(0, 0, 0, .24)) drop-shadow(0 4px 5px rgba(0, 0, 0, .16)); }
+.button-controls .press-button.edge-button path { stroke: rgba(93, 96, 110, .52); stroke-width: 1; stroke-linejoin: round; }
+.button-controls .press-button.edge-button[aria-pressed="true"] { --edge-top: #ffe987; --edge-bottom: #ffd23f; color: #5e4300; }
+.button-controls .press-button.edge-button[aria-pressed="true"] path { stroke: #d39400; }
+.button-controls .press-button.edge-button:hover:not(:disabled) svg { filter: brightness(1.05) drop-shadow(0 3px 2px rgba(0, 0, 0, .25)) drop-shadow(0 5px 6px rgba(0, 0, 0, .16)); }
+.button-controls .press-button.edge-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.button-controls .press-button.edge-button:active:not(:disabled) { transform: translateY(2px) scale(.97); box-shadow: none; }
+.button-controls .press-button.edge-button:active:not(:disabled) svg { filter: brightness(.94) drop-shadow(0 1px 1px rgba(0, 0, 0, .3)); }
+.button-controls .press-button.edge-button:disabled { opacity: .45; cursor: default; box-shadow: none; }
 .button-controls .press-button {
   min-width: 112px;
   min-height: 32px;
@@ -227,9 +246,6 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 /* Action colours: green Enable (buttons hidden now), red Disable (buttons showing now). */
 .button-controls .toggle-button { color: #fff; background: #1f9d55; border: 1px solid #188546; }
 .button-controls .toggle-button[data-enabled="true"] { background: #d93a49; border-color: #b72f3c; }
-.button-controls .edge-button { color: #1d1d27; background: #fff; border: 1px solid #cfcde0; }
-.button-controls .edge-button[aria-pressed="true"] { background: #ffd23f; border-color: #e0b400; }
-.button-controls .edge-button:disabled { opacity: .45; cursor: default; box-shadow: none; }
 .button-controls .press-button:hover:not(:disabled) { filter: brightness(1.04); }
 /* Pressed: the button sinks while held, then springs back. */
 .button-controls .press-button:active:not(:disabled) {
@@ -252,6 +268,11 @@ body.popup main { overflow-y: auto; scrollbar-width: thin; }
 .popup .site-card, .popup .popup-edge, .popup .popup-footer { flex: 0 0 auto; }
 .popup .button-controls { gap: 24px; }
 .popup .button-controls .press-button.toggle-button { min-height: 0; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .button-controls .press-button.edge-button:not([aria-pressed="true"]) { --edge-top: #fbfbff; --edge-bottom: #aeb1be; }
+}
+:root[data-theme="dark"] .button-controls .press-button.edge-button:not([aria-pressed="true"]) { --edge-top: #fbfbff; --edge-bottom: #aeb1be; }
 
 /* The arrow buttons sit on the centre line (under Enable); "Position" hangs to their left. */
 .button-controls .position-row { display: grid; grid-template-columns: 1fr auto 1fr; justify-self: stretch; }
