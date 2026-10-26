@@ -80,7 +80,7 @@ AddOrHide is an independent project and is not affiliated with, endorsed by or s
 
 **Privacy policy URL:** https://novadreamer.github.io/addorhide-player/privacy.html
 
-**Optional fields:** leave Homepage URL and Support URL empty (support is by email: mybrainnoor@gmail.com); leave "mature content" unchecked.
+**Optional fields:** Homepage URL `https://github.com/novadreamer/addorhide`, Support URL `https://github.com/novadreamer/addorhide/issues` (the repo is public since 1.0.7; email support stays mybrainnoor@gmail.com); leave "mature content" unchecked.
 
 ---
 
