@@ -9,6 +9,7 @@
   let removeAllTimer = 0;
   let removeAllButton = null;
   const siteRemoveConfirmations = new Map();
+  const OPEN_BIN_ICON = '<svg class="bin-open" viewBox="0 0 34 24" aria-hidden="true" focusable="false"><path class="q" d="M3.2 8.6c0-2.2 1.7-3.6 3.8-3.6s3.6 1.3 3.6 3.2c0 2.6-3.4 2.9-3.4 5.6"/><circle class="q-dot" cx="7.2" cy="18.6" r="1.25"/><g transform="translate(12 0)"><path d="M4.6 7.4 18.2 3.9"/><path d="M9.3 6.2 8.9 4.6c-.2-.7.2-1.4.9-1.6l2.4-.6c.7-.2 1.4.2 1.6.9l.4 1.5"/><path d="M4.4 10.5h15.2"/><path d="M5.4 10.5l.9 9.3c.1 1 .9 1.7 1.9 1.7h7.6c1 0 1.8-.7 1.9-1.7l.9-9.3"/><path d="M10 13.5v5M14 13.5v5"/></g></svg>';
   const BIN_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6.5h16"/><path d="M9.5 6.5V4.8c0-.7.5-1.3 1.2-1.3h2.6c.7 0 1.2.6 1.2 1.3v1.7"/><path d="M6.3 6.5l.9 12.6c.1 1 .9 1.9 2 1.9h5.6c1.1 0 1.9-.9 2-1.9l.9-12.6"/><path d="M10 10.5v6.5M14 10.5v6.5"/></svg>';
 
   function element(tag, className, text) {
@@ -206,12 +207,10 @@
     identity.appendChild(name);
     identity.appendChild(element("span", "count-badge", String(group.entries.length)));
     heading.appendChild(identity);
-    // A bin icon (the whole button); while it waits for the second click it reads "Are you sure?".
+    // A bin icon (the whole button); while it waits for the second click it shows an open bin with a "?".
     const armed = siteRemoveConfirmations.has(group.site);
-    const removeAll = element("button", `site-remove-all${armed ? " armed" : ""}`, armed ? "Are you sure?" : "");
-    if (!armed) {
-      removeAll.innerHTML = BIN_ICON;
-    }
+    const removeAll = element("button", `site-remove-all${armed ? " armed" : ""}`);
+    removeAll.innerHTML = armed ? OPEN_BIN_ICON : BIN_ICON;
     removeAll.type = "button";
     removeAll.id = `hidden-remove-all-${slug}-${groupIndex}`;
     removeAll.title = armed ? `Click again to remove every ${group.name} video from this list (they stay hidden)`

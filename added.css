@@ -91,8 +91,16 @@ body.hoa-added-view main {
 .hoa-added-page .site-delete-all:hover:not(:disabled) { color: #a0202c; background: none; transform: scale(1.12); }
 .hoa-added-page .site-delete-all:active:not(:disabled) { transform: scale(.94); }
 .hoa-added-page .site-delete-all:focus-visible { outline: 2px solid #d93a49; outline-offset: 2px; }
-.hoa-added-page .site-delete-all.armed { width: auto; padding: 4px 11px; color: #fff; font-size: 12px; font-weight: 700; white-space: nowrap; background: #d93a49; border-radius: 999px; }
-.hoa-added-page .site-delete-all.armed:hover:not(:disabled) { color: #fff; background: #b72f3c; transform: none; }
+/* Armed: an open bin with a question mark in front of it (the second click deletes). */
+.hoa-added-page .site-delete-all.armed { width: 38px; color: #b4202e; }
+.hoa-added-page .site-delete-all.armed svg { width: 36px; height: 26px; }
+.hoa-added-page .site-delete-all.armed .q { stroke-width: 2.3; }
+.hoa-added-page .site-delete-all.armed .q-dot { fill: currentColor; stroke: none; }
+.hoa-added-page .site-delete-all.armed:hover:not(:disabled) { color: #8f1722; }
+@media (prefers-reduced-motion: no-preference) {
+  .hoa-added-page .site-delete-all.armed svg { animation: hoa-bin-ask 900ms ease-in-out infinite; transform-origin: 70% 90%; }
+}
+@keyframes hoa-bin-ask { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
 .hoa-added-page .site-controls select,
 .hoa-added-page .tag-editor select,
 .hoa-added-page .tag-editor input {
