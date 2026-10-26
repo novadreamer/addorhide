@@ -86,7 +86,8 @@
   line-height: 1.2;
 }
 /* The Hidden / Undo toast sits in the middle of the browser window. */
-#hoa-toast { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+#hoa-toast { top: 50%; right: auto; bottom: auto; left: 50%; width: max-content; max-width: calc(100vw - 40px); transform: translate(-50%, -50%); }
+/* Only as wide as its contents ("Hidden" + "Undo"), the same width it had in the corner; height unchanged. */
 #hoa-banner { top: 14px; left: 50%; transform: translateX(-50%); }
 #hoa-toast button, #hoa-banner button { min-height: 24px; padding: 0 5px; color: #aaaaff; line-height: 22px; }
 @media (prefers-reduced-motion: no-preference) {
