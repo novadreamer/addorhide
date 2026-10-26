@@ -167,8 +167,14 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 .popup .list-open-button:hover:not(:disabled) { filter: brightness(1.06); }
 .popup .list-open-button:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; animation: none; filter: none; }
 .list-summary { margin: 0; font-size: 12px; text-align: center; }
-/* The footer keeps the room "Open added page" used (123 px) empty for now. */
-.popup .footer-slot { display: block; flex: 0 0 123px; width: 123px; min-height: 32px; }
+/* Footer: GitHub link on the left, Support in the centre, Options on the right. */
+.popup .popup-footer { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+.popup .popup-footer .github-link { justify-self: start; }
+.popup .popup-footer .support-link { justify-self: center; }
+.popup .popup-footer #open-options-button { justify-self: end; }
+.github-link { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; border-radius: 6px; }
+.github-link svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.github-link:hover, .github-link:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 .popup .popup-footer { flex: 0 0 auto; margin-top: 0; }
 
 /* The [hidden] attribute must win over component display rules (empty states, banners, toasts). */

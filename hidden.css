@@ -85,9 +85,16 @@ body.hoa-hidden-view main { max-width: 1180px; margin: 0 auto; }
   white-space: nowrap;
 }
 .hoa-hidden-view .site-name-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.hoa-hidden-view .site-remove-all { justify-self: end; min-height: 28px; padding: 3px 8px; color: #b32e3d; font-size: 12px; white-space: nowrap; }
-.hoa-hidden-view .site-remove-all:hover:not(:disabled),
-.hoa-hidden-view .site-remove-all:focus-visible { color: #fff; background: #d93a49; box-shadow: 0 0 0 2px rgba(217, 58, 73, .24); }
+/* Per-site Remove all: the bin icon is the button; armed it becomes a red "Are you sure?" pill. */
+.hoa-hidden-view .site-remove-all { justify-self: end; }
+.hoa-hidden-view .site-remove-all { display: inline-grid; place-items: center; width: 30px; height: 30px; min-height: 0; padding: 0; color: #c8323f;
+  background: none; border: 0; border-radius: 8px; box-shadow: none; cursor: pointer; transition: color 120ms ease, transform 120ms ease; }
+.hoa-hidden-view .site-remove-all svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.hoa-hidden-view .site-remove-all:hover:not(:disabled) { color: #a0202c; background: none; transform: scale(1.12); }
+.hoa-hidden-view .site-remove-all:active:not(:disabled) { transform: scale(.94); }
+.hoa-hidden-view .site-remove-all:focus-visible { outline: 2px solid #d93a49; outline-offset: 2px; }
+.hoa-hidden-view .site-remove-all.armed { width: auto; padding: 4px 11px; color: #fff; font-size: 12px; font-weight: 700; white-space: nowrap; background: #d93a49; border-radius: 999px; }
+.hoa-hidden-view .site-remove-all.armed:hover:not(:disabled) { color: #fff; background: #b72f3c; transform: none; }
 .hoa-hidden-view .site-group-body { padding-top: 14px; }
 .hoa-hidden-view .hidden-row {
   display: grid;

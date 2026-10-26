@@ -17,6 +17,7 @@ const HOA_ADDED = (() => {
     ["live", "Live"], ["music", "Music"], ["sport", "Sport"], ["other", "Other"]
   ];
   const siteDeleteConfirmations = new Map();
+  const BIN_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6.5h16"/><path d="M9.5 6.5V4.8c0-.7.5-1.3 1.2-1.3h2.6c.7 0 1.2.6 1.2 1.3v1.7"/><path d="M6.3 6.5l.9 12.6c.1 1 .9 1.9 2 1.9h5.6c1.1 0 1.9-.9 2-1.9l.9-12.6"/><path d="M10 10.5v6.5M14 10.5v6.5"/></svg>';
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -511,11 +512,17 @@ const HOA_ADDED = (() => {
         controls.appendChild(labelFor("Group by", groupSelect));
         controls.appendChild(groupSelect);
       }
-      const deleteAll = element("button", "ghost-button danger-button site-delete-all",
-        siteDeleteConfirmations.has(group.site) ? "Delete all?" : "Delete all");
+      // A bin icon (the whole button); while it waits for the second click it reads "Are you sure?".
+      const armed = siteDeleteConfirmations.has(group.site);
+      const deleteAll = element("button", `site-delete-all${armed ? " armed" : ""}`, armed ? "Are you sure?" : "");
+      if (!armed) {
+        deleteAll.innerHTML = BIN_ICON;
+      }
       deleteAll.type = "button";
       deleteAll.id = `added-delete-all-${slug}`;
-      deleteAll.title = `Delete every ${group.name} video from this page`;
+      deleteAll.title = armed ? `Click again to delete every ${group.name} video from this page`
+        : `Delete all: every ${group.name} video on this page`;
+      deleteAll.setAttribute("aria-label", armed ? "Are you sure? Click again to delete them all" : `Delete all ${group.name} videos`);
       deleteAll.addEventListener("click", () => {
         if (siteDeleteConfirmations.has(group.site)) {
           const pendingTimer = siteDeleteConfirmations.get(group.site);

@@ -1,12 +1,27 @@
 # AddOrHide
 
-AddOrHide is a browser extension for saving videos to an Added Videos list or hiding recommendations. It includes built-in rules for YouTube and Tubi (tubitv.com), plus one-click and picker support for other websites.
+AddOrHide is a Chrome/Brave extension that puts you in charge of video recommendations: point at any video
+thumbnail and choose **Add** (keep it on your own Added Videos page) or **Hide** (remove it from the feed for good).
+It has built-in rules for YouTube and Tubi (tubitv.com), one-click support for IMDb, TMDB, Dailymotion and Twitch,
+and a card picker that teaches it any other video site. Everything stays in your browser.
+
+## Install
+
+- **Chrome Web Store:** search for [AddOrHide](https://chromewebstore.google.com/search/AddOrHide) (works in Chrome,
+  Brave and Edge).
+- **From this repository (Developer mode):** download it (**Code → Download ZIP**, then extract) or `git clone` it,
+  open `chrome://extensions` (Brave: `brave://extensions`), turn on **Developer mode**, choose **Load unpacked** and
+  select the folder that contains `manifest.json`. Keep that folder; the browser runs the extension from it. To
+  update, replace the files and click the extension's reload arrow.
+
+Moving between the store copy and a Developer-mode copy: they are separate extensions with separate data, so use
+**Options → Your data → Export** in one and **Import** in the other.
 
 ## Supported sites
 
 YouTube (home feed, subscriptions and creators' Home/Videos/Shorts/Live tabs) and Tubi are built in. IMDb charts/lists, TMDB lists, Dailymotion home, explore, video pages and search, and the Twitch directory can be enabled in one click with **Enable on this site**. Any other site can use the card picker. Sites that need a login or show a CAPTCHA or consent wall were not checked and should use the picker.
 
-The Add/Hide buttons appear centred at the top of a card (or at the bottom of its video picture, chosen under **Position** in the popup or Options) whenever the mouse is anywhere over it. The big button names its action (red **Disable** while the hover buttons show, green **Enable** while they are hidden) and turns the buttons off on every site without un-hiding anything; while they are off the toolbar icon turns grey with an OFF badge. If the site's own controls sit there, the buttons slide past them; if a site lays its own hover preview over the card (YouTube), the buttons are drawn above it.
+The Add/Hide buttons appear centred at the top of a card (or at the bottom of its video picture, chosen with the up/down arrowhead buttons under **Position** in the popup or Options) whenever the mouse is anywhere over it. The round power button turns them off and on for every site without un-hiding anything: red while the hover buttons show (click to disable), green while they are off (click to enable); its tooltip and the line under it say which. While they are off the toolbar icon turns grey with an OFF badge. If the site's own controls sit there, the buttons slide past them; if a site lays its own hover preview over the card (YouTube), the buttons are drawn above it.
 
 ## Look and feel
 
@@ -14,15 +29,11 @@ AddOrHide uses a calm indigo-and-violet interface with warm neutrals, clear cont
 
 The sun/moon switch in the popup header picks a light or dark theme for all AddOrHide pages (the default follows the system), and the popup's troubleshooting Details line is folded away until needed.
 
-## Load the extension
+## Using it
 
-1. Open `chrome://extensions` in Brave.
-2. Turn on Developer mode.
-3. Choose **Load unpacked** and select this folder.
+On a recommendation card, **Hide** removes the video from the feed and provides a six-second Undo. **Add** saves the video while leaving it in the feed; clicking **Added** removes it from the Added list. The popup has two buttons side by side: green **Added Videos** opens your Added Videos page and red **Hidden Videos** opens the Hidden videos window. Each is greyed out while its list is empty and has a count line under it ("There are 3 added videos."). The Hidden videos window is grouped by website with collapsible sections, **Restore**/**Remove** per video, **Restore all**/**Remove all** for everything, and a bin button on each website that removes that site's videos from the list (they stay hidden); it asks "Are you sure?" first.
 
-On a recommendation card, **Hide** removes the video from the feed and provides a six-second Undo. **Add** saves the video while leaving it in the feed; clicking **Added** removes it from the Added list. The popup has a **Hidden Videos** button and count line; it opens a Hidden videos window grouped by website with collapsible sections, **Restore**/**Remove** per video, and **Restore all**/**Remove all** controls.
-
-The **Added Videos** page contains only videos explicitly added. It groups entries by website with favicon logo tiles (no brand logos are bundled), and each site shows only the sort and group options that would change something for its videos (date added, date published or year, views, votes, rating, duration, A-Z; by type, by genre). Groups follow the chosen sort, and the page keeps its scroll position when you sort, group, collapse or tag. The inline **Tag** editor lets you add or correct a type and comma-separated genres for sites that do not expose those details. The picker can learn up to twelve cumulative card patterns per site (**Teach cards** / **Teach more cards**).
+The **Added Videos** page contains only videos explicitly added. It groups entries by website with favicon logo tiles (no brand logos are bundled), and each site shows only the sort and group options that would change something for its videos (date added, date published or year, views, votes, rating, duration, A-Z; by type, by genre). Groups follow the chosen sort, and the page keeps its scroll position when you sort, group, collapse or tag. The inline **Tag** editor lets you add or correct a type and comma-separated genres for sites that do not expose those details. Each website also has a bin button that deletes all of that site's videos from the page; it asks "Are you sure?" first, and **Clear page** empties the whole page. The picker can learn up to twelve cumulative card patterns per site (**Teach cards** / **Teach more cards**).
 
 **Where the data comes from:** duration, views, age, year, rating and genres are read from the card when you click **Add** (YouTube: duration, views and age; Tubi: duration, year, rating and genres; other sites are best effort). Nothing is fetched from the sites. Older entries and many sites will lack fields, and missing values always sort last.
 
@@ -46,7 +57,7 @@ Storage is local to this browser and is not synced between devices. Added items 
 
 ## Support link
 
-An optional Ko-fi tip link (`HOA.SUPPORT_URL`, https://ko-fi.com/ashmustafa) appears as a quiet "♥ Support" text link in the popup footer, the Options page header and the Added Videos page header. It only opens the Ko-fi page; no feature depends on it and nothing is sent to Ko-fi.
+An optional Ko-fi tip link (`HOA.SUPPORT_URL`, https://ko-fi.com/ashmustafa) appears as a quiet "♥ Support" text link in the centre of the popup footer (next to a link to this GitHub page), the Options page header and the Added Videos page header. It only opens the Ko-fi page; no feature depends on it and nothing is sent to Ko-fi.
 
 ## Permissions
 
@@ -69,9 +80,15 @@ JSDOM_PATH=<folder>/node_modules/jsdom node tests/engine.test.js
 
 Regenerating icons: run `python tools/make_icons.py` from this directory.
 
-Build the Chrome Web Store archive with `python tools/package.py .`. It writes the runtime-only archive to `dist/AddOrHide-1.0.4.zip`.
+Build the Chrome Web Store archive with `python tools/package.py .`. It writes the runtime-only archive to `dist/AddOrHide-<version>.zip`.
 
-## Status: 1.0.4 (1.0.1 is live on the Chrome Web Store; 1.0.4 adds YouTube search results, Shorts and new layouts everywhere, gap-free hiding of Shorts, Hide the whole feed on every YouTube page, and two installed copies no longer fight: the newest runs the page and the other one's popup says so)
+## Status: 1.0.7
+
+1.0.1 is on the Chrome Web Store. Since then: YouTube search results, Shorts and new layouts everywhere, gap-free
+hiding of Shorts, Hide the whole feed on every YouTube page, two installed copies no longer fight (the newest runs
+the page and the other one's popup says so), a redesigned popup (Added Videos and Hidden Videos side by side, a round
+3D power button, arrowhead Position buttons, a GitHub link) and a per-website delete button on the Added page and in
+the Hidden videos window.
 
 Used day to day as an unpacked extension in Brave on YouTube (home feed and creator pages), Tubi, IMDb, Twitch and Dailymotion, including private windows.
 
@@ -80,6 +97,13 @@ Checked in a real browser (Brave with Playwright, see below) on live pages, plus
 Not checked by automation: the browser's own permission prompt (it cannot be clicked by automation), the signed-in YouTube home feed and its inline preview player (checked by hand only), and the private-window Added page on `youtube.com/robots.txt`.
 
 The popup shows a **Details** line (page script version, cards found, buttons attached). It is the first thing to read when buttons do not appear on a page.
+
+## Privacy
+
+AddOrHide collects nothing and sends nothing anywhere: your Added and Hidden lists, site rules and settings are kept in
+the browser's local extension storage. The full policy is at
+https://novadreamer.github.io/addorhide-player/privacy.html (source: `store/privacy-policy.md`). Questions or problem
+reports: mybrainnoor@gmail.com, or open an issue here.
 
 ## Store submission
 

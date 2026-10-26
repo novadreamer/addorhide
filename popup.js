@@ -341,6 +341,10 @@ function openAddedPage() {
 
 openAddedButton.addEventListener("click", openAddedPage);
 openOptionsButton.addEventListener("click", () => openInThisWindow(chrome.runtime.getURL("options.html")));
+document.getElementById("github-link").addEventListener("click", event => {
+  event.preventDefault();
+  openInThisWindow("https://github.com/novadreamer/addorhide");
+});
 document.getElementById("support-link").addEventListener("click", event => {
   event.preventDefault();
   openInThisWindow(HOA.SUPPORT_URL);

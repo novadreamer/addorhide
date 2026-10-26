@@ -9,6 +9,7 @@
   let removeAllTimer = 0;
   let removeAllButton = null;
   const siteRemoveConfirmations = new Map();
+  const BIN_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6.5h16"/><path d="M9.5 6.5V4.8c0-.7.5-1.3 1.2-1.3h2.6c.7 0 1.2.6 1.2 1.3v1.7"/><path d="M6.3 6.5l.9 12.6c.1 1 .9 1.9 2 1.9h5.6c1.1 0 1.9-.9 2-1.9l.9-12.6"/><path d="M10 10.5v6.5M14 10.5v6.5"/></svg>';
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -205,11 +206,17 @@
     identity.appendChild(name);
     identity.appendChild(element("span", "count-badge", String(group.entries.length)));
     heading.appendChild(identity);
-    const removeAll = element("button", "ghost-button danger-button site-remove-all",
-      siteRemoveConfirmations.has(group.site) ? "Remove all?" : "Remove all");
+    // A bin icon (the whole button); while it waits for the second click it reads "Are you sure?".
+    const armed = siteRemoveConfirmations.has(group.site);
+    const removeAll = element("button", `site-remove-all${armed ? " armed" : ""}`, armed ? "Are you sure?" : "");
+    if (!armed) {
+      removeAll.innerHTML = BIN_ICON;
+    }
     removeAll.type = "button";
     removeAll.id = `hidden-remove-all-${slug}-${groupIndex}`;
-    removeAll.title = `Remove every ${group.name} video from this list (they stay hidden)`;
+    removeAll.title = armed ? `Click again to remove every ${group.name} video from this list (they stay hidden)`
+      : `Remove all: every ${group.name} video from this list (they stay hidden)`;
+    removeAll.setAttribute("aria-label", armed ? "Are you sure? Click again to remove them all" : `Remove all ${group.name} videos from this list`);
     removeAll.addEventListener("click", () => {
       if (siteRemoveConfirmations.has(group.site)) {
         const pendingTimer = siteRemoveConfirmations.get(group.site);
