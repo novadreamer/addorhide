@@ -15,6 +15,8 @@ body.hoa-hidden-view main { max-width: 1180px; margin: 0 auto; }
 .hoa-hidden-view .hidden-header h1 { margin-bottom: 4px; }
 .hoa-hidden-view .hidden-header .muted { margin-bottom: 0; }
 .hoa-hidden-view .hidden-header-actions { flex: 0 0 auto; }
+.hoa-hidden-view .hidden-header-actions { align-items: center; }
+.hoa-hidden-view .header-remove-all:disabled { opacity: .35; cursor: default; transform: none; }
 .hoa-hidden-view .count-badge {
   display: inline-grid;
   min-width: 25px;
@@ -100,7 +102,7 @@ body.hoa-hidden-view main { max-width: 1180px; margin: 0 auto; }
 .hoa-hidden-view .site-remove-all.armed .q-dot { fill: currentColor; stroke: none; }
 .hoa-hidden-view .site-remove-all.armed:hover:not(:disabled) { color: #8f1722; }
 @media (prefers-reduced-motion: no-preference) {
-  .hoa-hidden-view .site-remove-all.armed svg { animation: hoa-bin-ask 900ms ease-in-out infinite; transform-origin: 70% 90%; }
+  .hoa-hidden-view .site-remove-all.armed svg { animation: hoa-bin-ask 900ms ease-in-out infinite; transform-origin: 35% 90%; }
 }
 @keyframes hoa-bin-ask { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
 .hoa-hidden-view .site-group-body { padding-top: 14px; }

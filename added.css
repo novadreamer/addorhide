@@ -98,7 +98,7 @@ body.hoa-added-view main {
 .hoa-added-page .site-delete-all.armed .q-dot { fill: currentColor; stroke: none; }
 .hoa-added-page .site-delete-all.armed:hover:not(:disabled) { color: #8f1722; }
 @media (prefers-reduced-motion: no-preference) {
-  .hoa-added-page .site-delete-all.armed svg { animation: hoa-bin-ask 900ms ease-in-out infinite; transform-origin: 70% 90%; }
+  .hoa-added-page .site-delete-all.armed svg { animation: hoa-bin-ask 900ms ease-in-out infinite; transform-origin: 35% 90%; }
 }
 @keyframes hoa-bin-ask { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
 .hoa-added-page .site-controls select,

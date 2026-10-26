@@ -9,7 +9,7 @@
   let removeAllTimer = 0;
   let removeAllButton = null;
   const siteRemoveConfirmations = new Map();
-  const OPEN_BIN_ICON = '<svg class="bin-open" viewBox="0 0 34 24" aria-hidden="true" focusable="false"><path class="q" d="M3.2 8.6c0-2.2 1.7-3.6 3.8-3.6s3.6 1.3 3.6 3.2c0 2.6-3.4 2.9-3.4 5.6"/><circle class="q-dot" cx="7.2" cy="18.6" r="1.25"/><g transform="translate(12 0)"><path d="M4.6 7.4 18.2 3.9"/><path d="M9.3 6.2 8.9 4.6c-.2-.7.2-1.4.9-1.6l2.4-.6c.7-.2 1.4.2 1.6.9l.4 1.5"/><path d="M4.4 10.5h15.2"/><path d="M5.4 10.5l.9 9.3c.1 1 .9 1.7 1.9 1.7h7.6c1 0 1.8-.7 1.9-1.7l.9-9.3"/><path d="M10 13.5v5M14 13.5v5"/></g></svg>';
+  const OPEN_BIN_ICON = '<svg class="bin-open" viewBox="0 0 34 24" aria-hidden="true" focusable="false"><path d="M4.6 7.4 18.2 3.9"/><path d="M9.3 6.2 8.9 4.6c-.2-.7.2-1.4.9-1.6l2.4-.6c.7-.2 1.4.2 1.6.9l.4 1.5"/><path d="M4.4 10.5h15.2"/><path d="M5.4 10.5l.9 9.3c.1 1 .9 1.7 1.9 1.7h7.6c1 0 1.8-.7 1.9-1.7l.9-9.3"/><path d="M10 13.5v5M14 13.5v5"/><g transform="translate(20.6 0)"><path class="q" d="M3.2 8.6c0-2.2 1.7-3.6 3.8-3.6s3.6 1.3 3.6 3.2c0 2.6-3.4 2.9-3.4 5.6"/><circle class="q-dot" cx="7.2" cy="18.6" r="1.25"/></g></svg>';
   const BIN_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6.5h16"/><path d="M9.5 6.5V4.8c0-.7.5-1.3 1.2-1.3h2.6c.7 0 1.2.6 1.2 1.3v1.7"/><path d="M6.3 6.5l.9 12.6c.1 1 .9 1.9 2 1.9h5.6c1.1 0 1.9-.9 2-1.9l.9-12.6"/><path d="M10 10.5v6.5M14 10.5v6.5"/></svg>';
 
   function element(tag, className, text) {
@@ -269,23 +269,35 @@
     restoreAll.addEventListener("click", () => {
       writeHidden(HOA.restoreKeys(hidden, entries.map(([key]) => key)), "Returned to feed.");
     });
-    removeAllButton = element("button", "ghost-button danger-button", "Remove all");
+    // Remove all (every site): a bin icon like the per-site ones; the first click opens the bin with a "?", a second
+    // click within 4 s removes every video from the list (they stay hidden).
+    removeAllButton = element("button", "site-remove-all header-remove-all");
     removeAllButton.type = "button";
+    removeAllButton.id = "hidden-remove-all";
     removeAllButton.disabled = entries.length === 0;
+    const showRemoveAll = armed => {
+      if (!removeAllButton) {
+        return;
+      }
+      removeAllButton.classList.toggle("armed", armed);
+      removeAllButton.innerHTML = armed ? OPEN_BIN_ICON : BIN_ICON;
+      removeAllButton.title = armed ? "Click again to remove every video from this list (they stay hidden)"
+        : "Remove all: every video from this list (they stay hidden)";
+      removeAllButton.setAttribute("aria-label", armed ? "Are you sure? Click again to remove them all" : "Remove all videos from this list");
+    };
+    showRemoveAll(false);
     removeAllButton.addEventListener("click", () => {
       if (removeAllTimer) {
         clearTimeout(removeAllTimer);
         removeAllTimer = 0;
-        removeAllButton.textContent = "Remove all";
+        showRemoveAll(false);
         writeHidden(HOA.removeFromList(hidden, entries.map(([key]) => key)), "Removed from the list; videos remain hidden.");
         return;
       }
-      removeAllButton.textContent = "Confirm remove all?";
+      showRemoveAll(true);
       removeAllTimer = window.setTimeout(() => {
         removeAllTimer = 0;
-        if (removeAllButton) {
-          removeAllButton.textContent = "Remove all";
-        }
+        showRemoveAll(false);
       }, 4000);
     });
     actions.appendChild(restoreAll);
