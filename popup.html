@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AddOrHide</title>
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="pages.css">
+  <style>
+    .site-setting { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0; }
+    .page-details { margin-top: 4px; font-size: 11px; user-select: all; }
+  </style>
+</head>
+<body class="popup">
+  <main>
+    <header class="popup-header">
+      <div class="brand-lockup">
+        <img src="icons/icon32.png" width="32" height="32" alt="">
+        <div>
+          <h1>AddOrHide</h1>
+          <p class="muted">Take control of your feed.</p>
+        </div>
+      </div>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark theme" title="Switch to dark theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <line x1="12" y1="2" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="22"></line>
+          <line x1="2" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="22" y2="12"></line>
+          <line x1="4.93" y1="4.93" x2="7.05" y2="7.05"></line><line x1="16.95" y1="16.95" x2="19.07" y2="19.07"></line>
+          <line x1="4.93" y1="19.07" x2="7.05" y2="16.95"></line><line x1="16.95" y1="7.05" x2="19.07" y2="4.93"></line>
+        </svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+        </svg>
+      </button>
+    </header>
+    <section class="panel site-card" aria-labelledby="site-heading">
+      <div class="card-heading">
+        <div>
+          <p class="eyebrow">Current site</p>
+          <h2 id="site-heading">This site</h2>
+        </div>
+        <span class="section-mark" aria-hidden="true">✦</span>
+      </div>
+      <div id="site-content"></div>
+      <div id="site-status" class="status" role="status" aria-live="polite"></div>
+    </section>
+    <section class="panel lists-card" aria-label="Your videos">
+      <div class="list-column">
+        <button id="open-added-button" class="list-open-button added-open-button press-button" type="button" aria-describedby="added-summary">Added Videos</button>
+        <p id="added-summary" class="list-summary muted">No added videos.</p>
+      </div>
+      <div class="list-divider" aria-hidden="true"></div>
+      <div class="list-column">
+        <button id="open-hidden-button" class="list-open-button hidden-open-button press-button" type="button" aria-describedby="hidden-summary">Hidden Videos</button>
+        <p id="hidden-summary" class="list-summary muted">No hidden videos.</p>
+      </div>
+    </section>
+    <div class="popup-edge">
+      <div class="button-controls">
+        <div class="toggle-row">
+          <button id="buttons-toggle" class="toggle-button press-button" type="button" data-enabled="true" aria-describedby="buttons-toggle-note">Disable</button>
+          <p id="buttons-toggle-note" class="toggle-note muted">Disable to hide the hover buttons on thumbnails</p>
+        </div>
+        <div class="control-row position-row">
+          <span id="position-label" class="control-label">Position</span>
+          <div id="button-edge" class="position-buttons" role="group" aria-labelledby="position-label">
+            <button class="edge-button press-button" type="button" data-edge="top" aria-pressed="false" aria-label="Top" title="Top"><svg aria-hidden="true" focusable="false" viewBox="0 0 46 30"><defs><linearGradient id="popup-edge-top-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--edge-top)"/><stop offset="1" stop-color="var(--edge-bottom)"/></linearGradient></defs><path d="M23 2 44 28H2Z" fill="url(#popup-edge-top-gradient)"/></svg></button>
+            <button class="edge-button press-button" type="button" data-edge="bottom" aria-pressed="false" aria-label="Bottom" title="Bottom"><svg aria-hidden="true" focusable="false" viewBox="0 0 46 30"><defs><linearGradient id="popup-edge-bottom-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--edge-top)"/><stop offset="1" stop-color="var(--edge-bottom)"/></linearGradient></defs><path d="M2 2h42L23 28Z" fill="url(#popup-edge-bottom-gradient)"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="popup-footer">
+      <a id="github-link" class="github-link" href="https://github.com/novadreamer/addorhide" target="_blank" rel="noopener noreferrer" title="AddOrHide on GitHub" aria-label="AddOrHide on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+      <a id="support-link" class="support-link" href="https://ko-fi.com/ashmustafa" target="_blank" rel="noopener noreferrer" title="Support AddOrHide on Ko-fi"><span aria-hidden="true">&#9829;</span> Support</a>
+      <button id="open-options-button" class="ghost-button" type="button">Options</button>
+    </div>
+    <div id="popup-status" class="status popup-toast" role="status" aria-live="polite"></div>
+  </main>
+  <script src="shared.js"></script>
+  <script src="edge-choice.js"></script>
+  <script src="catalog.js"></script>
+  <script src="sites.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
