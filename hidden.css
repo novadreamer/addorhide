@@ -202,3 +202,17 @@ body.hoa-hidden-view main { max-width: 1180px; margin: 0 auto; }
   .hoa-hidden-view .hidden-row > img,
   .hoa-hidden-view .hidden-thumbnail-placeholder { width: 84px; }
 }
+
+/* Icon-only action buttons: the icon is the button (restore purple, remove red), tooltip says what it does. */
+.hoa-hidden-view button.icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; min-height: 0; padding: 0;
+  color: #5b5bf0; background: none; border: 0; border-radius: 8px; box-shadow: none; cursor: pointer;
+  transition: color 120ms ease, transform 120ms ease; }
+.hoa-hidden-view button.icon-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hoa-hidden-view button.icon-btn.remove-button { color: #c8323f; }
+.hoa-hidden-view button.icon-btn:hover:not(:disabled), .hoa-hidden-view button.icon-btn:focus-visible { color: #3f3fd0; background: none; box-shadow: none; transform: scale(1.14); }
+.hoa-hidden-view button.icon-btn.remove-button:hover:not(:disabled), .hoa-hidden-view button.icon-btn.remove-button:focus-visible { color: #a0202c; background: none; box-shadow: none; }
+.hoa-hidden-view button.icon-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.hoa-hidden-view button.icon-btn:active:not(:disabled) { transform: scale(.94); }
+.hoa-hidden-view button.icon-btn:disabled { opacity: .35; cursor: default; transform: none; }
+:root[data-theme="dark"] .hoa-hidden-view button.icon-btn:not(.remove-button) { color: #a3a3ff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hoa-hidden-view button.icon-btn:not(.remove-button) { color: #a3a3ff; } }

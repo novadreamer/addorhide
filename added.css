@@ -327,3 +327,20 @@ body.hoa-added-view main {
   .hoa-added-page .added-header { align-items: flex-start; }
   .hoa-added-page .short-grid { grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)); }
 }
+
+/* Icon-only action buttons: the icon is the button (restore purple, remove red), tooltip says what it does. */
+.hoa-added-page button.icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; min-height: 0; padding: 0;
+  color: #5b5bf0; background: none; border: 0; border-radius: 8px; box-shadow: none; cursor: pointer;
+  transition: color 120ms ease, transform 120ms ease; }
+.hoa-added-page button.icon-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hoa-added-page button.icon-btn.remove-button { color: #c8323f; }
+.hoa-added-page button.icon-btn:hover:not(:disabled), .hoa-added-page button.icon-btn:focus-visible { color: #3f3fd0; background: none; box-shadow: none; transform: scale(1.14); }
+.hoa-added-page button.icon-btn.remove-button:hover:not(:disabled), .hoa-added-page button.icon-btn.remove-button:focus-visible { color: #a0202c; background: none; box-shadow: none; }
+.hoa-added-page button.icon-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.hoa-added-page button.icon-btn:active:not(:disabled) { transform: scale(.94); }
+.hoa-added-page button.icon-btn:disabled { opacity: .35; cursor: default; transform: none; }
+:root[data-theme="dark"] .hoa-added-page button.icon-btn:not(.remove-button) { color: #a3a3ff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hoa-added-page button.icon-btn:not(.remove-button) { color: #a3a3ff; } }
+/* Clear page while there is nothing to clear: greyed out, not clickable, tooltip explains why. */
+.hoa-added-page button[aria-disabled="true"] { opacity: .4; cursor: not-allowed; }
+.hoa-added-page button[aria-disabled="true"]:hover { color: inherit; background: none; box-shadow: none; transform: none; }
