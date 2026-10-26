@@ -84,7 +84,7 @@ Regenerating icons: run `python tools/make_icons.py` from this directory.
 
 Build the Chrome Web Store archive with `python tools/package.py .`. It writes the runtime-only archive to `dist/AddOrHide-<version>.zip`.
 
-## Status: 1.0.12
+## Status: 1.0.13
 
 1.0.1 is on the Chrome Web Store. Since then: YouTube search results, Shorts and new layouts everywhere, gap-free
 hiding of Shorts, Hide the whole feed on every YouTube page, two installed copies no longer fight (the newest runs

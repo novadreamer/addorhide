@@ -1,6 +1,6 @@
 # AddOrHide: Chrome Web Store submission pack
 
-Release note: version 1.0.12 is the update to submit (the store has 1.0.1). Same permissions as 1.0.1, so users are not asked to approve anything new. Upload `dist/AddOrHide-1.0.12.zip`, replace all five screenshots and both promo tiles with the files in `store/assets/` (regenerated 2026-10-26), and paste the detailed description below.
+Release note: version 1.0.13 is the update to submit (the store has 1.0.1). Same permissions as 1.0.1, so users are not asked to approve anything new. Upload `dist/AddOrHide-1.0.13.zip`, replace all five screenshots and both promo tiles with the files in `store/assets/` (regenerated 2026-10-26), and paste the detailed description below.
 
 All the placeholders have been filled in. Field limits and required assets below come from the current Chrome Web Store documentation, except where marked "(dashboard limit)", which are limits the dashboard enforces that the docs page does not state.
 

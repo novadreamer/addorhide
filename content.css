@@ -85,7 +85,8 @@
   font-size: 13px;
   line-height: 1.2;
 }
-#hoa-toast { bottom: 20px; left: 20px; }
+/* The Hidden / Undo toast sits in the middle of the browser window. */
+#hoa-toast { top: 50%; left: 50%; transform: translate(-50%, -50%); }
 #hoa-banner { top: 14px; left: 50%; transform: translateX(-50%); }
 #hoa-toast button, #hoa-banner button { min-height: 24px; padding: 0 5px; color: #aaaaff; line-height: 22px; }
 @media (prefers-reduced-motion: no-preference) {
@@ -93,7 +94,9 @@
   .hoa-actions button { transition: transform 140ms ease-out, box-shadow 140ms ease-out, background-color 140ms ease-out; }
   #hoa-toast, #hoa-banner { animation: hoa-fade-in 160ms ease-out both; }
   #hoa-banner { animation-name: hoa-banner-in; }
+  #hoa-toast { animation-name: hoa-toast-in; }
   @keyframes hoa-fade-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes hoa-toast-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 6px)) scale(.96); } to { opacity: 1; transform: translate(-50%, -50%); } }
   @keyframes hoa-banner-in { from { opacity: 0; transform: translate(-50%, -5px); } to { opacity: 1; transform: translate(-50%, 0); } }
 }
 @media (prefers-reduced-motion: reduce) {
