@@ -1,5 +1,7 @@
 # AddOrHide
 
+[![Support me on Ko-fi](https://img.shields.io/badge/Support%20me%20on-Ko--fi-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/ashmustafa)
+
 AddOrHide is a Chrome/Brave extension that puts you in charge of video recommendations: point at any video
 thumbnail and choose **Add** (keep it on your own Added Videos page) or **Hide** (remove it from the feed for good).
 It has built-in rules for YouTube and Tubi (tubitv.com), one-click support for IMDb, TMDB, Dailymotion and Twitch,
@@ -57,7 +59,7 @@ Storage is local to this browser and is not synced between devices. Added items 
 
 ## Support link
 
-An optional Ko-fi tip link (`HOA.SUPPORT_URL`, https://ko-fi.com/ashmustafa) appears as a quiet "♥ Support" text link in the centre of the popup footer (next to a link to this GitHub page), the Options page header and the Added Videos page header. It only opens the Ko-fi page; no feature depends on it and nothing is sent to Ko-fi.
+An optional Ko-fi tip link (`HOA.SUPPORT_URL`, https://ko-fi.com/ashmustafa) appears as a quiet "♥ Support" text link in the centre of the popup footer (between a GitHub icon linking here and Options), the Options page header and the Added Videos page header. It only opens the Ko-fi page; no feature depends on it and nothing is sent to Ko-fi.
 
 ## Permissions
 
@@ -82,7 +84,7 @@ Regenerating icons: run `python tools/make_icons.py` from this directory.
 
 Build the Chrome Web Store archive with `python tools/package.py .`. It writes the runtime-only archive to `dist/AddOrHide-<version>.zip`.
 
-## Status: 1.0.7
+## Status: 1.0.8
 
 1.0.1 is on the Chrome Web Store. Since then: YouTube search results, Shorts and new layouts everywhere, gap-free
 hiding of Shorts, Hide the whole feed on every YouTube page, two installed copies no longer fight (the newest runs
@@ -104,6 +106,12 @@ AddOrHide collects nothing and sends nothing anywhere: your Added and Hidden lis
 the browser's local extension storage. The full policy is at
 https://novadreamer.github.io/addorhide-player/privacy.html (source: `store/privacy-policy.md`). Questions or problem
 reports: mybrainnoor@gmail.com, or open an issue here.
+
+## Legal
+
+Copyright © 2026 Ashraf Mustafa. Free for personal use; you may not sell, redistribute or republish it without
+written permission. See [LICENSE](LICENSE) and [LEGAL.md](LEGAL.md) (no warranty, not affiliated with any site it works
+on, donations).
 
 ## Store submission
 

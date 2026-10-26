@@ -172,8 +172,9 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 .popup .popup-footer .github-link { justify-self: start; }
 .popup .popup-footer .support-link { justify-self: center; }
 .popup .popup-footer #open-options-button { justify-self: end; }
-.github-link { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; border-radius: 6px; }
-.github-link svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.github-link { display: inline-flex; align-items: center; padding: 2px; color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; border-radius: 6px; }
+.github-link svg { width: 22px; height: 22px; fill: currentColor; transition: transform 140ms ease-out; }
+.github-link:hover svg { transform: scale(1.15); }
 .github-link:hover, .github-link:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 .popup .popup-footer { flex: 0 0 auto; margin-top: 0; }
 
