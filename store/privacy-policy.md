@@ -1,6 +1,6 @@
 # AddOrHide Privacy Policy
 
-**Effective date:** October 9, 2026
+**Effective date:** October 9, 2026 (updated October 26, 2026)
 **Developer:** Ashraf Mustafa
 **Contact:** mybrainnoor@gmail.com
 
@@ -50,6 +50,7 @@ The extension does not send your data to the developer. These requests happen di
 - **Images.** The Added Videos page and the Hidden Videos window show thumbnails and site icons by loading them from the site they came from (for example i.ytimg.com or a site's own favicon). Those sites can see that your browser requested the image, as they would for any image.
 - **Adding a video by link.** If you add a YouTube link from the Options page, the extension asks YouTube's public oEmbed service for the video's title, sending the link you typed.
 - **Private-window Added page.** Browsers cannot show an extension's own pages in private windows, so in a private window the extension builds the Added Videos page on an address on youtube.com (youtube.com/robots.txt). Loading that address contacts YouTube, but the contents of your list are shown by the extension on your device and are not sent to YouTube.
+- **Links.** The **♥ Support** link (Ko-fi) and the popup's GitHub icon only open that page in a new tab when you click them. Nothing about you or your lists is sent with them.
 - **The sites you visit.** Your use of YouTube, Tubi and any other site is between you and that site and is covered by their own policies.
 
 The extension does not download or run code from the internet.

@@ -1,6 +1,6 @@
 # AddOrHide: Chrome Web Store submission pack
 
-Release note: version 1.0.1 is ready for submission. The Options page includes Export my data and Import data for moving local lists and settings between extension installations.
+Release note: version 1.0.12 is the update to submit (the store has 1.0.1). Same permissions as 1.0.1, so users are not asked to approve anything new. Upload `dist/AddOrHide-1.0.12.zip`, replace all five screenshots and both promo tiles with the files in `store/assets/` (regenerated 2026-10-26), and paste the detailed description below.
 
 All the placeholders have been filled in. Field limits and required assets below come from the current Chrome Web Store documentation, except where marked "(dashboard limit)", which are limits the dashboard enforces that the docs page does not state.
 
@@ -26,17 +26,24 @@ HOW IT WORKS
 Hover over a video on a supported site and two small buttons appear:
 - Add saves the video to your Added Videos page. The video stays where it is, and the button turns into "Added".
 - Hide removes the video from the feed. Changed your mind? Tap Undo, or restore it from the Hidden Videos window in the extension popup.
+- Hide the whole feed: one switch clears every recommendation on a page when you just want to search.
 
 YOUR ADDED VIDEOS PAGE
 - Videos are grouped by website, each with its own logo tile.
 - Sort each site's videos by date added, date published, views, duration, year or A-Z.
 - Group them by type (video, short, movie, TV, live, music, sport) or by genre where the site shows one.
-- Tag any video with your own type and genres.
+- Tag any video with your own type and genres, or remove it, with the small icons on its card.
+- Delete all of one website's videos with its bin button (it asks first), or clear the whole page.
 - Click a video marked Popup player to watch it in a small floating window using the site's own official player, ads included; other saved videos open on their original site.
 - Works in private windows too, if you allow the extension there.
 
+THE POPUP
+- Added Videos and Hidden Videos side by side, each with a count of videos and websites.
+- A round power button turns the hover buttons off or on everywhere, without un-hiding anything.
+- Choose whether the buttons sit at the top or bottom of a thumbnail.
+
 THE HIDDEN LIST
-The toolbar popup shows how many videos you added and hid. Its Added Videos button opens your saved videos, and its Hidden Videos button opens a window listing them by website, with thumbnails. Restore one or all of them, or remove a row to keep the video hidden without cluttering the list.
+Hidden Videos opens a window listing them by website, with thumbnails. Restore one or all of them, or take one, one website's or all of them off the list while they stay hidden. Every button has a short tooltip.
 
 WORKS ON
 - YouTube, built in, with no setup.
@@ -54,6 +61,7 @@ GOOD TO KNOW
 - Details such as duration, views and genre appear only when the site shows them on the video's card. You can tag the rest yourself.
 - Websites change their layout from time to time, which can occasionally affect the buttons. Please report problems at mybrainnoor@gmail.com.
 - AddOrHide is free, with every feature included. If you find it useful, you can support it at https://ko-fi.com/ashmustafa (optional).
+- Source code, release notes and a manual install: https://github.com/novadreamer/addorhide
 
 AddOrHide is an independent project and is not affiliated with, endorsed by or sponsored by any of the websites it works on. All product names and trademarks belong to their owners.
 ```
