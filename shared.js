@@ -420,19 +420,28 @@ var HOA = Object.freeze((() => {
     return SITE_NAMES[hostname] || hostname;
   }
 
-  function hiddenSummaryText(count) {
+  // "... and N websites" when a website count is given (the popup and the Hidden window), e.g.
+  // "There are 3 hidden videos and 1 website."
+  function withSites(sentence, sites) {
+    if (!Number.isInteger(sites) || sites <= 0) {
+      return `${sentence}.`;
+    }
+    return `${sentence} and ${sites} website${sites === 1 ? "" : "s"}.`;   // no line break inside "1 website"
+  }
+
+  function hiddenSummaryText(count, sites) {
     if (!Number.isInteger(count) || count <= 0) {
       return "No hidden videos.";
     }
-    return count === 1 ? "There is 1 hidden video." : `There are ${count} hidden videos.`;
+    return withSites(count === 1 ? "There is 1 hidden video" : `There are ${count} hidden videos`, sites);
   }
 
   // The popup's line under Added Videos, worded like the one under Hidden Videos.
-  function addedCountText(count) {
+  function addedCountText(count, sites) {
     if (!Number.isInteger(count) || count <= 0) {
       return "No added videos.";
     }
-    return count === 1 ? "There is 1 added video." : `There are ${count} added videos.`;
+    return withSites(count === 1 ? "There is 1 added video" : `There are ${count} added videos`, sites);
   }
 
   function addedSummaryText(videoCount, siteCount) {

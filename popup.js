@@ -299,13 +299,14 @@ function loadSite() {
 }
 
 function render() {
-  const count = HOA.listedHidden(hidden).length;
+  const listed = HOA.listedHidden(hidden);
+  const count = listed.length;
   openHiddenButton.disabled = count === 0;
-  hiddenSummary.textContent = HOA.hiddenSummaryText(count);
+  hiddenSummary.textContent = HOA.hiddenSummaryText(count, HOA.groupBySite(Object.fromEntries(listed)).length);
   // Added Videos works the same way: off while nothing is added, with the count underneath.
   const addedCount = Object.keys(added || {}).length;
   openAddedButton.disabled = addedCount === 0;
-  addedSummary.textContent = HOA.addedCountText(addedCount);
+  addedSummary.textContent = HOA.addedCountText(addedCount, HOA.groupBySite(added).length);
 }
 
 openHiddenButton.addEventListener("click", () => {

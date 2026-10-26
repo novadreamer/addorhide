@@ -272,7 +272,7 @@
     const title = element("h1", "", "Hidden videos");
     title.appendChild(element("span", "count-badge", String(entries.length)));
     copy.appendChild(title);
-    copy.appendChild(element("p", "muted", HOA.hiddenSummaryText(entries.length)));
+    copy.appendChild(element("p", "muted", HOA.hiddenSummaryText(entries.length, groups.length)));
     const actions = element("div", "page-actions hidden-header-actions");
     const restoreAll = iconButton("restore-button header-restore-all", RESTORE_ALL_ICON, "Restore all: show every video in the feed again");
     restoreAll.id = "hidden-restore-all";
