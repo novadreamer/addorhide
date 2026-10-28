@@ -369,6 +369,57 @@ const CASES = [
     reload.window.close();
     window.close();
   }
+  {
+    const page = await load({ fixture: "youtube-watch-shorts.html", url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      siteRules: { "www.youtube.com": { hideKinds: ["shorts"] } } });
+    check("filters: Shorts hide captured Shorts cards", () => assert.strictEqual(
+      page.document.querySelectorAll("ytm-shorts-lockup-view-model-v2.hoa-filtered").length, 3));
+    check("filters: cards hidden by type are not hidden-list entries", () => assert.deepStrictEqual(page.store.hiddenItems || {}, {}));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/",
+      siteRules: { "www.youtube.com": { hideKinds: ["recommended"] } } });
+    check("filters: recommended hides ordinary captured home videos", () => assert.strictEqual(
+      page.document.querySelectorAll("ytd-rich-item-renderer.hoa-filtered").length, 3));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/",
+      siteRules: { "www.youtube.com": { hideKeywords: ["overheat"] } } });
+    check("filters: a captured title keyword hides exactly its card", () => assert.strictEqual(
+      page.document.querySelectorAll("ytd-rich-item-renderer.hoa-filtered").length, 1));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "tubi.html", url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["movies"] } } });
+    check("filters: Tubi movie links hide as movies", () => assert.strictEqual(
+      page.document.querySelectorAll('[data-test-id="web-ui-grid-item"].hoa-filtered').length, 3));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/",
+      siteRules: { "www.youtube.com": { hideKinds: ["playlists", "mixes", "live", "music", "podcasts", "movies", "posts", "fundraisers"] } } });
+    check("filters: synthetic known YouTube category markup is classified", () => ["playlist", "mix", "live", "music", "podcast", "movie", "post", "fundraiser"]
+      .forEach(id => assert.ok(page.document.getElementById(id).classList.contains("hoa-filtered"), id)));
+    page.window.close();
+  }
+  {
+    // "Recommended" takes only ordinary single videos, never collections, live videos, posts or shelves.
+    const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/",
+      siteRules: { "www.youtube.com": { hideKinds: ["recommended"] } } });
+    check("filters: Recommended leaves playlists, mixes, live, podcasts, posts and fundraisers alone", () =>
+      ["playlist", "mix", "live", "podcast", "post", "fundraiser"]
+        .forEach(id => assert.ok(!page.document.getElementById(id).classList.contains("hoa-filtered"), id)));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/" });
+    check("filters: nothing is filtered while no filter is on", () => assert.strictEqual(
+      page.document.querySelectorAll(".hoa-filtered").length, 0));
+    page.window.close();
+  }
   console.log(`engine.test.js: ${passed} passed, 0 failed`);
 })().catch(error => {
   console.error(error);

@@ -48,6 +48,8 @@ function appendPageStatus(container) {
       line.textContent = "The whole feed is hidden on this page. Turn off Hide the whole feed to see it again.";
     } else if (!reply.active) {
       line.textContent = "AddOrHide is off on this page.";
+    } else if (reply.filteredHere) {
+      line.textContent = `${reply.filteredHere} card${reply.filteredHere === 1 ? "" : "s"} hidden by your filters on this page.`;
     } else if (!reply.cards) {
       line.textContent = "Active, but no videos were recognised on this page. Try a list or home page, or use Pick cards.";
     } else if (!reply.overlays) {
@@ -66,7 +68,7 @@ function appendPageStatus(container) {
     const manifestVersion = chrome.runtime.getManifest().version;
     details.textContent = reply
       ? `Details: page script v${reply.version || "?"} (extension v${manifestVersion}), cards ${reply.cards}, buttons ${reply.overlays}`
-        + `${reply.staleOverlays ? `, old buttons ${reply.staleOverlays}` : ""}, hidden here ${reply.hiddenHere || 0}`
+        + `${reply.staleOverlays ? `, old buttons ${reply.staleOverlays}` : ""}, hidden here ${reply.hiddenHere || 0}, filtered here ${reply.filteredHere || 0}`
       : `Details: no page script answered (extension v${manifestVersion})`;
     detailsBox.appendChild(details);
     container.appendChild(detailsBox);
@@ -154,6 +156,63 @@ function addLearnedControl(host, catalog, rule, container) {
   container.appendChild(forget);
 }
 
+function appendFilterControls(container, catalogRule) {
+  const categories = catalogRule && Array.isArray(catalogRule.categories) ? catalogRule.categories : [];
+  const current = siteRule(activeHost);
+  const kinds = HOA.normalizeHideKinds(current.hideKinds, categories.map(category => category.id));
+  const keywords = HOA.normalizeKeywords(current.hideKeywords);
+  const details = document.createElement("details");
+  details.className = "hide-filters";
+  const summary = document.createElement("summary");
+  const labels = categories.filter(category => kinds.includes(category.id)).map(category => category.label);
+  summary.textContent = `Hide on this site${labels.length || keywords.length ? ` — ${[...labels, keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ")}` : ""}`;
+  details.appendChild(summary);
+  const body = document.createElement("div");
+  body.className = "hide-filters-body";
+  const save = (nextKinds, nextKeywords) => saveSiteRules({ ...siteRules, [activeHost]: {
+    ...siteRule(activeHost), enabled: siteRule(activeHost).enabled !== false,
+    hideKinds: HOA.normalizeHideKinds(nextKinds, categories.map(category => category.id)),
+    hideKeywords: HOA.normalizeKeywords(nextKeywords)
+  } }, "Filter settings saved.");
+  categories.forEach(category => {
+    const label = document.createElement("label");
+    label.className = "switch-row";
+    label.title = category.hint;
+    const toggle = document.createElement("input");
+    toggle.type = "checkbox";
+    toggle.setAttribute("role", "switch");
+    toggle.checked = kinds.includes(category.id);
+    toggle.addEventListener("change", () => save(toggle.checked ? [...kinds, category.id] : kinds.filter(id => id !== category.id), keywords));
+    label.append(toggle, document.createTextNode(` ${category.label}`));
+    body.appendChild(label);
+  });
+  const words = document.createElement("div");
+  words.className = "filter-words";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = "Hide videos with these words";
+  input.value = keywords.join(", ");
+  input.setAttribute("aria-label", "Hide videos with these words, comma-separated");
+  const saveButton = button("Save", () => save(kinds, input.value.split(",")));
+  saveButton.className = "secondary-button";
+  input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); save(kinds, input.value.split(",")); } });
+  words.append(input, saveButton);
+  body.appendChild(words);
+  if (keywords.length) {
+    const chips = document.createElement("div");
+    chips.className = "filter-chips";
+    keywords.forEach(word => {
+      const chip = button(`× ${word}`, () => save(kinds, keywords.filter(value => value !== word)));
+      chip.className = "filter-chip";
+      chip.title = `Remove ${word}`;
+      chips.appendChild(chip);
+    });
+    body.appendChild(chips);
+  }
+  details.appendChild(body);
+  container.appendChild(details);
+}
+
 function renderSite() {
   clearNode(siteContent);
   setSiteStatus("");
@@ -187,6 +246,7 @@ function renderSite() {
     label.appendChild(toggle);
     label.appendChild(document.createTextNode(" Hide the whole feed"));
     siteContent.appendChild(label);
+    appendFilterControls(siteContent, catalogRule);
     return;
   }
   const renderEnabled = granted => {
@@ -257,6 +317,7 @@ function renderSite() {
   toggleLabel.appendChild(document.createTextNode(" Hide the whole feed"));
   actions.appendChild(toggleLabel);
   siteContent.appendChild(actions);
+  appendFilterControls(siteContent, catalogRule);
   const links = document.createElement("div");
   links.className = "site-links";
   addLearnedControl(activeHost, isCatalog, rule, links);

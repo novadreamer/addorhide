@@ -18,6 +18,7 @@ const exportDataButton = document.getElementById("export-data-button");
 const importDataButton = document.getElementById("import-data-button");
 const importDataInput = document.getElementById("import-data-input");
 const dataStatus = document.getElementById("data-status");
+const filterSites = document.getElementById("filter-sites");
 
 let hidden = {};
 let added = {};
@@ -145,6 +146,7 @@ function loadRules() {
     bulkHideInput.checked = (siteRules["www.youtube.com"] || siteRules["youtube.com"] || {}).bulkHide === true;
     bulkHideTubiInput.checked = (siteRules["tubitv.com"] || siteRules["www.tubitv.com"] || {}).bulkHide === true;
     renderSites();
+    renderFilterSites();
   });
 }
 
@@ -235,6 +237,73 @@ function openAddedPage() {
       details.windowId = currentWindow.id;
     }
     chrome.tabs.create(details);
+  });
+}
+
+function filterHost(catalogRule) {
+  return catalogRule.id === "youtube" ? "www.youtube.com" : catalogRule.hosts[0];
+}
+
+function saveFilterRule(host, categories, kinds, keywords) {
+  siteRules = { ...siteRules, [host]: {
+    ...siteRule(host),
+    hideKinds: HOA.normalizeHideKinds(kinds, categories.map(category => category.id)),
+    hideKeywords: HOA.normalizeKeywords(keywords)
+  } };
+  chrome.storage.local.set({ [HOA.SITES_KEY]: siteRules }, loadRules);
+}
+
+function renderFilterSites() {
+  while (filterSites.firstChild) filterSites.firstChild.remove();
+  HOA_CATALOG.rules.forEach(catalogRule => {
+    const host = filterHost(catalogRule);
+    const categories = Array.isArray(catalogRule.categories) ? catalogRule.categories : [];
+    const rule = siteRule(host);
+    const kinds = HOA.normalizeHideKinds(rule.hideKinds, categories.map(category => category.id));
+    const keywords = HOA.normalizeKeywords(rule.hideKeywords);
+    const details = document.createElement("details");
+    details.className = "hide-filters";
+    const summary = document.createElement("summary");
+    const labels = categories.filter(category => kinds.includes(category.id)).map(category => category.label);
+    summary.textContent = `${catalogRule.name}${labels.length || keywords.length ? ` — ${[...labels, keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ")}` : " — no filters"}`;
+    details.appendChild(summary);
+    const body = document.createElement("div");
+    body.className = "hide-filters-body";
+    categories.forEach(category => {
+      const label = document.createElement("label");
+      label.className = "switch-row";
+      label.title = category.hint;
+      const toggle = document.createElement("input");
+      toggle.type = "checkbox";
+      toggle.setAttribute("role", "switch");
+      toggle.checked = kinds.includes(category.id);
+      toggle.addEventListener("change", () => saveFilterRule(host, categories,
+        toggle.checked ? [...kinds, category.id] : kinds.filter(id => id !== category.id), keywords));
+      label.append(toggle, document.createTextNode(` ${category.label}`));
+      body.appendChild(label);
+    });
+    const words = document.createElement("div");
+    words.className = "filter-words";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = keywords.join(", ");
+    input.placeholder = "Hide videos with these words";
+    input.setAttribute("aria-label", `${catalogRule.name}: hide videos with these words`);
+    const save = siteActionButton("Save", () => saveFilterRule(host, categories, kinds, input.value.split(",")));
+    input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); saveFilterRule(host, categories, kinds, input.value.split(",")); } });
+    words.append(input, save);
+    body.appendChild(words);
+    const chips = document.createElement("div");
+    chips.className = "filter-chips";
+    keywords.forEach(word => {
+      const chip = siteActionButton(`× ${word}`, () => saveFilterRule(host, categories, kinds, keywords.filter(value => value !== word)));
+      chip.className = "filter-chip";
+      chip.title = `Remove ${word}`;
+      chips.appendChild(chip);
+    });
+    body.appendChild(chips);
+    details.appendChild(body);
+    filterSites.appendChild(details);
   });
 }
 openAddedButton.addEventListener("click", openAddedPage);
@@ -337,6 +406,7 @@ function importDataFile(file) {
           siteRules = merged.siteRules;
           renderHidden();
           renderSites();
+          renderFilterSites();
         });
       });
     });

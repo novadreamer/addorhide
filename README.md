@@ -57,6 +57,10 @@ In private windows, the Added Videos page uses the hosted view at `youtube.com/r
 
 Storage is local to this browser and is not synced between devices. Added items are capped at 500 and hidden items at 1000, with the oldest entries evicted first. **Hide the whole feed** toggles for YouTube and Tubi are in Options (and in the popup for the current site) and are reversible from the same toggle.
 
+## Hide by type and keyword
+
+Each supported site has optional per-site filters in the popup and Options page. Choose categories such as YouTube Shorts, live streams, playlists, movies or Tubi TV shows, or enter comma-separated words and phrases. A word matches whole words (including non-English text) in the title, channel and available card tags. Filtered cards disappear only from the current page: they are not added to Hidden Videos, and turning a category off or removing a word brings them back on the next page update.
+
 ## Support link
 
 An optional Ko-fi tip link (`HOA.SUPPORT_URL`, https://ko-fi.com/ashmustafa) appears as a quiet "♥ Support" text link in the centre of the popup footer (between a GitHub icon linking here and Options), the Options page header and the Added Videos page header. It only opens the Ko-fi page; no feature depends on it and nothing is sent to Ko-fi.

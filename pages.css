@@ -294,3 +294,17 @@ body.popup main { overflow-y: auto; scrollbar-width: thin; }
 .support-link span { display: inline-block; color: #e0457b; transition: transform 140ms ease-out; }
 .support-link:hover span { transform: scale(1.25); }
 .support-line { margin-top: 6px; font-size: 13px; }
+
+/* Per-site category and keyword filters. Closed in the popup to preserve its 600px working height. */
+.hide-filters { margin-top: 8px; border-top: 1px solid var(--border); }
+.hide-filters summary { padding: 8px 0; color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; }
+.hide-filters-body { display: grid; gap: 4px; max-height: 270px; padding: 2px 0 8px; overflow-y: auto; scrollbar-width: thin; }
+.hide-filters .switch-row { min-height: 32px; font-size: 12px; }
+.hide-filters .switch-row input[type="checkbox"][role="switch"] { transform: scale(.88); transform-origin: left center; margin-right: -4px; }
+.filter-words { display: flex; gap: 6px; align-items: center; margin-top: 5px; }
+.filter-words input { min-width: 0; min-height: 30px; font-size: 12px; }
+.filter-words button { flex: 0 0 auto; min-height: 30px; }
+.filter-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+button.filter-chip { min-height: 23px; padding: 2px 7px; color: var(--text); background: var(--surface-2); border-color: var(--border); font-size: 11px; font-weight: 500; }
+.filter-sites { display: grid; gap: 8px; }
+.filter-sites .hide-filters { margin-top: 0; }

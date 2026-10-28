@@ -428,6 +428,23 @@ check("added summary text", () => assert.deepEqual([
   HOA.addedSummaryText(2, 4)
 ], ["Nothing saved yet.", "1 video saved on 1 site", "3 videos saved on 1 site", "2 videos saved across 4 sites"]));
 
+check("normalize hide kinds keeps allowed unique ids", () => assert.deepEqual(
+  HOA.normalizeHideKinds(["shorts", " shorts ", "bad", 4], ["shorts", "live"]), ["shorts"]));
+check("normalize keywords trims, folds spaces and deduplicates case-insensitively", () => assert.deepEqual(
+  HOA.normalizeKeywords(["  Space   Robot ", "space robot", "", 4]), ["Space Robot"]));
+check("keyword matching uses Unicode whole-word boundaries", () => {
+  assert.equal(HOA.keywordMatch("A Space Robot and الفن", ["space robot"]), true);
+  assert.equal(HOA.keywordMatch("party time", ["art"]), false);
+  assert.equal(HOA.keywordMatch("الفن رائع", ["الفن"]), true);
+});
+check("backup keeps filter settings", () => {
+  const result = HOA.parseBackup(JSON.stringify(HOA.buildBackup({ hidden: {}, added: {}, siteRules: {
+    "www.youtube.com": { hideKinds: ["shorts", "live"], hideKeywords: [" Robot ", "robot"] }
+  }, prefs: {} }, "1.1.0", now)));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.backup.siteRules["www.youtube.com"], { hideKinds: ["shorts", "live"], hideKeywords: ["Robot"] });
+});
+
 // The popup injects shared.js/catalog.js again into pages that already run them (picker, Enable).
 check("shared.js and catalog.js can be injected twice into one world", () => {
   const vm = require("node:vm");

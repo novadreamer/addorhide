@@ -43,10 +43,11 @@ window.__hoaLoaded = true;
     rootElement.dataset.hoaExtension = ownExtension;
     rootElement.dataset.hoaVersion = ownVersion;
     document.querySelectorAll(".hoa-actions, #hoa-toast, #hoa-banner").forEach(node => node.remove());
-    document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-show"));
+    document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-show"));
   }
 
   const ACTIVE_CLASS = "hoa-removed";
+  const FILTER_CLASS = "hoa-filtered";
   let hidden = {};
   let added = {};
   let siteRules = {};
@@ -73,7 +74,7 @@ window.__hoaLoaded = true;
 
   function removeOwnUi() {
     document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"]`).forEach(node => node.remove());
-    document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-show"));
+    document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-show"));
     ["hoa-toast", "hoa-banner"].forEach(id => {
       const node = document.getElementById(id);
       if (node) {
@@ -170,7 +171,7 @@ window.__hoaLoaded = true;
     if (!catalogRule && (!validPicks.length || !stored || stored.enabled !== true)) {
       return null;
     }
-    const merged = { ...base, catalog: Boolean(catalogRule), userPicked: validPicks.length > 0 };
+    const merged = { ...base, catalog: Boolean(catalogRule), userPicked: validPicks.length > 0, hideKinds: [], hideKeywords: [] };
     if (stored && typeof stored === "object") {
       // Enable stores linkSelector: "" for every site; an empty value must not wipe a catalog rule's link.
       if (typeof stored.linkSelector === "string" && stored.linkSelector && stored.linkSelector.length <= 500
@@ -180,6 +181,9 @@ window.__hoaLoaded = true;
       if (typeof stored.bulkHide === "boolean") {
         merged.bulkHide = stored.bulkHide;
       }
+      const allowedKinds = (base.categories || []).map(category => category.id);
+      merged.hideKinds = HOA.normalizeHideKinds(stored.hideKinds, allowedKinds);
+      merged.hideKeywords = HOA.normalizeKeywords(stored.hideKeywords);
     }
     merged.pickedSelectors = validPicks;
     merged.variants = [...(Array.isArray(base.variants) ? base.variants : []), ...validPicks.map(cardSelector => ({
@@ -204,6 +208,126 @@ window.__hoaLoaded = true;
     // Catalog rules only list adMarkers when a site needs them (YouTube).
     // A card is an ad when it is, contains or sits inside an ad container (search ads wrap normal-looking cards).
     return (rule.adMarkers || []).some(marker => card.matches(marker) || card.querySelector(marker) || card.closest(marker));
+  }
+
+  function categoryMatches(card, rule, category) {
+    if (!category || category.fallback || (category.pathPattern && !safePattern(category.pathPattern, location.pathname))) {
+      return false;
+    }
+    const test = category.card;
+    if (!test || typeof test !== "object") {
+      return false;
+    }
+    const results = [];
+    if (test.has) {
+      results.push(safeQuery(card, test.has));
+    }
+    if (test.is) {
+      try { results.push(card.matches(test.is)); } catch (error) { results.push(false); }
+    }
+    if (test.href) {
+      const link = getLink(card, rule);
+      results.push(Boolean(link && safePattern(test.href, link.getAttribute("href") || link.href || "")));
+    }
+    if (test.text) {
+      results.push(safePattern(test.text, cardText(card)));
+    }
+    if (test.channel) {
+      results.push(safePattern(test.channel, channelText(card, rule)));
+    }
+    // Conditions are alternatives. This lets catalog rules recognise old and new markup without site-specific code.
+    return results.some(Boolean);
+  }
+
+  function safeQuery(card, selector) {
+    try { return Boolean(card.querySelector(selector)); } catch (error) { return false; }
+  }
+
+  function safePattern(source, text) {
+    try { return new RegExp(source, "iu").test(text || ""); } catch (error) { return false; }
+  }
+
+  function cardText(card) {
+    const clone = card.cloneNode(true);
+    clone.querySelectorAll(".hoa-actions").forEach(node => node.remove());
+    return (clone.textContent || "").replace(/\s+/g, " ").trim();
+  }
+
+  function channelText(card, rule) {
+    for (const selector of rule.channelCandidates || []) {
+      try {
+        const text = elementText(card.querySelector(selector));
+        if (text) return text;
+      } catch (error) {
+        // A changed site selector must not stop the whole filter pass.
+      }
+    }
+    return "";
+  }
+
+  function filterText(card, rule, data) {
+    const text = [data && data.title, channelText(card, rule)];
+    const meta = rule.meta || {};
+    ["genres", "texts", "metaTexts"].forEach(name => {
+      const selectors = Array.isArray(meta[name]) ? meta[name] : [meta[name]];
+      selectors.filter(Boolean).forEach(selector => {
+        try {
+          card.querySelectorAll(selector).forEach(node => text.push(elementText(node)));
+        } catch (error) {
+          // Ignore a stale catalog selector.
+        }
+      });
+    });
+    return text.filter(Boolean).join(" ");
+  }
+
+  function activeCategories(rule) {
+    const categories = Array.isArray(rule.categories) ? rule.categories : [];
+    const selected = new Set(HOA.normalizeHideKinds(rule.hideKinds, categories.map(category => category.id)));
+    return { all: categories, selected: categories.filter(category => selected.has(category.id)) };
+  }
+
+  // An ordinary single video (a watch link that is not part of a playlist or mix): the only kind of card the
+  // "Recommended" fallback may take, so it never swallows shelves, posts or collections.
+  function isOrdinaryVideo(card, rule) {
+    const link = getLink(card, rule);
+    const href = link ? link.getAttribute("href") || link.href || "" : "";
+    return /\/watch\?(?:.*&)?v=/.test(href) && !/[?&]list=/.test(href);
+  }
+
+  function shouldFilterCard(card, rule, data, categories) {
+    const keywords = Array.isArray(rule.hideKeywords) ? rule.hideKeywords : [];
+    // Nothing switched on for this site: no work at all (this runs for every card on every pass).
+    if (!categories.selected.length && !keywords.length) {
+      return false;
+    }
+    let kindMatch = categories.selected.some(category => !category.fallback && categoryMatches(card, rule, category));
+    const fallback = categories.selected.find(category => category.fallback);
+    if (!kindMatch && fallback && (!fallback.pathPattern || safePattern(fallback.pathPattern, location.pathname))
+      && isOrdinaryVideo(card, rule)) {
+      kindMatch = !categories.all.some(category => !category.fallback && categoryMatches(card, rule, category));
+    }
+    return kindMatch || (keywords.length > 0 && HOA.keywordMatch(filterText(card, rule, data), keywords));
+  }
+
+  function filterContainers(rule, categories) {
+    const selected = categories.selected;
+    selected.forEach(category => {
+      if (category.pathPattern && !safePattern(category.pathPattern, location.pathname)) return;
+      if (category.containers) {
+        try { document.querySelectorAll(category.containers).forEach(node => node.classList.add(FILTER_CLASS)); } catch (error) { /* stale selector */ }
+      }
+      if (category.shelfTitle) {
+        const shelves = "ytd-rich-shelf-renderer, ytd-shelf-renderer, ytd-reel-shelf-renderer, grid-shelf-view-model, ytd-rich-section-renderer, yt-section-header-view-model, [data-test-id=web-ui-content-row]";
+        try {
+          document.querySelectorAll(shelves).forEach(shelf => {
+            if (safePattern(category.shelfTitle, cardText(shelf))) {
+              (shelf.closest("ytd-rich-section-renderer") || shelf).classList.add(FILTER_CLASS);
+            }
+          });
+        } catch (error) { /* stale selector */ }
+      }
+    });
   }
 
   function removalTarget(card, rule) {
@@ -779,8 +903,8 @@ window.__hoaLoaded = true;
   }
 
   function cleanup() {
-    document.querySelectorAll(".hoa-removed, .hoa-host").forEach(card => {
-      card.classList.remove(ACTIVE_CLASS, "hoa-host", "hoa-show");
+    document.querySelectorAll(".hoa-removed, .hoa-filtered, .hoa-host").forEach(card => {
+      card.classList.remove(ACTIVE_CLASS, FILTER_CLASS, "hoa-host", "hoa-show");
       card.querySelectorAll(":scope > .hoa-actions").forEach(node => {
         if (node.hoaPlacementObserver) {
           node.hoaPlacementObserver.disconnect();
@@ -826,6 +950,7 @@ window.__hoaLoaded = true;
     const handled = new Set();
     const alreadyHandled = card => Array.from(handled).some(parent => parent !== card && parent.contains(card));
     if (rule.bulkHide && (!rule.bulkHidePattern || new RegExp(rule.bulkHidePattern).test(location.pathname))) {
+      document.querySelectorAll(`.${FILTER_CLASS}`).forEach(node => node.classList.remove(FILTER_CLASS));
       // Whole-feed mode also takes cards that never get buttons (YouTube playlists, podcasts, courses).
       const bulkCards = variants.map(variant => [variant.cardSelector, variant]);
       if (rule.bulkExtraSelector) {
@@ -847,6 +972,11 @@ window.__hoaLoaded = true;
       bulkApplied = false;
     }
     removeBanner();
+    // Filtering is ephemeral. Clearing the class first means a disabled category or removed word immediately
+    // reveals its cards, while the separately stored hoa-removed mark still wins below.
+    document.querySelectorAll(`.${FILTER_CLASS}`).forEach(node => node.classList.remove(FILTER_CLASS));
+    const categories = activeCategories(rule);
+    filterContainers(rule, categories);
     variants.forEach(variant => Array.from(document.querySelectorAll(variant.cardSelector)).forEach(card => {
       if (handled.has(card) || alreadyHandled(card)) {
         return;
@@ -865,12 +995,30 @@ window.__hoaLoaded = true;
       if (hidden[data.key]) {
         removeActions(card);
         target.classList.add(ACTIVE_CLASS);
+      } else if (shouldFilterCard(card, variant, data, categories)) {
+        removeActions(card);
+        target.classList.remove(ACTIVE_CLASS);
+        target.classList.add(FILTER_CLASS);
       } else {
         target.classList.remove(ACTIVE_CLASS);
+        target.classList.remove(FILTER_CLASS);
         ensureActions(card, data, variant);
       }
       handled.add(card);
     }));
+    // Some YouTube collection cards are deliberately outside button variants. They still participate in filtering.
+    if (rule.bulkExtraSelector && (categories.selected.length || rule.hideKeywords.length)) {
+      try {
+        // Only the collection cards themselves (playlists, mixes, podcasts); shelves are handled by containers/shelfTitle.
+        document.querySelectorAll(rule.bulkExtraSelector).forEach(card => {
+          if (card.matches("yt-lockup-view-model") && !isAd(card, rule) && shouldFilterCard(card, rule, cardData(card, rule), categories)) {
+            removalTarget(card, rule).classList.add(FILTER_CLASS);
+          }
+        });
+      } catch (error) {
+        // A stale optional selector should not affect the normal feed.
+      }
+    }
   }
 
   function scheduleApply() {
@@ -886,7 +1034,7 @@ window.__hoaLoaded = true;
   // A site that rewrites a card's class attribute (Tubi does this as its page finishes loading) wipes our
   // hoa-removed/hoa-host marks without adding or removing any element. Only a mark that went missing counts,
   // so our own class changes never retrigger apply().
-  const OWN_MARKS = [ACTIVE_CLASS, "hoa-host"];
+  const OWN_MARKS = [ACTIVE_CLASS, FILTER_CLASS, "hoa-host"];
   function lostOwnMark(mutation) {
     if (mutation.type !== "attributes") {
       return false;
@@ -1018,7 +1166,8 @@ window.__hoaLoaded = true;
           overlays: Array.from(document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"]:not(.hoa-float)`))
             .filter(actions => actions.parentElement && actions.parentElement.getClientRects().length).length,
           staleOverlays: document.querySelectorAll(`.hoa-actions:not([data-hoa-owner="${ownInstance}"])`).length,
-          hiddenHere: document.querySelectorAll(`.${ACTIVE_CLASS}`).length
+          hiddenHere: document.querySelectorAll(`.${ACTIVE_CLASS}`).length,
+          filteredHere: document.querySelectorAll(`.${FILTER_CLASS}`).length
         });
       }
     });

@@ -32,6 +32,64 @@ var HOA = Object.freeze((() => {
   function themeOf(value) {
     return value === "light" || value === "dark" ? value : "";
   }
+
+  // Filter settings are deliberately small and boring: they are stored in siteRules and may also arrive from a
+  // backup made by an older/newer extension version.
+  function normalizeHideKinds(list, allowedIds) {
+    const allowed = Array.isArray(allowedIds) ? new Set(allowedIds.filter(id => typeof id === "string")) : null;
+    if (!Array.isArray(list)) {
+      return [];
+    }
+    const result = [];
+    list.forEach(value => {
+      if (typeof value !== "string") {
+        return;
+      }
+      const id = value.trim();
+      if (!id || id.length > 80 || (allowed && !allowed.has(id)) || result.includes(id) || result.length >= 50) {
+        return;
+      }
+      result.push(id);
+    });
+    return result;
+  }
+
+  function normalizeKeywords(list) {
+    if (!Array.isArray(list)) {
+      return [];
+    }
+    const result = [];
+    const seen = new Set();
+    list.forEach(value => {
+      if (typeof value !== "string") {
+        return;
+      }
+      const word = value.trim().replace(/\s+/g, " ").slice(0, 60);
+      const key = word.toLocaleLowerCase();
+      if (!word || seen.has(key) || result.length >= 50) {
+        return;
+      }
+      seen.add(key);
+      result.push(word);
+    });
+    return result;
+  }
+
+  function keywordMatch(text, keywords) {
+    if (typeof text !== "string" || !text || !Array.isArray(keywords)) {
+      return false;
+    }
+    return normalizeKeywords(keywords).some(keyword => {
+      // Escape user text before placing it between Unicode-aware word boundaries. Punctuation in a phrase is
+      // intentionally literal; only letters and digits on either side prevent a match.
+      const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      try {
+        return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "iu").test(text);
+      } catch (error) {
+        return false;
+      }
+    });
+  }
   const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
   const TWITCH_CHANNEL_RE = /^[A-Za-z0-9_]{2,25}$/;
   const TWITCH_SLUG_RE = /^[A-Za-z0-9_-]{2,100}$/;
@@ -1079,6 +1137,14 @@ var HOA = Object.freeze((() => {
         rule.pickedSelectors = usablePicks({ pickedSelectors: raw.pickedSelectors })
           .slice(0, 12);
       }
+      const hideKinds = normalizeHideKinds(raw.hideKinds);
+      const hideKeywords = normalizeKeywords(raw.hideKeywords);
+      if (Array.isArray(raw.hideKinds)) {
+        rule.hideKinds = hideKinds;
+      }
+      if (Array.isArray(raw.hideKeywords)) {
+        rule.hideKeywords = hideKeywords;
+      }
       result[host] = rule;
     });
     return result;
@@ -1291,6 +1357,9 @@ var HOA = Object.freeze((() => {
     buttonsEnabledOf,
     buttonEdgeOf,
     themeOf,
+    normalizeHideKinds,
+    normalizeKeywords,
+    keywordMatch,
     MAX_HIDDEN,
     MAX_ADDED,
     MAX_TITLE,

@@ -53,6 +53,18 @@ catalog.rules.forEach(rule => {
       assert.equal(types.has(type), true);
     });
   }));
+  (rule.categories || []).forEach(category => check(`${rule.id} category ${category.id} is valid`, () => {
+    assert.match(category.id, /^[a-z][a-z0-9-]*$/);
+    assert.equal(typeof category.label, "string");
+    assert.ok(category.label.length > 0);
+    assert.equal(typeof category.hint, "string");
+    assert.ok(category.hint.length > 0);
+    [category.pathPattern, category.shelfTitle].filter(Boolean).forEach(source => assert.doesNotThrow(() => new RegExp(source, "iu")));
+    ["href", "text", "channel"].map(key => category.card && category.card[key]).filter(Boolean)
+      .forEach(source => assert.doesNotThrow(() => new RegExp(source, "iu")));
+    [category.containers, category.card && category.card.has, category.card && category.card.is].filter(Boolean)
+      .forEach(selector => assert.equal(typeof selector, "string"));
+  }));
 });
 
 [
