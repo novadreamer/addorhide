@@ -234,13 +234,16 @@ function appendFilterControls(container, catalogRule) {
       const allIds = categories.map(c => c.id);
       const eye = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
       const eyeOff = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
-      const iconTool = (svg, label, action) => { const tool = button("", action); tool.className = "filter-tool"; tool.innerHTML = svg; tool.title = label; tool.setAttribute("aria-label", label); return tool; };
-      const hideAll = iconTool(eyeOff, "Hide all types on this site", () => { kinds = [...allIds]; save(); redraw(); });
-      const showAll = iconTool(eye, "Unhide all types on this site", () => { kinds = []; save(); redraw(); });
-      tools.prepend(hideAll, showAll);
+      // One toggle: while every type is on it unhides them all, otherwise it hides them all.
+      const allOn = () => allIds.every(id => kinds.includes(id));
+      const toggleAll = button("", () => { kinds = allOn() ? [] : [...allIds]; save(); redraw(); });
+      toggleAll.className = "filter-tool";
+      const paintToggleAll = () => { const on = allOn(); const label = on ? "Unhide all types on this site" : "Hide all types on this site";
+        toggleAll.innerHTML = on ? eye : eyeOff; toggleAll.title = label; toggleAll.setAttribute("aria-label", label); toggleAll.setAttribute("aria-pressed", String(on)); };
+      tools.prepend(toggleAll);
       const redraw = () => {
         if (panel.hoaRefresh) { window.clearInterval(panel.hoaRefresh); panel.hoaRefresh = 0; }
-        hideAll.disabled = allIds.every(id => kinds.includes(id)); showAll.disabled = !kinds.length;
+        paintToggleAll();
         body.replaceChildren();
         categories.forEach(category => { const label = document.createElement("label"); label.className = "switch-row"; label.title = category.hint;
           const toggle = document.createElement("input"); toggle.type = "checkbox"; toggle.setAttribute("role", "switch"); toggle.checked = kinds.includes(category.id);
