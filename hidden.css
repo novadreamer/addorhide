@@ -152,6 +152,7 @@ body.hoa-hidden-view main { max-width: 1180px; margin: 0 auto; }
 }
 .hoa-hidden-view .hidden-watched, .hoa-hidden-view .hidden-channel { color: #5b5bf0; }
 .hoa-hidden-view .watched-logo { display: grid; place-items: center; font-weight: 800; color: #5b5bf0; background: var(--surface-2); }
+.hoa-hidden-view .watched-logo svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .hoa-hidden-view .hidden-row-status { flex: 1 1 100%; min-height: 0; color: var(--muted); font-size: 12px; }
 .hoa-hidden-view .hidden-actions { display: flex; gap: 4px; justify-content: flex-end; }
 .hoa-hidden-view .hidden-actions button { min-height: 28px; padding: 3px 8px; font-size: 12px; }

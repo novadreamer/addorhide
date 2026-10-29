@@ -89,5 +89,9 @@ check("non-built-in hosts are not static", () => catalog.rules.filter(rule => !r
 check("YouTube category order includes watched and comments", () => assert.deepEqual(
   catalog.byId("youtube").categories.map(category => category.id),
   ["recommended", "watched", "shorts", "playlists", "mixes", "live", "music", "gaming", "podcasts", "movies", "posts", "fundraisers", "comments"]));
+check("YouTube gaming category has title terms", () => {
+  const gaming = catalog.byId("youtube").categories.find(category => category.id === "gaming");
+  assert.ok(Array.isArray(gaming.titleTerms) && gaming.titleTerms.includes("minecraft"));
+});
 
 console.log(`catalog.test.js: ${passed} passed, 0 failed`);

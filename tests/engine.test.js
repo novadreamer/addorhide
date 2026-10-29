@@ -437,6 +437,11 @@ const CASES = [
   {
     const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/" });
     check("YouTube watched cards show a visible label", () => assert.ok(page.document.querySelector("#watched .hoa-watched-label")));
+    check("YouTube watched label uses the thumbnail, not the clipped progress host", () => {
+      const label = page.document.querySelector("#watched .hoa-watched-label");
+      assert.equal(label.parentElement.tagName.toLowerCase(), "yt-thumbnail-view-model");
+      assert.notEqual(label.parentElement.className, "ytThumbnailOverlayProgressBarHost");
+    });
     check("YouTube channel action is present and the float bar mirrors it", () => {
       assert.ok(buttons(page.document.getElementById("blocked"), "channel"));
       assert.match(read("content.js"), /\["add", "hide", "channel"\]/);
@@ -450,11 +455,22 @@ const CASES = [
     page.window.close();
   }
   {
+    const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/",
+      siteRules: { "www.youtube.com": { hideKinds: ["gaming"] } } });
+    await wait(120);
+    check("gaming title terms hide gameplay while leaving ordinary titles", () => {
+      assert.ok(page.document.getElementById("gaming-title").classList.contains("hoa-filtered"));
+      assert.ok(!page.document.getElementById("party").classList.contains("hoa-filtered"));
+    });
+    page.window.close();
+  }
+  {
     const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/@blockedchan/videos",
       siteRules: { "www.youtube.com": { hideKinds: ["comments"] } } });
     page.window.chrome.storage.local.set({ hiddenChannels: { "youtube.com|/@blockedchan": { key: "youtube.com|/@blockedchan", name: "Blocked Channel", url: "https://www.youtube.com/@blockedchan", ts: Date.now() } } });
     await wait(120);
     check("hidden channels do not hide cards on their own channel page", () => assert.ok(!page.document.getElementById("blocked").classList.contains("hoa-filtered")));
+    check("channel pages do not offer a hide-channel action", () => assert.equal(buttons(page.document.getElementById("blocked"), "channel"), null));
     check("comments category hides the comments container", () => assert.ok(page.document.getElementById("comments").classList.contains("hoa-filtered")));
     page.window.close();
   }

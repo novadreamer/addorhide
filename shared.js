@@ -70,7 +70,7 @@ var HOA = Object.freeze((() => {
       }
       const word = value.trim().replace(/\s+/g, " ").slice(0, 60);
       const key = word.toLocaleLowerCase();
-      if (!word || seen.has(key) || result.length >= 50) {
+      if (!word || seen.has(key) || result.length >= 10) {
         return;
       }
       seen.add(key);

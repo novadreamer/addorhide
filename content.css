@@ -71,7 +71,7 @@
 .hoa-actions button[data-action="hide"]:hover, .hoa-actions button[data-action="hide"]:focus-visible { color: #fff; background: #d93a49; }
 .hoa-actions button[data-action="channel"]:hover, .hoa-actions button[data-action="channel"]:focus-visible { color: #fff; background: #8a4bd8; }
 /* Keep the watched marker inside YouTube's thumbnail even when its component CSS is more specific. */
-ytd-rich-item-renderer .hoa-watched-label, yt-lockup-view-model .hoa-watched-label,
+ytd-rich-item-renderer .hoa-watched-label, yt-lockup-view-model .hoa-watched-label, yt-thumbnail-view-model .hoa-watched-label, ytd-thumbnail .hoa-watched-label, a.ytLockupViewModelContentImage .hoa-watched-label,
 ytd-video-renderer .hoa-watched-label, ytd-compact-video-renderer .hoa-watched-label,
 ytd-grid-video-renderer .hoa-watched-label, ytd-reel-item-renderer .hoa-watched-label {
   display: block !important; position: absolute !important; z-index: 2147482999 !important;

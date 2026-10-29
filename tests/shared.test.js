@@ -432,6 +432,8 @@ check("normalize hide kinds keeps allowed unique ids", () => assert.deepEqual(
   HOA.normalizeHideKinds(["shorts", " shorts ", "bad", 4], ["shorts", "live"]), ["shorts"]));
 check("normalize keywords trims, folds spaces and deduplicates case-insensitively", () => assert.deepEqual(
   HOA.normalizeKeywords(["  Space   Robot ", "space robot", "", 4]), ["Space Robot"]));
+check("normalize keywords keeps at most ten words", () => assert.equal(
+  HOA.normalizeKeywords(Array.from({ length: 12 }, (_, index) => `word ${index}`)).length, 10));
 check("keyword matching uses Unicode whole-word boundaries", () => {
   assert.equal(HOA.keywordMatch("A Space Robot and الفن", ["space robot"]), true);
   assert.equal(HOA.keywordMatch("party time", ["art"]), false);

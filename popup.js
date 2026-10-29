@@ -15,6 +15,7 @@ let added = {};
 let channels = {};
 let activeTab = null;
 let activeHost = "";
+let siteRulesWrittenHere = false;
 
 // Permissions are requested for the scheme the tab is really on (https almost everywhere).
 // Asks the content script on the active tab how many videos it recognised, so a silent miss is visible.
@@ -69,7 +70,7 @@ function appendPageStatus(container) {
     const manifestVersion = chrome.runtime.getManifest().version;
     details.textContent = reply
       ? `Details: page script v${reply.version || "?"} (extension v${manifestVersion}), cards ${reply.cards}, buttons ${reply.overlays}`
-        + `${reply.staleOverlays ? `, old buttons ${reply.staleOverlays}` : ""}, hidden here ${reply.hiddenHere || 0}, filtered here ${reply.filteredHere || 0}`
+        + `${reply.staleOverlays ? `, old buttons ${reply.staleOverlays}` : ""}, hidden here ${reply.hiddenHere || 0}, filtered here ${reply.filteredHere || 0}, watched here ${reply.watchedHere || 0}`
       : `Details: no page script answered (extension v${manifestVersion})`;
     detailsBox.appendChild(details);
     container.appendChild(detailsBox);
@@ -127,6 +128,7 @@ function siteButton(label, action, secondary = false) {
 
 function saveSiteRules(next, message) {
   siteRules = next;
+  siteRulesWrittenHere = true;
   chrome.storage.local.set({ [HOA.SITES_KEY]: siteRules }, () => {
     setSiteStatus(chrome.runtime.lastError ? "Could not save the site setting." : message,
       chrome.runtime.lastError ? "error" : "success");
@@ -159,59 +161,48 @@ function addLearnedControl(host, catalog, rule, container) {
 
 function appendFilterControls(container, catalogRule) {
   const categories = catalogRule && Array.isArray(catalogRule.categories) ? catalogRule.categories : [];
-  const current = siteRule(activeHost);
-  const kinds = HOA.normalizeHideKinds(current.hideKinds, categories.map(category => category.id));
-  const keywords = HOA.normalizeKeywords(current.hideKeywords);
-  const details = document.createElement("details");
-  details.className = "hide-filters";
-  const summary = document.createElement("summary");
-  const labels = categories.filter(category => kinds.includes(category.id)).map(category => category.label);
-  summary.textContent = `Hide on this site${labels.length || keywords.length ? ` — ${[...labels, keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ")}` : ""}`;
-  details.appendChild(summary);
-  const body = document.createElement("div");
-  body.className = "hide-filters-body";
-  const save = (nextKinds, nextKeywords) => saveSiteRules({ ...siteRules, [activeHost]: {
-    ...siteRule(activeHost), enabled: siteRule(activeHost).enabled !== false,
-    hideKinds: HOA.normalizeHideKinds(nextKinds, categories.map(category => category.id)),
-    hideKeywords: HOA.normalizeKeywords(nextKeywords)
-  } }, "Filter settings saved.");
-  categories.forEach(category => {
-    const label = document.createElement("label");
-    label.className = "switch-row";
-    label.title = category.hint;
-    const toggle = document.createElement("input");
-    toggle.type = "checkbox";
-    toggle.setAttribute("role", "switch");
-    toggle.checked = kinds.includes(category.id);
-    toggle.addEventListener("change", () => save(toggle.checked ? [...kinds, category.id] : kinds.filter(id => id !== category.id), keywords));
-    label.append(toggle, document.createTextNode(` ${category.label}`));
-    body.appendChild(label);
-  });
-  const words = document.createElement("div");
-  words.className = "filter-words";
-  const input = document.createElement("input");
-  input.type = "text";
-  input.placeholder = "Hide videos with these words";
-  input.value = keywords.join(", ");
-  input.setAttribute("aria-label", "Hide videos with these words, comma-separated");
-  const saveButton = button("Save", () => save(kinds, input.value.split(",")));
-  saveButton.className = "secondary-button";
-  input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); save(kinds, input.value.split(",")); } });
-  words.append(input, saveButton);
-  body.appendChild(words);
-  if (keywords.length) {
-    const chips = document.createElement("div");
-    chips.className = "filter-chips";
-    keywords.forEach(word => {
-      const chip = button(`× ${word}`, () => save(kinds, keywords.filter(value => value !== word)));
-      chip.className = "filter-chip";
-      chip.title = `Remove ${word}`;
-      chips.appendChild(chip);
-    });
-    body.appendChild(chips);
+  let kinds = HOA.normalizeHideKinds(siteRule(activeHost).hideKinds, categories.map(category => category.id));
+  let keywords = HOA.normalizeKeywords(siteRule(activeHost).hideKeywords);
+  let duplicateMessage = "";
+  const launch = button("Hide on this site", openPanel);
+  launch.className = "secondary-button filter-launch";
+  launch.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7v5l-4 2v-7z"/></svg> Hide on this site';
+  const summary = document.createElement("p"); summary.className = "muted filter-summary";
+  const updateSummary = () => { const labels = categories.filter(c => kinds.includes(c.id)).map(c => c.label); summary.textContent = !labels.length && !keywords.length ? "Off" : [...labels, keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", "); };
+  updateSummary();
+  container.append(launch, summary);
+  function save() {
+    saveSiteRules({ ...siteRules, [activeHost]: { ...siteRule(activeHost), enabled: siteRule(activeHost).enabled !== false,
+      hideKinds: HOA.normalizeHideKinds(kinds, categories.map(c => c.id)), hideKeywords: HOA.normalizeKeywords(keywords) } }, "Filter settings saved.");
+    updateSummary();
   }
-  details.appendChild(body);
-  container.appendChild(details);
+  function openPanel() {
+    const backdrop = document.createElement("div"); backdrop.className = "filter-backdrop";
+    const panel = document.createElement("section"); panel.className = "filter-popover"; panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true");
+    const rect = launch.getBoundingClientRect();
+    const header = document.createElement("div"); header.className = "filter-popover-header";
+    header.appendChild(Object.assign(document.createElement("strong"), { textContent: `Hide on ${HOA.siteDisplayName(activeHost)}` }));
+    const close = button("×", closePanel); close.className = "filter-close"; close.setAttribute("aria-label", "Close filters"); header.appendChild(close); panel.appendChild(header);
+    const body = document.createElement("div"); body.className = "hide-filters-body";
+    panel.appendChild(body);   // the switches, keyword box and count live in this scrolling body
+    const redraw = () => {
+      body.replaceChildren();
+      categories.forEach(category => { const label = document.createElement("label"); label.className = "switch-row"; label.title = category.hint;
+        const toggle = document.createElement("input"); toggle.type = "checkbox"; toggle.setAttribute("role", "switch"); toggle.checked = kinds.includes(category.id);
+        toggle.addEventListener("change", () => { kinds = toggle.checked ? [...kinds, category.id] : kinds.filter(id => id !== category.id); save(); }); label.append(toggle, document.createTextNode(` ${category.label}`)); body.appendChild(label); });
+      const words = document.createElement("div"); words.className = "filter-words"; const input = document.createElement("input"); input.type = "text"; input.setAttribute("aria-label", "Hide videos with these words, comma-separated");
+      input.disabled = keywords.length >= 10; input.placeholder = input.disabled ? "10 of 10 words — remove one to add another" : "Hide videos with these words";
+      const note = document.createElement("p"); note.className = "filter-note muted"; note.textContent = duplicateMessage;
+      const addWords = () => { const candidates = HOA.normalizeKeywords(input.value.split(",")); const duplicate = candidates.some(word => keywords.some(value => value.localeCompare(word, undefined, { sensitivity: "accent" }) === 0)); keywords = HOA.normalizeKeywords([...keywords, ...candidates]); input.value = ""; duplicateMessage = duplicate ? "Already in the list" : ""; save(); redraw(); if (duplicateMessage) window.setTimeout(() => { duplicateMessage = ""; if (panel.isConnected) redraw(); }, 1600); };
+      const add = button("Add", addWords); add.className = "secondary-button"; input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); addWords(); } }); words.append(input, add); body.appendChild(words);
+      const chips = document.createElement("div"); chips.className = "filter-chips"; keywords.forEach(word => { const chip = button(`× ${word}`, () => { keywords = keywords.filter(value => value !== word); save(); redraw(); }); chip.className = "filter-chip"; chip.title = `Remove ${word}`; chips.appendChild(chip); }); body.append(chips, note);
+      const count = document.createElement("p"); count.className = "muted filter-page-count"; count.textContent = "Checking filtered cards..."; body.appendChild(count);
+      if (activeTab && Number.isInteger(activeTab.id)) chrome.tabs.sendMessage(activeTab.id, { type: "hoa-status" }, reply => { if (reply) count.textContent = `${reply.filteredHere || 0} card${reply.filteredHere === 1 ? "" : "s"} hidden by your filters on this page`; });
+    };
+    const closeOnKey = event => { if (event.key === "Escape") closePanel(); };
+    function closePanel() { document.removeEventListener("keydown", closeOnKey); panel.classList.add("is-closing"); backdrop.classList.add("is-closing"); window.setTimeout(() => { panel.remove(); backdrop.remove(); launch.focus(); }, 290); }
+    backdrop.addEventListener("click", closePanel); document.addEventListener("keydown", closeOnKey); redraw(); document.body.append(backdrop, panel); requestAnimationFrame(() => { /* The panel is centred; measure its full-size box (it is drawn at 15% scale right now) so it grows out of the button. */ const panelLeft = window.innerWidth / 2 - panel.offsetWidth / 2; const panelTop = window.innerHeight / 2 - panel.offsetHeight / 2; panel.style.transformOrigin = `${rect.left + rect.width / 2 - panelLeft}px ${rect.top + rect.height / 2 - panelTop}px`; backdrop.classList.add("is-open"); panel.classList.add("is-open"); close.focus(); });
+  }
 }
 
 function renderSite() {
@@ -447,6 +438,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === "local" && changes[HOA.SITES_KEY]) {
     siteRules = changes[HOA.SITES_KEY].newValue && typeof changes[HOA.SITES_KEY].newValue === "object"
       ? changes[HOA.SITES_KEY].newValue : {};
+    if (siteRulesWrittenHere) { siteRulesWrittenHere = false; return; }
     renderSite();
   }
 });

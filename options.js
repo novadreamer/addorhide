@@ -23,6 +23,8 @@ const filterSites = document.getElementById("filter-sites");
 let hidden = {};
 let added = {};
 let siteRules = {};
+let siteRulesWrittenHere = false;
+const filterDuplicateNotes = {};
 
 function siteRule(host) {
   return siteRules[host] && typeof siteRules[host] === "object" ? siteRules[host] : {};
@@ -250,10 +252,15 @@ function saveFilterRule(host, categories, kinds, keywords) {
     hideKinds: HOA.normalizeHideKinds(kinds, categories.map(category => category.id)),
     hideKeywords: HOA.normalizeKeywords(keywords)
   } };
-  chrome.storage.local.set({ [HOA.SITES_KEY]: siteRules }, loadRules);
+  siteRulesWrittenHere = true;
+  chrome.storage.local.set({ [HOA.SITES_KEY]: siteRules }, () => renderFilterSites());
 }
 
 function renderFilterSites() {
+  const scrollTop = window.scrollY;
+  const openSites = new Set(Array.from(filterSites.querySelectorAll("details[open]")).map(node => node.dataset.host));
+  const focused = document.activeElement;
+  const focusId = focused && focused.id ? focused.id : "";
   while (filterSites.firstChild) filterSites.firstChild.remove();
   HOA_CATALOG.rules.forEach(catalogRule => {
     const host = filterHost(catalogRule);
@@ -263,6 +270,8 @@ function renderFilterSites() {
     const keywords = HOA.normalizeKeywords(rule.hideKeywords);
     const details = document.createElement("details");
     details.className = "hide-filters";
+    details.dataset.host = host;
+    details.open = openSites.has(host);
     const summary = document.createElement("summary");
     const labels = categories.filter(category => kinds.includes(category.id)).map(category => category.label);
     summary.textContent = `${catalogRule.name}${labels.length || keywords.length ? ` — ${[...labels, keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ")}` : " — no filters"}`;
@@ -286,11 +295,23 @@ function renderFilterSites() {
     words.className = "filter-words";
     const input = document.createElement("input");
     input.type = "text";
-    input.value = keywords.join(", ");
     input.placeholder = "Hide videos with these words";
+    input.disabled = keywords.length >= 10;
+    if (input.disabled) input.placeholder = "10 of 10 words — remove one to add another";
     input.setAttribute("aria-label", `${catalogRule.name}: hide videos with these words`);
-    const save = siteActionButton("Save", () => saveFilterRule(host, categories, kinds, input.value.split(",")));
-    input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); saveFilterRule(host, categories, kinds, input.value.split(",")); } });
+    const duplicateNote = document.createElement("p");
+    duplicateNote.className = "filter-note muted";
+    duplicateNote.textContent = filterDuplicateNotes[host] || "";
+    const addWords = () => {
+      const next = HOA.normalizeKeywords(input.value.split(","));
+      const duplicate = next.some(word => keywords.some(value => value.localeCompare(word, undefined, { sensitivity: "accent" }) === 0));
+      input.value = "";
+      filterDuplicateNotes[host] = duplicate ? "Already in the list" : "";
+      saveFilterRule(host, categories, kinds, [...keywords, ...next]);
+      if (duplicate) window.setTimeout(() => { delete filterDuplicateNotes[host]; renderFilterSites(); }, 1600);
+    };
+    const save = siteActionButton("Add", addWords);
+    input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); addWords(); } });
     words.append(input, save);
     body.appendChild(words);
     const chips = document.createElement("div");
@@ -301,10 +322,13 @@ function renderFilterSites() {
       chip.title = `Remove ${word}`;
       chips.appendChild(chip);
     });
-    body.appendChild(chips);
+    body.append(chips, duplicateNote);
     details.appendChild(body);
     filterSites.appendChild(details);
   });
+  window.scrollTo(0, scrollTop);
+  const nextFocus = focusId ? document.getElementById(focusId) : null;
+  if (nextFocus) nextFocus.focus({ preventScroll: true });
 }
 openAddedButton.addEventListener("click", openAddedPage);
 
@@ -437,6 +461,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; renderHidden(); });
   }
   if (changes[HOA.SITES_KEY]) {
+    if (siteRulesWrittenHere) { siteRulesWrittenHere = false; return; }
     loadRules();
   }
 });

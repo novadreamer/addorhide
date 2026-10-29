@@ -218,10 +218,18 @@ window.__hoaLoaded = true;
       return false;
     }
     const test = category.card;
-    if (!test || typeof test !== "object") {
-      return false;
-    }
     const results = [];
+    if (Array.isArray(category.titleTerms) && category.titleTerms.length) {
+      let title = "";
+      for (const selector of rule.titleCandidates || []) {
+        try { title = elementText(card.querySelector(selector)); } catch (error) { title = ""; }
+        if (title) break;
+      }
+      results.push(HOA.keywordMatch(title, category.titleTerms));
+    }
+    if (!test || typeof test !== "object") {
+      return results.some(Boolean);
+    }
     if (test.has) {
       results.push(safeQuery(card, test.has));
     }
@@ -317,7 +325,17 @@ window.__hoaLoaded = true;
 
   function thumbnailForWatchedLabel(card) {
     const progress = card.querySelector("ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, .ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment, #progress.ytd-thumbnail-overlay-resume-playback-renderer");
-    if (progress) return progress.closest("ytd-thumbnail, .ytThumbnailViewModelHost, .ytThumbnailOverlayProgressBarHost") || progress.parentElement || card;
+    if (progress) {
+      const selector = "yt-thumbnail-view-model, ytd-thumbnail, .ytThumbnailViewModelHost, a#thumbnail, .yt-lockup-view-model__content-image, a.ytLockupViewModelContentImage";
+      let node = progress;
+      while (node && node !== card) {
+        if (node.matches && node.matches(selector)) {
+          if (getComputedStyle(node).position === "static") node.style.position = "relative";
+          return node;
+        }
+        node = node.parentElement;
+      }
+    }
     return card.querySelector("ytd-thumbnail, .ytThumbnailViewModelHost, [class*='thumbnail' i]") || card;
   }
 
@@ -929,7 +947,8 @@ window.__hoaLoaded = true;
     actions.hoaRule = rule;
     const identity = channelIdentity(card, rule);
     let channel = actions.querySelector('[data-action="channel"]');
-    if (identity && !channel) {
+    const isChannelPage = /^\/(?:@|channel\/|c\/|user\/)/.test(location.pathname);
+    if (identity && !isChannelPage && !channel) {
       channel = actionButton("Hide channel", () => hideChannel(channel.hoaIdentity));
       channel.dataset.action = "channel";
       actions.appendChild(channel);
@@ -937,7 +956,7 @@ window.__hoaLoaded = true;
     if (channel) {
       channel.hoaIdentity = identity;
       channel.title = identity && identity.name ? `Hide every video from ${identity.name}` : "Hide this channel";
-      if (!identity) channel.remove();
+      if (!identity || isChannelPage) channel.remove();
     }
     if (!actions.hoaPlacementBound) {
       actions.hoaPlacementBound = true;
@@ -1293,6 +1312,7 @@ window.__hoaLoaded = true;
       if (message && message.type === "hoa-status" && !retired) {
         const rule = hostnameRule();
         let cards = 0;
+        let matchedCards = [];
         let pathMatched = true;
         try {
           if (rule) {
@@ -1303,8 +1323,9 @@ window.__hoaLoaded = true;
             // A card nested inside another matched card (YouTube lockup inside its grid item) is one video.
             // Only cards that are on screen count: YouTube keeps the previous page (the home feed) in the DOM,
             // hidden, after you open a video.
-            cards = Array.from(document.querySelectorAll(union))
-              .filter(card => !(card.parentElement && card.parentElement.closest(union)) && card.getClientRects().length).length;
+            matchedCards = Array.from(document.querySelectorAll(union))
+              .filter(card => !(card.parentElement && card.parentElement.closest(union)) && card.getClientRects().length);
+            cards = matchedCards.length;
           }
         } catch (error) {
           cards = 0;
@@ -1322,7 +1343,8 @@ window.__hoaLoaded = true;
             .filter(actions => actions.parentElement && actions.parentElement.getClientRects().length).length,
           staleOverlays: document.querySelectorAll(`.hoa-actions:not([data-hoa-owner="${ownInstance}"])`).length,
           hiddenHere: document.querySelectorAll(`.${ACTIVE_CLASS}`).length,
-          filteredHere: document.querySelectorAll(`.${FILTER_CLASS}`).length
+          filteredHere: document.querySelectorAll(`.${FILTER_CLASS}`).length,
+          watchedHere: rule ? matchedCards.filter(card => watchedCard(card, rule)).length : 0
         });
       }
     });
