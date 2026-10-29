@@ -42,7 +42,7 @@ window.__hoaLoaded = true;
     rootElement.dataset.hoaInstance = ownInstance;
     rootElement.dataset.hoaExtension = ownExtension;
     rootElement.dataset.hoaVersion = ownVersion;
-    document.querySelectorAll(".hoa-actions, #hoa-toast, #hoa-banner").forEach(node => node.remove());
+    document.querySelectorAll(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner").forEach(node => node.remove());
     document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-show"));
   }
 
@@ -50,6 +50,9 @@ window.__hoaLoaded = true;
   const FILTER_CLASS = "hoa-filtered";
   let hidden = {};
   let added = {};
+  let channels = {};
+  let watchedShown = {};
+  let watchedWriteTimer = 0;
   let siteRules = {};
   let scheduled = 0;
   let toastTimer = 0;
@@ -73,7 +76,7 @@ window.__hoaLoaded = true;
   }
 
   function removeOwnUi() {
-    document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"]`).forEach(node => node.remove());
+    document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"], .hoa-watched-label[data-hoa-owner="${ownInstance}"]`).forEach(node => node.remove());
     document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-show"));
     ["hoa-toast", "hoa-banner"].forEach(id => {
       const node = document.getElementById(id);
@@ -263,6 +266,77 @@ window.__hoaLoaded = true;
       }
     }
     return "";
+  }
+
+  function channelIdentity(card, rule) {
+    if (!rule || rule.id !== "youtube") return null;
+    const links = [
+      'ytd-channel-name a[href], ytd-channel-name a#text[href]',
+      '.ytContentMetadataViewModelMetadataRow a[href]',
+      'a[href^="/@"], a[href^="/channel/"], a[href^="/c/"], a[href^="/user/"]'
+    ];
+    let link = null;
+    for (const selector of links) {
+      try { link = card.querySelector(selector); } catch (error) { link = null; }
+      if (link && HOA.youtubeChannelKey(link.getAttribute("href") || link.href)) break;
+    }
+    const name = channelText(card, rule);
+    const url = link ? (link.href || link.getAttribute("href") || "") : "";
+    const key = HOA.youtubeChannelKey(url);
+    const nameKey = HOA.channelNameKey(name);
+    return key || nameKey ? { key: key || nameKey, linkKey: key, nameKey, name, url } : null;
+  }
+
+  function isOwnChannelPage(identity) {
+    if (!identity || !identity.linkKey) return false;
+    const path = identity.linkKey.slice("youtube.com|".length);
+    const here = location.pathname.toLowerCase();
+    // "/@foo" and "/@foo/videos", but not another channel "/@foobar".
+    return here === path || here.startsWith(`${path}/`);
+  }
+
+  function hiddenChannel(card, rule) {
+    // No hidden channels: skip reading every card's channel on every pass.
+    if (!channels || !Object.keys(channels).length) return false;
+    const identity = channelIdentity(card, rule);
+    if (!identity || isOwnChannelPage(identity)) return false;
+    return Boolean((identity.linkKey && channels[identity.linkKey]) || (identity.nameKey && channels[identity.nameKey])
+      || Object.values(channels).some(entry => entry && ((identity.linkKey && entry.linkKey === identity.linkKey)
+        || (identity.nameKey && entry.nameKey === identity.nameKey) || (identity.linkKey && entry.key === identity.linkKey)
+        || (identity.nameKey && entry.key === identity.nameKey))));
+  }
+
+  function watchedCard(card, rule) {
+    const watched = (rule.categories || []).find(category => category.id === "watched");
+    return Boolean(watched && categoryMatches(card, rule, watched));
+  }
+
+  function watchedEnabled(categories) {
+    return categories.selected.some(category => category.id === "watched");
+  }
+
+  function thumbnailForWatchedLabel(card) {
+    const progress = card.querySelector("ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, .ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment, #progress.ytd-thumbnail-overlay-resume-playback-renderer");
+    if (progress) return progress.closest("ytd-thumbnail, .ytThumbnailViewModelHost, .ytThumbnailOverlayProgressBarHost") || progress.parentElement || card;
+    return card.querySelector("ytd-thumbnail, .ytThumbnailViewModelHost, [class*='thumbnail' i]") || card;
+  }
+
+  function ensureWatchedLabel(card, rule, visible) {
+    card.querySelectorAll(":scope .hoa-watched-label").forEach(node => {
+      if (node.dataset.hoaOwner !== ownInstance) node.remove();
+    });
+    let label = card.querySelector(`.hoa-watched-label[data-hoa-owner="${ownInstance}"]`);
+    if (!visible || rule.id !== "youtube" || !watchedCard(card, rule)) {
+      if (label) label.remove();
+      return;
+    }
+    if (!label) {
+      label = document.createElement("span");
+      label.className = "hoa-watched-label";
+      label.dataset.hoaOwner = ownInstance;
+      label.textContent = "Watched";
+      thumbnailForWatchedLabel(card).appendChild(label);
+    }
   }
 
   function filterText(card, rule, data) {
@@ -657,6 +731,42 @@ window.__hoaLoaded = true;
     scheduleApply();
   }
 
+  function hideChannel(identity) {
+    if (!identity) return;
+    const key = identity.linkKey || identity.nameKey;
+    if (!key) return;
+    channels = {
+      ...channels,
+      [key]: {
+        key,
+        name: identity.name || key.replace(/^youtube\.com\|name:/, ""),
+        url: identity.url || "",
+        site: "youtube.com",
+        ts: Date.now(),
+        ...(identity.nameKey ? { nameKey: identity.nameKey } : {}),
+        ...(identity.linkKey ? { linkKey: identity.linkKey } : {})
+      }
+    };
+    HOA.writeLists({ channels });
+    showToast(key, "Channel hidden", () => {
+      channels = { ...channels };
+      delete channels[key];
+      HOA.writeLists({ channels });
+    });
+    scheduleApply();
+  }
+
+  function queueWatched(data) {
+    if (hidden[data.key] || watchedShown[data.key]) return;
+    hidden = { ...hidden, [data.key]: { ...data, ts: Date.now(), listed: true, reason: "watched" } };
+    if (!watchedWriteTimer) {
+      watchedWriteTimer = window.setTimeout(() => {
+        watchedWriteTimer = 0;
+        HOA.writeLists({ hidden });
+      }, 500);
+    }
+  }
+
   function toggleAdd(data, button) {
     added = HOA.toggleAdded(added, data.key, data);
     try {
@@ -817,6 +927,18 @@ window.__hoaLoaded = true;
     actions.hoaData = data;
     actions.hoaCard = card;
     actions.hoaRule = rule;
+    const identity = channelIdentity(card, rule);
+    let channel = actions.querySelector('[data-action="channel"]');
+    if (identity && !channel) {
+      channel = actionButton("Hide channel", () => hideChannel(channel.hoaIdentity));
+      channel.dataset.action = "channel";
+      actions.appendChild(channel);
+    }
+    if (channel) {
+      channel.hoaIdentity = identity;
+      channel.title = identity && identity.name ? `Hide every video from ${identity.name}` : "Hide this channel";
+      if (!identity) channel.remove();
+    }
     if (!actions.hoaPlacementBound) {
       actions.hoaPlacementBound = true;
       card.addEventListener("mouseenter", () => {
@@ -842,7 +964,7 @@ window.__hoaLoaded = true;
     }
   }
 
-  function showToast(key) {
+  function showToast(key, messageText = "Hidden", undoAction = null) {
     if (toastTimer) {
       clearTimeout(toastTimer);
     }
@@ -854,15 +976,13 @@ window.__hoaLoaded = true;
     toast.id = "hoa-toast";
     toast.setAttribute("role", "status");
     const message = document.createElement("span");
-    message.textContent = "Hidden";
+    message.textContent = messageText;
     toast.appendChild(message);
     const undo = actionButton("Undo", () => {
-      hidden = HOA.restoreKeys(hidden, [key]);
-      try {
-        HOA.writeLists({ hidden });
-      } catch (error) {
-        retire(false);
-        return;
+      if (undoAction) undoAction();
+      else {
+        hidden = HOA.restoreKeys(hidden, [key]);
+        try { HOA.writeLists({ hidden }); } catch (error) { retire(false); return; }
       }
       toast.remove();
       scheduleApply();
@@ -912,6 +1032,7 @@ window.__hoaLoaded = true;
         node.remove();
       });
     });
+    document.querySelectorAll(".hoa-watched-label").forEach(node => node.remove());
     removeBanner();
     const toast = document.getElementById("hoa-toast");
     if (toast) {
@@ -992,20 +1113,46 @@ window.__hoaLoaded = true;
         target.classList.remove(ACTIVE_CLASS);
         return;
       }
-      if (hidden[data.key]) {
+      const isWatched = watchedCard(card, variant);
+      // A restored watched item is an explicit opt-out from the persistent Watched switch, not merely from the
+      // storage write.  Remove only that category for this card; other selected filters still apply.
+      const cardCategories = isWatched && watchedShown[data.key]
+        ? { ...categories, selected: categories.selected.filter(category => category.id !== "watched") } : categories;
+      if (hiddenChannel(card, variant)) {
         removeActions(card);
+        ensureWatchedLabel(card, variant, false);
+        target.classList.remove(ACTIVE_CLASS);
+        target.classList.add(FILTER_CLASS);
+      } else if (hidden[data.key]) {
+        removeActions(card);
+        ensureWatchedLabel(card, variant, false);
         target.classList.add(ACTIVE_CLASS);
-      } else if (shouldFilterCard(card, variant, data, categories)) {
+      } else if (isWatched && watchedEnabled(categories) && !watchedShown[data.key]) {
+        queueWatched({ ...data, ...cardMeta(card, variant, data.key) });
         removeActions(card);
+        ensureWatchedLabel(card, variant, false);
+        target.classList.add(ACTIVE_CLASS);
+      } else if (shouldFilterCard(card, variant, data, cardCategories)) {
+        removeActions(card);
+        ensureWatchedLabel(card, variant, false);
         target.classList.remove(ACTIVE_CLASS);
         target.classList.add(FILTER_CLASS);
       } else {
         target.classList.remove(ACTIVE_CLASS);
         target.classList.remove(FILTER_CLASS);
+        ensureWatchedLabel(card, variant, isWatched);
         ensureActions(card, data, variant);
       }
       handled.add(card);
     }));
+    // Collection cards outside the normal video variants (notably playlist lockups) still expose a channel name.
+    // They have no per-video hidden key, but a hidden channel should remove them just like videos and Shorts.
+    if (rule.id === "youtube" && Object.keys(channels).length) {
+      document.querySelectorAll("yt-lockup-view-model, ytd-playlist-renderer, ytd-grid-playlist-renderer, ytd-compact-playlist-renderer")
+        .forEach(card => {
+          if (!isAd(card, rule) && hiddenChannel(card, rule)) removalTarget(card, rule).classList.add(FILTER_CLASS);
+        });
+    }
     // Some YouTube collection cards are deliberately outside button variants. They still participate in filtering.
     if (rule.bulkExtraSelector && (categories.selected.length || rule.hideKeywords.length)) {
       try {
@@ -1028,7 +1175,7 @@ window.__hoaLoaded = true;
   }
 
   function isOwnMutation(mutation) {
-    return mutation.target.closest && mutation.target.closest(".hoa-actions, #hoa-toast, #hoa-banner");
+    return mutation.target.closest && mutation.target.closest(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner");
   }
 
   // A site that rewrites a card's class attribute (Tubi does this as its page finishes loading) wipes our
@@ -1060,6 +1207,8 @@ window.__hoaLoaded = true;
   HOA.readLists(lists => {
     hidden = lists.hidden;
     added = lists.added;
+    channels = lists.channels;
+    watchedShown = lists.watchedShown;
     scheduleApply();
   });
   chrome.storage.local.get({ [HOA.SITES_KEY]: {} }, result => {
@@ -1075,6 +1224,12 @@ window.__hoaLoaded = true;
     }
     if (changes[HOA.ADDED_KEY]) {
       added = HOA.normalizeItems(changes[HOA.ADDED_KEY].newValue, { max: HOA.MAX_ADDED, withListed: false });
+    }
+    if (changes[HOA.CHANNELS_KEY]) {
+      channels = HOA.normalizeChannels(changes[HOA.CHANNELS_KEY].newValue);
+    }
+    if (changes[HOA.WATCHED_SHOWN_KEY]) {
+      watchedShown = HOA.normalizeWatchedShown(changes[HOA.WATCHED_SHOWN_KEY].newValue);
     }
     if (changes[HOA.SITES_KEY]) {
       siteRules = changes[HOA.SITES_KEY].newValue && typeof changes[HOA.SITES_KEY].newValue === "object"
@@ -1208,8 +1363,8 @@ window.__hoaLoaded = true;
     floatBar.className = "hoa-actions hoa-float";
     floatBar.dataset.hoaOwner = ownInstance;
     floatBar.hidden = true;
-    ["add", "hide"].forEach(action => {
-      const button = actionButton(action === "add" ? "Add" : "Hide", () => {
+    ["add", "hide", "channel"].forEach(action => {
+      const button = actionButton(action === "add" ? "Add" : action === "hide" ? "Hide" : "Hide channel", () => {
         const source = floatBar.hoaSource && floatBar.hoaSource.querySelector(`[data-action="${action}"]`);
         if (source) {
           source.click();
@@ -1250,10 +1405,11 @@ window.__hoaLoaded = true;
     bar.querySelectorAll("button").forEach(button => {
       const source = actions.querySelector(`[data-action="${button.dataset.action}"]`);
       if (source) {
+        button.hidden = false;
         button.textContent = source.textContent;
         button.setAttribute("aria-label", source.getAttribute("aria-label") || source.textContent);
         button.setAttribute("aria-pressed", source.getAttribute("aria-pressed") || "false");
-      }
+      } else button.hidden = true;
     });
     bar.hidden = false;
   }

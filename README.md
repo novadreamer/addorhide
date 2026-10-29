@@ -61,6 +61,8 @@ Storage is local to this browser and is not synced between devices. Added items 
 
 Each supported site has optional per-site filters in the popup and Options page. Choose categories such as YouTube Shorts, live streams, playlists, movies or Tubi TV shows, or enter comma-separated words and phrases. A word matches whole words (including non-English text) in the title, channel and available card tags. Filtered cards disappear only from the current page: they are not added to Hidden Videos, and turning a category off or removing a word brings them back on the next page update.
 
+On YouTube, you can hide every video from a channel directly from a card, hide watched videos (detected from YouTube's progress bar), and hide comments. Watched videos are saved in **Hidden Videos** so they remain hidden until restored; restored watched videos are remembered so the switch does not immediately hide them again. The Hidden Videos window keeps hidden **Channels** and **Watched Videos** in their own sections.
+
 ## Support link
 
 An optional Ko-fi tip link (`HOA.SUPPORT_URL`, https://ko-fi.com/ashmustafa) appears as a quiet "♥ Support" text link in the centre of the popup footer (between a GitHub icon linking here and Options), the Options page header and the Added Videos page header. It only opens the Ko-fi page; no feature depends on it and nothing is sent to Ko-fi.

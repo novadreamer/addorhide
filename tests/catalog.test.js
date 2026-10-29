@@ -86,5 +86,8 @@ const builtInHosts = new Set(catalog.rules.filter(rule => rule.builtIn).flatMap(
 check("built-in catalog hosts equal static content-script hosts", () => assert.deepEqual(builtInHosts, staticHosts));
 check("non-built-in hosts are not static", () => catalog.rules.filter(rule => !rule.builtIn)
   .forEach(rule => rule.hosts.forEach(host => assert.equal(staticHosts.has(host), false))));
+check("YouTube category order includes watched and comments", () => assert.deepEqual(
+  catalog.byId("youtube").categories.map(category => category.id),
+  ["recommended", "watched", "shorts", "playlists", "mixes", "live", "music", "gaming", "podcasts", "movies", "posts", "fundraisers", "comments"]));
 
 console.log(`catalog.test.js: ${passed} passed, 0 failed`);

@@ -444,6 +444,21 @@ check("backup keeps filter settings", () => {
   assert.equal(result.ok, true);
   assert.deepEqual(result.backup.siteRules["www.youtube.com"], { hideKinds: ["shorts", "live"], hideKeywords: ["Robot"] });
 });
+check("YouTube channel keys strip query strings and normalize handles", () => assert.equal(
+  HOA.youtubeChannelKey("/@Handle?si=x"), "youtube.com|/@handle"));
+check("normalizeChannels keeps channel name and both identities", () => {
+  const channels = HOA.normalizeChannels({ "youtube.com|/@handle": { name: "Example Channel", url: "https://www.youtube.com/@Handle?si=x", ts: 1 } });
+  assert.equal(channels["youtube.com|/@handle"].nameKey, "youtube.com|name:example channel");
+  assert.equal(channels["youtube.com|/@handle"].key, "youtube.com|/@handle");
+});
+check("watched hidden items preserve only the watched reason", () => {
+  const items = HOA.normalizeItems({ [watch]: { title: "Watched", thumb: "", ts: 1, reason: "watched" }, [short]: { title: "Other", thumb: "", ts: 1, reason: "other" } }, { max: 10, withListed: true });
+  assert.equal(items[watch].reason, "watched");
+  assert.equal(items[short].reason, undefined);
+});
+check("watchedShown is normalized and markWatchedShown records restores", () => {
+  assert.ok(HOA.markWatchedShown({}, [watch], 9)[watch] === 9);
+});
 
 // The popup injects shared.js/catalog.js again into pages that already run them (picker, Enable).
 check("shared.js and catalog.js can be injected twice into one world", () => {

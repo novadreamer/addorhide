@@ -4,9 +4,13 @@
 // and a second const declaration in the same content-script world throws and aborts the injection.
 var HOA = Object.freeze((() => {
   const HIDDEN_KEY = "hiddenItems";
+  const CHANNELS_KEY = "hiddenChannels";
+  const WATCHED_SHOWN_KEY = "watchedShown";
   const ADDED_KEY = "addedItems";
   const SITES_KEY = "siteRules";
   const MAX_HIDDEN = 1000;
+  const MAX_CHANNELS = 500;
+  const MAX_WATCHED_SHOWN = 1000;
   const MAX_ADDED = 500;
   const MAX_TITLE = 200;
   const MAX_URL = 2048;
@@ -824,6 +828,9 @@ var HOA = Object.freeze((() => {
       addOptionalFields(normalized[key], raw);
       if (withListed) {
         normalized[key].listed = raw.listed === undefined ? true : Boolean(raw.listed);
+        if (raw.reason === "watched") {
+          normalized[key].reason = "watched";
+        }
       }
     });
     const keys = Object.keys(normalized);
@@ -832,6 +839,64 @@ var HOA = Object.freeze((() => {
       keys.slice(0, keys.length - max).forEach(key => delete normalized[key]);
     }
     return normalized;
+  }
+
+  // Keep channel identities independent of a presentation URL.  Handles and the legacy channel paths are stable
+  // enough to use as keys, while name keys let older / unusual cards still match.
+  function youtubeChannelKey(href) {
+    if (typeof href !== "string" || !href.trim()) return "";
+    let url;
+    try { url = new URL(href, "https://www.youtube.com"); } catch (error) { return ""; }
+    if (!/(^|\.)youtube\.com$/i.test(url.hostname)) return "";
+    const match = url.pathname.match(/^\/(?:@[^/?#]+|channel\/[^/?#]+|c\/[^/?#]+|user\/[^/?#]+)/i);
+    return match ? `youtube.com|${match[0].toLowerCase()}` : "";
+  }
+
+  function channelNameKey(name) {
+    const text = typeof name === "string" ? name.trim().replace(/\s+/g, " ").toLowerCase() : "";
+    return text ? `youtube.com|name:${text}` : "";
+  }
+
+  function normalizeChannels(value) {
+    const normalized = {};
+    if (!isObject(value)) return normalized;
+    Object.keys(value).forEach(key => {
+      const raw = value[key];
+      if (!isObject(raw) || !Number.isFinite(raw.ts) || typeof raw.name !== "string") return;
+      const name = raw.name.trim().replace(/\s+/g, " ");
+      const linkKey = youtubeChannelKey(raw.url || key);
+      const nameKey = channelNameKey(name);
+      const validKey = /^youtube\.com\|(?:\/(?:@[^/?#]+|channel\/[^/?#]+|c\/[^/?#]+|user\/[^/?#]+)|name:.+)$/i.test(key);
+      if (!validKey || !name || name.length > MAX_TITLE) return;
+      const url = typeof raw.url === "string" && youtubeChannelKey(raw.url) ? new URL(raw.url, "https://www.youtube.com").href.replace(/[?#].*$/, "") : "";
+      normalized[key.toLowerCase()] = { key: key.toLowerCase(), name, url, site: "youtube.com", ts: raw.ts };
+      if (nameKey) normalized[key.toLowerCase()].nameKey = nameKey;
+      if (linkKey && linkKey !== key.toLowerCase()) normalized[key.toLowerCase()].linkKey = linkKey;
+    });
+    const keys = Object.keys(normalized);
+    if (keys.length > MAX_CHANNELS) keys.sort((a, b) => normalized[a].ts - normalized[b].ts || a.localeCompare(b))
+      .slice(0, keys.length - MAX_CHANNELS).forEach(key => delete normalized[key]);
+    return normalized;
+  }
+
+  function normalizeWatchedShown(value) {
+    const normalized = {};
+    if (!isObject(value)) return normalized;
+    Object.keys(value).forEach(key => {
+      const ts = typeof value[key] === "number" ? value[key] : value[key] && value[key].ts;
+      if (canonicalUrl(key) === key && Number.isFinite(ts)) normalized[key] = ts;
+    });
+    const keys = Object.keys(normalized);
+    if (keys.length > MAX_WATCHED_SHOWN) keys.sort((a, b) => normalized[a] - normalized[b] || a.localeCompare(b))
+      .slice(0, keys.length - MAX_WATCHED_SHOWN).forEach(key => delete normalized[key]);
+    return normalized;
+  }
+
+  function markWatchedShown(shown, keys, nowMs) {
+    const next = { ...normalizeWatchedShown(shown) };
+    const ts = Number.isFinite(nowMs) ? nowMs : Date.now();
+    (keys || []).forEach(key => { if (canonicalUrl(key) === key) next[key] = ts; });
+    return normalizeWatchedShown(next);
   }
 
   function listedHidden(hidden) {
@@ -1183,6 +1248,8 @@ var HOA = Object.freeze((() => {
       version,
       exportedAt: new Date(timestamp).toISOString(),
       hiddenItems: normalizeItems(source.hidden, { max: MAX_HIDDEN, withListed: true }),
+      hiddenChannels: normalizeChannels(source.channels),
+      watchedShown: normalizeWatchedShown(source.watchedShown),
       addedItems: normalizeItems(source.added, { max: MAX_ADDED }),
       siteRules: sanitizeBackupRules(source.siteRules),
       addedViewPrefs: sanitizeBackupPrefs(source.prefs)
@@ -1214,6 +1281,8 @@ var HOA = Object.freeze((() => {
         version: value.version,
         exportedAt: value.exportedAt,
         hiddenItems: normalizeItems(value.hiddenItems, { max: MAX_HIDDEN, withListed: true }),
+        hiddenChannels: normalizeChannels(value.hiddenChannels),
+        watchedShown: normalizeWatchedShown(value.watchedShown),
         addedItems: normalizeItems(value.addedItems, { max: MAX_ADDED }),
         siteRules: sanitizeBackupRules(value.siteRules),
         addedViewPrefs: sanitizeBackupPrefs(value.addedViewPrefs)
@@ -1242,6 +1311,14 @@ var HOA = Object.freeze((() => {
     return { items: normalizeItems(merged, options), count };
   }
 
+  function mergeBackupChannels(current, imported) {
+    const merged = { ...normalizeChannels(current) };
+    Object.entries(normalizeChannels(imported)).forEach(([key, entry]) => {
+      if (!merged[key] || entry.ts > merged[key].ts) merged[key] = entry;
+    });
+    return normalizeChannels(merged);
+  }
+
   function mergeBackup(current, backup) {
     const source = isObject(current) ? current : {};
     const imported = isObject(backup) ? backup : {};
@@ -1249,6 +1326,9 @@ var HOA = Object.freeze((() => {
       { max: MAX_HIDDEN, withListed: true });
     const addedResult = mergeBackupItems(source.added, imported.addedItems,
       { max: MAX_ADDED, withListed: false });
+    // Channel records are not video items, so normalise the merged result with their dedicated schema.
+    const channels = mergeBackupChannels(source.channels, imported.hiddenChannels);
+    const watchedShown = normalizeWatchedShown({ ...normalizeWatchedShown(source.watchedShown), ...normalizeWatchedShown(imported.watchedShown) });
     const siteRules = isObject(source.siteRules) ? { ...source.siteRules } : {};
     let siteCount = 0;
     const importedRules = sanitizeBackupRules(imported.siteRules);
@@ -1276,6 +1356,8 @@ var HOA = Object.freeze((() => {
     return {
       hidden: hiddenResult.items,
       added: addedResult.items,
+      channels: normalizeChannels(channels),
+      watchedShown,
       siteRules,
       prefs,
       counts: { added: addedResult.count, hidden: hiddenResult.count, sites: siteCount }
@@ -1289,13 +1371,15 @@ var HOA = Object.freeze((() => {
   function readLists(callback) {
     const cb = typeof callback === "function" ? callback : () => {};
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
-      cb({ hidden: {}, added: {} });
+      cb({ hidden: {}, added: {}, channels: {}, watchedShown: {} });
       return;
     }
-    chrome.storage.local.get({ [HIDDEN_KEY]: {}, [ADDED_KEY]: {} }, result => {
+    chrome.storage.local.get({ [HIDDEN_KEY]: {}, [ADDED_KEY]: {}, [CHANNELS_KEY]: {}, [WATCHED_SHOWN_KEY]: {} }, result => {
       cb({
         hidden: normalizeItems(result[HIDDEN_KEY], { max: MAX_HIDDEN, withListed: true }),
-        added: normalizeItems(result[ADDED_KEY], { max: MAX_ADDED, withListed: false })
+        added: normalizeItems(result[ADDED_KEY], { max: MAX_ADDED, withListed: false }),
+        channels: normalizeChannels(result[CHANNELS_KEY]),
+        watchedShown: normalizeWatchedShown(result[WATCHED_SHOWN_KEY])
       });
     });
   }
@@ -1313,6 +1397,8 @@ var HOA = Object.freeze((() => {
     if (lists && Object.prototype.hasOwnProperty.call(lists, "added")) {
       payload[ADDED_KEY] = normalizeItems(lists.added, { max: MAX_ADDED, withListed: false });
     }
+    if (lists && Object.prototype.hasOwnProperty.call(lists, "channels")) payload[CHANNELS_KEY] = normalizeChannels(lists.channels);
+    if (lists && Object.prototype.hasOwnProperty.call(lists, "watchedShown")) payload[WATCHED_SHOWN_KEY] = normalizeWatchedShown(lists.watchedShown);
     chrome.storage.local.set(payload, cb);
   }
 
@@ -1348,6 +1434,8 @@ var HOA = Object.freeze((() => {
 
   return {
     HIDDEN_KEY,
+    CHANNELS_KEY,
+    WATCHED_SHOWN_KEY,
     ADDED_KEY,
     SITES_KEY,
     PREFS_KEY,
@@ -1361,6 +1449,8 @@ var HOA = Object.freeze((() => {
     normalizeKeywords,
     keywordMatch,
     MAX_HIDDEN,
+    MAX_CHANNELS,
+    MAX_WATCHED_SHOWN,
     MAX_ADDED,
     MAX_TITLE,
     MAX_URL,
@@ -1403,6 +1493,12 @@ var HOA = Object.freeze((() => {
     normalizePrefs,
     youtubeThumb,
     normalizeItems,
+    normalizeChannels,
+    normalizeWatchedShown,
+    youtubeChannelKey,
+    channelKeyFromHref: youtubeChannelKey,
+    channelNameKey,
+    markWatchedShown,
     buildBackup,
     parseBackup,
     mergeBackup,

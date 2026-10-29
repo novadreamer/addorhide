@@ -150,6 +150,8 @@ body.hoa-hidden-view main { max-width: 1180px; margin: 0 auto; }
   font-size: 11px;
   line-height: 1.25;
 }
+.hoa-hidden-view .hidden-watched, .hoa-hidden-view .hidden-channel { color: #5b5bf0; }
+.hoa-hidden-view .watched-logo { display: grid; place-items: center; font-weight: 800; color: #5b5bf0; background: var(--surface-2); }
 .hoa-hidden-view .hidden-row-status { flex: 1 1 100%; min-height: 0; color: var(--muted); font-size: 12px; }
 .hoa-hidden-view .hidden-actions { display: flex; gap: 4px; justify-content: flex-end; }
 .hoa-hidden-view .hidden-actions button { min-height: 28px; padding: 3px 8px; font-size: 12px; }
@@ -216,3 +218,4 @@ body.hoa-hidden-view main { max-width: 1180px; margin: 0 auto; }
 .hoa-hidden-view button.icon-btn:disabled { opacity: .35; cursor: default; transform: none; }
 :root[data-theme="dark"] .hoa-hidden-view button.icon-btn:not(.remove-button) { color: #a3a3ff; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hoa-hidden-view button.icon-btn:not(.remove-button) { color: #a3a3ff; } }
+.hoa-hidden-view .site-heading-actions { display: flex; align-items: center; justify-self: end; gap: 6px; }

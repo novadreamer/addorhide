@@ -39,6 +39,7 @@ var HOA_CATALOG = Object.freeze((() => {
       ]),
       categories: Object.freeze([
         { id: "recommended", label: "Recommended", hint: "Ordinary suggested videos on Home and next to a playing video", fallback: true, pathPattern: "^/($|watch)" },
+        { id: "watched", label: "Watched", hint: "Videos you have watched (YouTube's red progress bar)", card: { has: "ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, .ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment, #progress.ytd-thumbnail-overlay-resume-playback-renderer" } },
         { id: "shorts", label: "Shorts", hint: "Short-form vertical videos", card: { is: "ytm-shorts-lockup-view-model-v2, ytm-shorts-lockup-view-model, ytd-reel-item-renderer", href: "/shorts/" }, containers: "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2, ytm-shorts-lockup-view-model)", shelfTitle: "^Shorts$" },
         { id: "playlists", label: "Playlists", hint: "Playlists and collections", card: { has: "yt-collection-thumbnail-view-model, ytd-playlist-renderer, ytd-grid-playlist-renderer, ytd-compact-playlist-renderer", href: "list=(?!RD)" } },
         { id: "mixes", label: "Mixes", hint: "YouTube mixes and radio playlists", card: { has: "ytd-radio-renderer, ytd-compact-radio-renderer", href: "list=RD", text: "^(Mix -|My Mix)" } },
@@ -49,7 +50,8 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "podcasts", label: "Podcasts", hint: "Podcast videos and shelves", card: { href: "/podcasts|list=", text: "Podcast" }, shelfTitle: "Podcast" },
         { id: "movies", label: "Movies & TV", hint: "Movies, episodes and paid rentals", card: { is: "ytd-movie-renderer, ytd-grid-movie-renderer, ytd-compact-movie-renderer", text: "Free with ads|Buy or rent|Movie|Episode", channel: "^YouTube Movies" }, shelfTitle: "Movies|TV shows|Free movies" },
         { id: "posts", label: "Posts", hint: "Community posts", containers: "ytd-post-renderer, ytd-backstage-post-thread-renderer, ytd-rich-section-renderer:has(ytd-post-renderer, ytd-backstage-post-thread-renderer)", shelfTitle: "posts" },
-        { id: "fundraisers", label: "Fundraisers", hint: "Donation and fundraiser shelves", containers: "ytd-donation-shelf-renderer, ytd-donation-unavailable-renderer", card: { text: "Fundraiser" }, shelfTitle: "Fundraiser" }
+        { id: "fundraisers", label: "Fundraisers", hint: "Donation and fundraiser shelves", containers: "ytd-donation-shelf-renderer, ytd-donation-unavailable-renderer", card: { text: "Fundraiser" }, shelfTitle: "Fundraiser" },
+        { id: "comments", label: "Comments", hint: "The comments under videos and the Shorts comments panel", containers: "ytd-comments#comments, #comments.ytd-watch-flexy, ytd-item-section-renderer[section-identifier=\"comment-item-section\"], ytd-engagement-panel-section-list-renderer[target-id=\"engagement-panel-comments-section\"], ytd-engagement-panel-section-list-renderer[target-id=\"engagement-panel-comments\"]" }
       ]),
       // Cards everywhere ytd-rich-item-renderer is used (home, subscriptions, a creator's Videos/Shorts/Live
       // tabs). Everywhere else YouTube uses the card types below, on every page (home layouts YouTube is testing,

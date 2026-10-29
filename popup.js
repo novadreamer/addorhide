@@ -12,6 +12,7 @@ const themeToggle = document.getElementById("theme-toggle");
 
 let hidden = {};
 let added = {};
+let channels = {};
 let activeTab = null;
 let activeHost = "";
 
@@ -362,8 +363,19 @@ function loadSite() {
 function render() {
   const listed = HOA.listedHidden(hidden);
   const count = listed.length;
-  openHiddenButton.disabled = count === 0;
+  openHiddenButton.disabled = count === 0 && Object.keys(channels).length === 0;
   hiddenSummary.textContent = HOA.hiddenSummaryText(count, HOA.groupBySite(Object.fromEntries(listed)).length);
+  let channelSummary = document.getElementById("hidden-channels-summary");
+  if (Object.keys(channels).length) {
+    if (!channelSummary) {
+      channelSummary = document.createElement("p");
+      channelSummary.id = "hidden-channels-summary";
+      channelSummary.className = "muted";
+      hiddenSummary.insertAdjacentElement("afterend", channelSummary);
+    }
+    const channelCount = Object.keys(channels).length;
+    channelSummary.textContent = `${channelCount} hidden channel${channelCount === 1 ? "" : "s"}`;
+  } else if (channelSummary) channelSummary.remove();
   // Added Videos works the same way: off while nothing is added, with the count underneath.
   const addedCount = Object.keys(added || {}).length;
   openAddedButton.disabled = addedCount === 0;
@@ -429,8 +441,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === "local" && changes[HOA.THEME_KEY]) {
     refreshThemeToggle();
   }
-  if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.ADDED_KEY])) {
-    HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; render(); });
+  if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.ADDED_KEY] || changes[HOA.CHANNELS_KEY])) {
+    HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; channels = lists.channels; render(); });
   }
   if (areaName === "local" && changes[HOA.SITES_KEY]) {
     siteRules = changes[HOA.SITES_KEY].newValue && typeof changes[HOA.SITES_KEY].newValue === "object"
@@ -438,5 +450,5 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     renderSite();
   }
 });
-HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; render(); });
+HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; channels = lists.channels; render(); });
 loadSite();

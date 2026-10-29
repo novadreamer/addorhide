@@ -312,6 +312,8 @@ function storageSnapshot(callback) {
   chrome.storage.local.get({
     [HOA.HIDDEN_KEY]: {},
     [HOA.ADDED_KEY]: {},
+    [HOA.CHANNELS_KEY]: {},
+    [HOA.WATCHED_SHOWN_KEY]: {},
     [HOA.SITES_KEY]: {},
     [HOA.PREFS_KEY]: {}
   }, callback);
@@ -323,6 +325,8 @@ function exportData() {
     const backup = HOA.buildBackup({
       hidden: result[HOA.HIDDEN_KEY],
       added: result[HOA.ADDED_KEY],
+      channels: result[HOA.CHANNELS_KEY],
+      watchedShown: result[HOA.WATCHED_SHOWN_KEY],
       siteRules: result[HOA.SITES_KEY],
       prefs: result[HOA.PREFS_KEY]
     }, manifest.version || "", Date.now());
@@ -381,6 +385,8 @@ function importDataFile(file) {
       const merged = HOA.mergeBackup({
         hidden: current[HOA.HIDDEN_KEY],
         added: current[HOA.ADDED_KEY],
+        channels: current[HOA.CHANNELS_KEY],
+        watchedShown: current[HOA.WATCHED_SHOWN_KEY],
         siteRules: current[HOA.SITES_KEY],
         prefs: current[HOA.PREFS_KEY]
       }, parsed.backup);
@@ -391,6 +397,8 @@ function importDataFile(file) {
       chrome.storage.local.set({
         [HOA.HIDDEN_KEY]: merged.hidden,
         [HOA.ADDED_KEY]: merged.added,
+        [HOA.CHANNELS_KEY]: merged.channels,
+        [HOA.WATCHED_SHOWN_KEY]: merged.watchedShown,
         [HOA.SITES_KEY]: merged.siteRules,
         [HOA.PREFS_KEY]: merged.prefs
       }, () => {

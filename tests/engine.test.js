@@ -420,6 +420,44 @@ const CASES = [
       page.document.querySelectorAll(".hoa-filtered").length, 0));
     page.window.close();
   }
+  {
+    const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/",
+      siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
+    await wait(600);
+    check("filters: Watched stores and hides watched cards", () => {
+      assert.ok(page.document.getElementById("watched").classList.contains("hoa-removed"));
+      assert.equal(page.store.hiddenItems["https://www.youtube.com/watch?v=watched1234"].reason, "watched");
+    });
+    page.window.chrome.storage.local.set({ hiddenItems: {}, watchedShown: { "https://www.youtube.com/watch?v=watched1234": Date.now() } });
+    await wait(120);
+    check("filters: restored watched keys are not auto-hidden", () => assert.ok(!page.document.getElementById("watched").classList.contains("hoa-removed")
+      && !page.document.getElementById("watched").classList.contains("hoa-filtered")));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/" });
+    check("YouTube watched cards show a visible label", () => assert.ok(page.document.querySelector("#watched .hoa-watched-label")));
+    check("YouTube channel action is present and the float bar mirrors it", () => {
+      assert.ok(buttons(page.document.getElementById("blocked"), "channel"));
+      assert.match(read("content.js"), /\["add", "hide", "channel"\]/);
+    });
+    page.window.chrome.storage.local.set({ hiddenChannels: { "youtube.com|/@blockedchan": { key: "youtube.com|/@blockedchan", name: "Blocked Channel", url: "https://www.youtube.com/@blockedchan", ts: Date.now(), nameKey: "youtube.com|name:blocked channel" } } });
+    await wait(120);
+    check("hidden channels filter only their cards", () => {
+      assert.ok(page.document.getElementById("blocked").classList.contains("hoa-filtered"));
+      assert.ok(!page.document.getElementById("other").classList.contains("hoa-filtered"));
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/@blockedchan/videos",
+      siteRules: { "www.youtube.com": { hideKinds: ["comments"] } } });
+    page.window.chrome.storage.local.set({ hiddenChannels: { "youtube.com|/@blockedchan": { key: "youtube.com|/@blockedchan", name: "Blocked Channel", url: "https://www.youtube.com/@blockedchan", ts: Date.now() } } });
+    await wait(120);
+    check("hidden channels do not hide cards on their own channel page", () => assert.ok(!page.document.getElementById("blocked").classList.contains("hoa-filtered")));
+    check("comments category hides the comments container", () => assert.ok(page.document.getElementById("comments").classList.contains("hoa-filtered")));
+    page.window.close();
+  }
   console.log(`engine.test.js: ${passed} passed, 0 failed`);
 })().catch(error => {
   console.error(error);

@@ -4,6 +4,8 @@
   const HIDDEN_PREFS_KEY = "hiddenViewPrefs";
   const root = document.getElementById("hidden-root");
   let hidden = {};
+  let channels = {};
+  let watchedShown = {};
   let prefs = {};
   let pageStatusText = "";
   let removeAllTimer = 0;
@@ -138,6 +140,17 @@
     });
   }
 
+  function restoreEntries(keys, message) {
+    const watchedKeys = (keys || []).filter(key => hidden[key] && hidden[key].reason === "watched");
+    hidden = HOA.restoreKeys(hidden, keys);
+    if (watchedKeys.length) watchedShown = HOA.markWatchedShown(watchedShown, watchedKeys);
+    pageStatusText = message;
+    render();
+    HOA.writeLists({ hidden, ...(watchedKeys.length ? { watchedShown } : {}) }, () => {
+      if (chrome.runtime.lastError) { pageStatusText = "Could not save the hidden videos list."; render(); }
+    });
+  }
+
   // Icon-only buttons: the icon is the button; a short tooltip (and the same text for screen readers) says what it does.
   function iconButton(className, icon, label) {
     const button = element("button", `icon-btn ${className}`);
@@ -167,6 +180,9 @@
     if (entry.kind === "short") {
       info.appendChild(element("span", "hidden-kind", "Short"));
     }
+    if (entry.reason === "watched") {
+      info.appendChild(element("span", "hidden-kind hidden-watched", "Watched"));
+    }
     const rowStatus = element("span", "hidden-row-status", "");
     rowStatus.setAttribute("role", "status");
     info.appendChild(rowStatus);
@@ -176,7 +192,7 @@
     restore.id = `hidden-restore-${index}`;
     restore.addEventListener("click", () => {
       rowStatus.textContent = "Returned to feed.";
-      writeHidden(HOA.restoreKeys(hidden, [key]), "Returned to feed.");
+      restoreEntries([key], "Returned to feed.");
     });
     const remove = iconButton("remove-button", REMOVE_ICON, "Remove from this list (the video stays hidden)");
     remove.id = `hidden-remove-${index}`;
@@ -203,7 +219,11 @@
     collapse.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${group.name}`);
     collapse.addEventListener("click", () => toggleSite(group.site));
     heading.appendChild(collapse);
-    heading.appendChild(makeLogo(group.site, group.entries));
+    if (group.watched) {
+      heading.appendChild(element("div", "site-logo watched-logo", "✓"));
+    } else {
+      heading.appendChild(makeLogo(group.site, group.entries));
+    }
     const identity = element("div", "site-identity");
     const name = element("h2", "site-name-toggle", group.name);
     name.tabIndex = 0;
@@ -218,6 +238,14 @@
     identity.appendChild(name);
     identity.appendChild(element("span", "count-badge", String(group.entries.length)));
     heading.appendChild(identity);
+    // The group's buttons share the heading's last column (the Watched group has two).
+    const headingActions = element("div", "site-heading-actions");
+    if (group.watched) {
+      const restoreAll = iconButton("restore-button group-restore-all", RESTORE_ALL_ICON, "Show all watched videos again");
+      restoreAll.id = `hidden-restore-watched-${groupIndex}`;
+      restoreAll.addEventListener("click", () => restoreEntries(group.entries.map(([key]) => key), "Returned to feed."));
+      headingActions.appendChild(restoreAll);
+    }
     // A bin icon (the whole button); while it waits for the second click it shows an open bin with a "?".
     const armed = siteRemoveConfirmations.has(group.site);
     const removeAll = element("button", `site-remove-all${armed ? " armed" : ""}`);
@@ -243,13 +271,69 @@
       siteRemoveConfirmations.set(group.site, timer);
       render();
     });
-    heading.appendChild(removeAll);
+    headingActions.appendChild(removeAll);
+    heading.appendChild(headingActions);
     section.appendChild(heading);
     if (!collapsed) {
       const body = element("div", "site-group-body");
       group.entries.forEach(([key, entry], index) => body.appendChild(makeRow(key, entry, `${groupIndex}-${index}`)));
       section.appendChild(body);
     }
+    return section;
+  }
+
+  function makeChannelsGroup(channelEntries) {
+    const section = element("section", "site-group channels-group");
+    const heading = element("div", "site-heading");
+    heading.appendChild(element("div", "site-logo watched-logo", "C"));
+    const identity = element("div", "site-identity");
+    identity.appendChild(element("h2", "site-name-toggle", "Channels"));
+    identity.appendChild(element("span", "count-badge", String(channelEntries.length)));
+    heading.appendChild(identity);
+    const removeAll = element("button", "site-remove-all");
+    removeAll.type = "button";
+    removeAll.innerHTML = BIN_ICON;
+    removeAll.title = "Unhide all channels";
+    removeAll.setAttribute("aria-label", "Unhide all channels");
+    let armed = false;
+    let timer = 0;
+    removeAll.addEventListener("click", () => {
+      if (armed) {
+        if (timer) clearTimeout(timer);
+        channels = {};
+        HOA.writeLists({ channels });
+        pageStatusText = "All channels are visible again.";
+        render();
+        return;
+      }
+      armed = true;
+      removeAll.classList.add("armed");
+      removeAll.innerHTML = OPEN_BIN_ICON;
+      removeAll.title = "Click again to unhide all channels";
+      timer = window.setTimeout(() => { armed = false; render(); }, 4000);
+    });
+    heading.appendChild(removeAll);
+    section.appendChild(heading);
+    const body = element("div", "site-group-body");
+    channelEntries.forEach(([key, entry], index) => {
+      const row = element("article", "hidden-row");
+      row.appendChild(element("div", "hidden-thumbnail-placeholder watched-logo", "C"));
+      const info = element("div", "hidden-info");
+      const href = HOA.safeHref(entry.url);
+      const title = element(href ? "a" : "span", "hidden-title", entry.name || key);
+      if (href) { title.href = href; title.addEventListener("click", event => { event.preventDefault(); openLink(href); }); }
+      info.appendChild(title);
+      info.appendChild(element("span", "hidden-kind hidden-channel", "Channel"));
+      row.appendChild(info);
+      const actions = element("div", "hidden-actions");
+      const unhide = iconButton("restore-button", RESTORE_ICON, "Show this channel's videos again");
+      unhide.id = `hidden-channel-${index}`;
+      unhide.addEventListener("click", () => { channels = { ...channels }; delete channels[key]; HOA.writeLists({ channels }); pageStatusText = "Channel visible again."; render(); });
+      actions.appendChild(unhide);
+      row.appendChild(actions);
+      body.appendChild(row);
+    });
+    section.appendChild(body);
     return section;
   }
 
@@ -266,7 +350,9 @@
       root.firstChild.remove();
     }
     const entries = HOA.listedHidden(hidden);
-    const groups = groupsFor(entries);
+    const watchedEntries = entries.filter(([, entry]) => entry.reason === "watched");
+    const groups = groupsFor(entries.filter(([, entry]) => entry.reason !== "watched"));
+    const channelEntries = Object.entries(channels);
     const header = element("header", "hidden-header");
     const copy = element("div", "hidden-header-copy");
     const title = element("h1", "", "Hidden videos");
@@ -278,7 +364,7 @@
     restoreAll.id = "hidden-restore-all";
     restoreAll.disabled = entries.length === 0;
     restoreAll.addEventListener("click", () => {
-      writeHidden(HOA.restoreKeys(hidden, entries.map(([key]) => key)), "Returned to feed.");
+      restoreEntries(entries.map(([key]) => key), "Returned to feed.");
     });
     // Remove all (every site): a bin icon like the per-site ones; the first click opens the bin with a "?", a second
     // click within 4 s removes every video from the list (they stay hidden).
@@ -319,10 +405,12 @@
     const status = element("p", "status hidden-status", pageStatusText);
     status.setAttribute("role", "status");
     root.appendChild(status);
-    if (!entries.length) {
-      root.appendChild(element("p", "empty-state hidden-empty muted", "No hidden videos."));
+    if (!entries.length && !channelEntries.length) {
+      root.appendChild(element("p", "empty-state hidden-empty muted", "No hidden videos or channels."));
     } else {
       const groupsRoot = element("div", "hidden-groups");
+      if (channelEntries.length) groupsRoot.appendChild(makeChannelsGroup(channelEntries));
+      if (watchedEntries.length) groupsRoot.appendChild(makeGroup({ site: "watched-videos", name: "Watched Videos", entries: watchedEntries, watched: true }, "watched"));
       groups.forEach((group, index) => groupsRoot.appendChild(makeGroup(group, index)));
       root.appendChild(groupsRoot);
     }
@@ -336,6 +424,8 @@
   function refresh() {
     HOA.readLists(lists => {
       hidden = lists.hidden;
+      channels = lists.channels;
+      watchedShown = lists.watchedShown;
       chrome.storage.local.get({ [HIDDEN_PREFS_KEY]: {} }, result => {
         prefs = normalizePrefs(result[HIDDEN_PREFS_KEY]);
         render();
@@ -344,7 +434,7 @@
   }
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HIDDEN_PREFS_KEY])) {
+    if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.CHANNELS_KEY] || changes[HOA.WATCHED_SHOWN_KEY] || changes[HIDDEN_PREFS_KEY])) {
       refresh();
     }
   });
