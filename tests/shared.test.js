@@ -462,6 +462,13 @@ check("watchedShown is normalized and markWatchedShown records restores", () => 
   assert.ok(HOA.markWatchedShown({}, [watch], 9)[watch] === 9);
 });
 
+check("normalization keeps only boolean watched markers", () => {
+  const items = HOA.normalizeItems({ [watch]: { title: "Watched", thumb: "", ts: 1, watched: true },
+    [short]: { title: "Other", thumb: "", ts: 1, watched: "true" } }, { max: 10, withListed: true });
+  assert.equal(items[watch].watched, true);
+  assert.equal(items[short].watched, undefined);
+});
+
 // The popup injects shared.js/catalog.js again into pages that already run them (picker, Enable).
 check("shared.js and catalog.js can be injected twice into one world", () => {
   const vm = require("node:vm");
@@ -473,6 +480,20 @@ check("shared.js and catalog.js can be injected twice into one world", () => {
     files.forEach(source => vm.runInContext(source, sandbox));
   }
   assert.equal(vm.runInContext("typeof HOA.canonicalUrl + typeof HOA_CATALOG.find", sandbox), "functionfunction");
+});
+
+check("turning Watched off drops only that site's auto-hidden entries", () => {
+  const yt = "https://www.youtube.com/watch?v=watched1234";
+  const manual = "https://www.youtube.com/watch?v=manual12345";
+  const tubi = "https://tubitv.com/movies/123";
+  const out = HOA.withoutAutoWatched({
+    [yt]: { site: "youtube.com", reason: "watched", ts: 1 },
+    [manual]: { site: "youtube.com", watched: true, ts: 1 },
+    [tubi]: { site: "tubitv.com", reason: "watched", ts: 1 }
+  }, { [yt]: 1, [tubi]: 1 }, "www.youtube.com");
+  assert.ok(out.changed);
+  assert.deepEqual(Object.keys(out.hidden).sort(), [manual, tubi].sort());
+  assert.deepEqual(Object.keys(out.watchedShown), [tubi]);
 });
 
 console.log(`shared.test.js: ${passed} passed, 0 failed`);

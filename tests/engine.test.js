@@ -41,9 +41,11 @@ async function load({ fixture, url, siteRules }) {
   const { window } = dom;
   const store = { siteRules: siteRules || {} };
   const listeners = [];
+  const messageListeners = [];
   const clone = value => JSON.parse(JSON.stringify(value));
   window.chrome = {
-    runtime: { id: "test-extension", lastError: null, getURL: value => value },
+    runtime: { id: "test-extension", lastError: null, getURL: value => value, getManifest: () => ({ version: "test" }),
+      onMessage: { addListener: listener => messageListeners.push(listener) } },
     storage: {
       local: {
         get(defaults, callback) {
@@ -65,7 +67,12 @@ async function load({ fixture, url, siteRules }) {
   };
   window.eval(bundle);
   await wait(120);
-  return { window, document: window.document, store };
+  const status = () => new Promise(resolve => {
+    let answered = false;
+    messageListeners.forEach(listener => listener({ type: "hoa-status" }, {}, reply => { if (!answered) { answered = true; resolve(reply); } }));
+    if (!messageListeners.length) resolve(null);
+  });
+  return { window, document: window.document, store, status };
 }
 
 const buttons = (card, action) => card.querySelector(`:scope > .hoa-actions [data-action="${action}"]`);
@@ -428,6 +435,8 @@ const CASES = [
       assert.ok(page.document.getElementById("watched").classList.contains("hoa-removed"));
       assert.equal(page.store.hiddenItems["https://www.youtube.com/watch?v=watched1234"].reason, "watched");
     });
+    check("filters: a zero-width watched segment is not treated as watched", () => assert.ok(
+      !page.document.getElementById("unwatched-progress").classList.contains("hoa-removed")));
     page.window.chrome.storage.local.set({ hiddenItems: {}, watchedShown: { "https://www.youtube.com/watch?v=watched1234": Date.now() } });
     await wait(120);
     check("filters: restored watched keys are not auto-hidden", () => assert.ok(!page.document.getElementById("watched").classList.contains("hoa-removed")
@@ -435,13 +444,35 @@ const CASES = [
     page.window.close();
   }
   {
-    const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/" });
-    check("YouTube watched cards show a visible label", () => assert.ok(page.document.querySelector("#watched .hoa-watched-label")));
-    check("YouTube watched label uses the thumbnail, not the clipped progress host", () => {
-      const label = page.document.querySelector("#watched .hoa-watched-label");
-      assert.equal(label.parentElement.tagName.toLowerCase(), "yt-thumbnail-view-model");
-      assert.notEqual(label.parentElement.className, "ytThumbnailOverlayProgressBarHost");
+    const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/",
+      siteRules: { "www.youtube.com": { hideKinds: ["live", "posts", "fundraisers"] } } });
+    // A copy of the live card on a page YouTube keeps in the DOM but hides (the previous page).
+    const old = page.document.createElement("div");
+    old.setAttribute("hidden", "");
+    old.innerHTML = '<ytd-rich-item-renderer><a href="/watch?v=old12345678"><span class="badge-style-type-live-now">LIVE</span></a><h3 id="video-title">Old live</h3></ytd-rich-item-renderer>';
+    page.document.body.appendChild(old);
+    await wait(300);
+    const reply = await page.status();
+    check("status: filtered videos and sections are counted once, current page only", () => {
+      assert.ok(reply, "status handler answered");
+      assert.equal(reply.filteredVideos, 1);
+      assert.equal(reply.filteredSections, 2);
+      assert.equal(reply.channelVideos, 0);
     });
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/" });
+    check("YouTube watched cards mark a thumbnail for the CSS Watched label", () => assert.ok(page.document.querySelector("#watched [data-hoa-watched]")));
+    check("YouTube watched label uses the thumbnail, not the clipped progress host", () => {
+      const label = page.document.querySelector("#watched [data-hoa-watched]");
+      assert.equal(label.tagName.toLowerCase(), "yt-thumbnail-view-model");
+      assert.notEqual(label.className, "ytThumbnailOverlayProgressBarHost");
+    });
+    const progress = page.document.querySelector("#watched ytd-thumbnail-overlay-resume-playback-renderer");
+    progress.remove();
+    await wait(180);
+    check("YouTube recycled cards lose the watched mark", () => assert.equal(page.document.querySelector("#watched [data-hoa-watched]"), null));
     check("YouTube channel action is present and the float bar mirrors it", () => {
       assert.ok(buttons(page.document.getElementById("blocked"), "channel"));
       assert.match(read("content.js"), /\["add", "hide", "channel"\]/);
@@ -451,6 +482,17 @@ const CASES = [
     check("hidden channels filter only their cards", () => {
       assert.ok(page.document.getElementById("blocked").classList.contains("hoa-filtered"));
       assert.ok(!page.document.getElementById("other").classList.contains("hoa-filtered"));
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/" });
+    const watched = page.document.getElementById("watched");
+    buttons(watched, "hide").click();
+    await wait(100);
+    check("manual Hide on a watched card records watched without an auto-hide reason", () => {
+      const entry = page.store.hiddenItems["https://www.youtube.com/watch?v=watched1234"];
+      assert.equal(entry.watched, true); assert.equal(entry.reason, undefined);
     });
     page.window.close();
   }

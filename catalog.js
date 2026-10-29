@@ -8,6 +8,10 @@
 // categories[{id,label,hint,card,containers,shelfTitle,pathPattern,fallback}].
 // var, not const: the popup re-injects this file (picker, Enable) into pages that already have it,
 // and a second const declaration in the same content-script world throws and aborts the injection.
+// Kept outside the catalog so the content script uses precisely the same progress
+// selector for filtering and for the CSS-drawn Watched marker.
+var HOA_WATCHED_SELECTOR = "ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, [class*='WatchedProgressBarSegment'], [class*='ResumePlayback'], #progress.ytd-thumbnail-overlay-resume-playback-renderer";
+
 var HOA_CATALOG = Object.freeze((() => {
   const YOUTUBE_LINK = 'a[href*="/watch?v="], a[href*="/shorts/"]';
   const YOUTUBE_TITLES = Object.freeze([
@@ -39,7 +43,7 @@ var HOA_CATALOG = Object.freeze((() => {
       ]),
       categories: Object.freeze([
         { id: "recommended", label: "Recommended", hint: "Ordinary suggested videos on Home and next to a playing video", fallback: true, pathPattern: "^/($|watch)" },
-        { id: "watched", label: "Watched", hint: "Videos you have watched (YouTube's red progress bar)", card: { has: "ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, .ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment, #progress.ytd-thumbnail-overlay-resume-playback-renderer" } },
+        { id: "watched", label: "Watched", hint: "Videos you have watched (YouTube's red progress bar)", card: { has: HOA_WATCHED_SELECTOR } },
         { id: "shorts", label: "Shorts", hint: "Short-form vertical videos", card: { is: "ytm-shorts-lockup-view-model-v2, ytm-shorts-lockup-view-model, ytd-reel-item-renderer", href: "/shorts/" }, containers: "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2, ytm-shorts-lockup-view-model)", shelfTitle: "^Shorts$" },
         { id: "playlists", label: "Playlists", hint: "Playlists and collections", card: { has: "yt-collection-thumbnail-view-model, ytd-playlist-renderer, ytd-grid-playlist-renderer, ytd-compact-playlist-renderer", href: "list=(?!RD)" } },
         { id: "mixes", label: "Mixes", hint: "YouTube mixes and radio playlists", card: { has: "ytd-radio-renderer, ytd-compact-radio-renderer", href: "list=RD", text: "^(Mix -|My Mix)" } },

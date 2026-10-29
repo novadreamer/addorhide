@@ -79,20 +79,24 @@ var HOA = Object.freeze((() => {
     return result;
   }
 
+  const keywordMatcherCache = new Map();
   function keywordMatch(text, keywords) {
     if (typeof text !== "string" || !text || !Array.isArray(keywords)) {
       return false;
     }
-    return normalizeKeywords(keywords).some(keyword => {
+    const normalized = normalizeKeywords(keywords);
+    const cacheKey = normalized.map(keyword => keyword.toLocaleLowerCase()).join("\u0001");
+    let matchers = keywordMatcherCache.get(cacheKey);
+    if (!matchers) {
+      matchers = normalized.map(keyword => {
       // Escape user text before placing it between Unicode-aware word boundaries. Punctuation in a phrase is
       // intentionally literal; only letters and digits on either side prevent a match.
       const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      try {
-        return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "iu").test(text);
-      } catch (error) {
-        return false;
-      }
-    });
+        try { return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, "iu"); } catch (error) { return null; }
+      });
+      keywordMatcherCache.set(cacheKey, matchers);
+    }
+    return matchers.some(matcher => matcher && matcher.test(text));
   }
   const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
   const TWITCH_CHANNEL_RE = /^[A-Za-z0-9_]{2,25}$/;
@@ -831,6 +835,9 @@ var HOA = Object.freeze((() => {
         if (raw.reason === "watched") {
           normalized[key].reason = "watched";
         }
+        if (typeof raw.watched === "boolean" && raw.watched) {
+          normalized[key].watched = true;
+        }
       }
     });
     const keys = Object.keys(normalized);
@@ -897,6 +904,30 @@ var HOA = Object.freeze((() => {
     const ts = Number.isFinite(nowMs) ? nowMs : Date.now();
     (keys || []).forEach(key => { if (canonicalUrl(key) === key) next[key] = ts; });
     return normalizeWatchedShown(next);
+  }
+
+  // Turning a site's Watched switch off returns the videos that switch hid (reason "watched"); videos the
+  // user hid by hand stay hidden. Their watchedShown opt-outs go too, so turning it on again starts fresh.
+  function withoutAutoWatched(hidden, shown, host) {
+    const site = String(host || "").replace(/^www\./, "");
+    const nextHidden = { ...(hidden || {}) };
+    const nextShown = { ...(shown || {}) };
+    let changed = false;
+    Object.entries(nextHidden).forEach(([key, entry]) => {
+      if (entry && entry.reason === "watched" && String(entry.site || siteOf(key) || "").replace(/^www\./, "") === site) {
+        delete nextHidden[key];
+        delete nextShown[key];
+        changed = true;
+      }
+    });
+    return { hidden: nextHidden, watchedShown: nextShown, changed };
+  }
+
+  function clearAutoWatched(host) {
+    readLists(lists => {
+      const next = withoutAutoWatched(lists.hidden, lists.watchedShown, host);
+      if (next.changed) writeLists({ hidden: next.hidden, watchedShown: next.watchedShown });
+    });
   }
 
   function listedHidden(hidden) {
@@ -1499,6 +1530,8 @@ var HOA = Object.freeze((() => {
     channelKeyFromHref: youtubeChannelKey,
     channelNameKey,
     markWatchedShown,
+    withoutAutoWatched,
+    clearAutoWatched,
     buildBackup,
     parseBackup,
     mergeBackup,

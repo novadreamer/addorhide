@@ -70,13 +70,12 @@
 .hoa-actions button[data-action="add"]:hover, .hoa-actions button[data-action="add"]:focus-visible { color: #fff; background: #1f9d55; }
 .hoa-actions button[data-action="hide"]:hover, .hoa-actions button[data-action="hide"]:focus-visible { color: #fff; background: #d93a49; }
 .hoa-actions button[data-action="channel"]:hover, .hoa-actions button[data-action="channel"]:focus-visible { color: #fff; background: #8a4bd8; }
-/* Keep the watched marker inside YouTube's thumbnail even when its component CSS is more specific. */
-ytd-rich-item-renderer .hoa-watched-label, yt-lockup-view-model .hoa-watched-label, yt-thumbnail-view-model .hoa-watched-label, ytd-thumbnail .hoa-watched-label, a.ytLockupViewModelContentImage .hoa-watched-label,
-ytd-video-renderer .hoa-watched-label, ytd-compact-video-renderer .hoa-watched-label,
-ytd-grid-video-renderer .hoa-watched-label, ytd-reel-item-renderer .hoa-watched-label {
-  display: block !important; position: absolute !important; z-index: 2147482999 !important;
-  bottom: 6px !important; left: 6px !important; padding: 2px 6px !important; color: #fff !important;
-  background: rgba(18,18,18,.78) !important; border-radius: 999px !important; font: 600 11px/1.2 Arial,sans-serif !important;
+/* A pseudo element survives YouTube's view-model re-rendering, unlike a foreign child node. */
+[data-hoa-watched]::after {
+  content: "Watched" !important; display: block !important; position: absolute !important;
+  z-index: 2147482999 !important; bottom: 6px !important; left: 6px !important;
+  padding: 2px 6px !important; color: #fff !important; background: rgba(18,18,18,.78) !important;
+  border-radius: 999px !important; font: 600 11px/1.2 Arial,sans-serif !important;
   pointer-events: none !important;
 }
 #hoa-toast, #hoa-banner {

@@ -187,7 +187,7 @@
     if (entry.kind === "short") {
       info.appendChild(element("span", "hidden-kind", "Short"));
     }
-    if (entry.reason === "watched") {
+    if (entry.reason === "watched" || entry.watched === true) {
       info.appendChild(element("span", "hidden-kind hidden-watched", "Watched"));
     }
     const rowStatus = element("span", "hidden-row-status", "");
@@ -357,8 +357,8 @@
       root.firstChild.remove();
     }
     const entries = HOA.listedHidden(hidden);
-    const watchedEntries = entries.filter(([, entry]) => entry.reason === "watched");
-    const groups = groupsFor(entries.filter(([, entry]) => entry.reason !== "watched"));
+    const watchedEntries = entries.filter(([, entry]) => entry.reason === "watched" || entry.watched === true);
+    const groups = groupsFor(entries.filter(([, entry]) => entry.reason !== "watched" && entry.watched !== true));
     const channelEntries = Object.entries(channels);
     const header = element("header", "hidden-header");
     const copy = element("div", "hidden-header-copy");

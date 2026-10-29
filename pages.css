@@ -143,7 +143,7 @@ input[type="checkbox"][role="switch"]:checked::after { left: 19px; }
 
 
 /* Popup compaction: everything must fit the 600px popup. */
-body.popup main { display: flex; flex-direction: column; max-height: 576px; min-height: 0; }
+body.popup main { display: flex; flex-direction: column; min-height: 0; }
 .popup .popup-header { margin-bottom: 8px; padding: 0 0 6px; }
 .popup .brand-lockup img { width: 28px; height: 28px; }
 .popup .brand-lockup h1 { font-size: 15px; line-height: 1.2; }
@@ -271,7 +271,7 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 /* Popup: sections never overlap. The site card and the buttons controls keep their size; the hidden-videos card
    keeps its contents inside its own box (its list scrolls) and never shrinks below its heading plus one row; if
    everything still cannot fit the 600px popup, the popup scrolls as a whole. */
-body.popup main { overflow-y: auto; scrollbar-width: thin; }
+body.popup main { overflow: visible; scrollbar-width: auto; }
 .popup .site-card, .popup .popup-edge, .popup .popup-footer { flex: 0 0 auto; }
 .popup .button-controls { gap: 24px; }
 .popup .button-controls .press-button.toggle-button { min-height: 0; }
@@ -305,7 +305,14 @@ body.popup main { overflow-y: auto; scrollbar-width: thin; }
 .filter-words input { min-width: 0; min-height: 30px; font-size: 12px; }
 .filter-words button { flex: 0 0 auto; min-height: 30px; }
 .filter-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.filter-launch { display: flex; align-items: center; gap: 5px; margin: 10px auto 0; }
+.filter-launch { display: flex; width: 260px; max-width: 100%; align-items: center; gap: 8px; margin: 10px auto 0; padding: 6px 9px 6px 6px; border-radius: 999px; box-shadow: 0 2px 0 rgba(0,0,0,.12), 0 5px 12px rgba(0,0,0,.08); transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease, background-color 150ms ease; }
+.filter-launch.is-active { color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, var(--surface)); border-color: color-mix(in srgb, var(--danger) 42%, var(--border)); }
+.filter-launch:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 3px 0 rgba(0,0,0,.12), 0 8px 16px rgba(0,0,0,.12); filter: none; }
+.filter-launch:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,.12), 0 3px 7px rgba(0,0,0,.1); }
+.filter-icon { display: grid; width: 26px; height: 26px; place-items: center; color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, transparent); border-radius: 8px; }
+.filter-icon svg, .filter-launch svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.filter-badge { min-width: 19px; margin-left: auto; padding: 1px 6px; color: var(--surface); background: var(--danger); border-radius: 999px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.filter-chevron { font-size: 21px; line-height: 1; color: var(--muted); }
 .filter-launch svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
 .filter-summary { margin: 4px 0 0; font-size: 11px; text-align: center; }
 .filter-backdrop { position: fixed; inset: 0; z-index: 10000; opacity: 0; background: rgba(0,0,0,.25); transition: opacity 240ms ease; }
@@ -317,7 +324,29 @@ body.popup main { overflow-y: auto; scrollbar-width: thin; }
 .filter-close { min-width: 28px; min-height: 28px; padding: 0; font-size: 21px; line-height: 1; }
 .filter-popover .hide-filters-body { max-height: 360px; padding: 10px 14px 14px; }
 .filter-note, .filter-page-count { margin: 2px 0; font-size: 11px; }
+.detail-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 4px 0; font-size: 12px; }
+.detail-row strong { text-align: right; font-variant-numeric: tabular-nums; }
+.footer-icon-button { display: inline-grid; width: 28px; min-height: 28px; padding: 3px; place-items: center; color: var(--text); }
+.footer-icon-button svg { width: 21px; height: 21px; }
+@media (prefers-reduced-motion: reduce) { .filter-launch, .filter-launch:hover:not(:disabled), .filter-launch:active:not(:disabled) { transform: none; transition: none; } }
 @media (prefers-reduced-motion: reduce) { .filter-popover { transform: translate(-50%,-50%); transition: opacity 160ms ease; } .filter-popover.is-open, .filter-popover.is-closing { transform: translate(-50%,-50%); } .filter-backdrop { transition-duration: 160ms; } }
 button.filter-chip { min-height: 23px; padding: 2px 7px; color: var(--text); background: var(--surface-2); border-color: var(--border); font-size: 11px; font-weight: 500; }
 .filter-sites { display: grid; gap: 8px; }
 .filter-sites .hide-filters { margin-top: 0; }
+
+/* Round 3: the popup itself never scrolls, so its sections are packed to fit the 600px popup. Only the
+   popovers scroll inside. Details sits right next to the theme button. */
+.popup .popup-header #page-details-toggle { margin-left: auto; }
+.popup .popup-header #theme-toggle { margin-left: -6px; }
+.popup .panel { margin-bottom: 8px; }
+.popup .lists-card { padding: 10px 8px; }
+.lists-card .list-column { gap: 5px; }
+.popup .button-controls { gap: 12px; padding-bottom: 2px; }
+.popup .popup-edge { margin-bottom: 6px; }
+.popup .filter-launch { margin-top: 6px; padding-top: 4px; padding-bottom: 4px; }
+.popup .filter-summary { margin-top: 3px; }
+.popup .panel { padding-top: 10px; padding-bottom: 10px; }
+.popup .toggle-row { gap: 3px; }
+/* Safety net for unusually long status text: still reachable by wheel/keyboard, but no scrollbar is drawn. */
+body.popup main { max-height: 576px; overflow-y: auto; scrollbar-width: none; }
+body.popup main::-webkit-scrollbar { display: none; }

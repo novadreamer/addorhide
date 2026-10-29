@@ -247,13 +247,16 @@ function filterHost(catalogRule) {
 }
 
 function saveFilterRule(host, categories, kinds, keywords) {
+  const wasWatched = HOA.normalizeHideKinds(siteRule(host).hideKinds, categories.map(category => category.id)).includes("watched");
+  const nextKinds = HOA.normalizeHideKinds(kinds, categories.map(category => category.id));
   siteRules = { ...siteRules, [host]: {
     ...siteRule(host),
-    hideKinds: HOA.normalizeHideKinds(kinds, categories.map(category => category.id)),
+    hideKinds: nextKinds,
     hideKeywords: HOA.normalizeKeywords(keywords)
   } };
   siteRulesWrittenHere = true;
   chrome.storage.local.set({ [HOA.SITES_KEY]: siteRules }, () => renderFilterSites());
+  if (wasWatched && !nextKinds.includes("watched")) HOA.clearAutoWatched(host);
 }
 
 function renderFilterSites() {
