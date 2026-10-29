@@ -90,9 +90,13 @@ Regenerating icons: run `python tools/make_icons.py` from this directory.
 
 Build the Chrome Web Store archive with `python tools/package.py .`. It writes the runtime-only archive to `dist/AddOrHide-<version>.zip`.
 
-## Status: 1.0.13
+## Status: 1.1.0
 
-1.0.1 is on the Chrome Web Store. Since then: YouTube search results, Shorts and new layouts everywhere, gap-free
+1.1.0 (in development, not yet released) adds hiding by type and keyword per site (YouTube: Recommended, Watched,
+Shorts, Playlists, Mixes, Live, Music, Gaming, Podcasts, Movies & TV, Posts, Fundraisers, Comments; tailored sets for
+other sites), hidden channels, a Watched label on YouTube thumbnails, and a Page details window in the popup.
+
+1.0.13 is submitted to the Chrome Web Store (1.0.1 is live). Up to 1.0.13: YouTube search results, Shorts and new layouts everywhere, gap-free
 hiding of Shorts, Hide the whole feed on every YouTube page, two installed copies no longer fight (the newest runs
 the page and the other one's popup says so), a redesigned popup (Added Videos and Hidden Videos side by side, a round
 3D power button, arrowhead Position buttons, a GitHub link) and a per-website delete button on the Added page and in

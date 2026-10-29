@@ -364,6 +364,16 @@ window.__hoaLoaded = true;
         }
         node = node.parentElement;
       }
+      // Unknown markup: the first box around the progress bar that is thumbnail-sized, else the card itself.
+      node = progress.parentElement;
+      while (node && node !== card) {
+        const box = node.getBoundingClientRect();
+        if (box.width >= 80 && box.height >= 40) break;
+        node = node.parentElement;
+      }
+      const target = node || card;
+      if (getComputedStyle(target).position === "static") target.style.position = "relative";
+      return target;
     }
     return null;
   }

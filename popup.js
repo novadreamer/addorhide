@@ -86,27 +86,40 @@ function openPopover(triggerButton, titleText, buildBody) {
   const rect = triggerButton.getBoundingClientRect();
   const header = document.createElement("div"); header.className = "filter-popover-header";
   header.appendChild(Object.assign(document.createElement("strong"), { textContent: titleText }));
-  const close = button("×", closePanel); close.className = "filter-close"; close.setAttribute("aria-label", `Close ${titleText}`); header.appendChild(close); panel.appendChild(header);
+  const tools = document.createElement("div"); tools.className = "filter-popover-tools"; header.appendChild(tools);
+  const close = button("×", closePanel); close.className = "filter-close"; close.setAttribute("aria-label", `Close ${titleText}`); tools.appendChild(close); panel.appendChild(header);
   const body = document.createElement("div"); body.className = "hide-filters-body"; panel.appendChild(body);
   const closeOnKey = event => { if (event.key === "Escape") closePanel(); };
   let closing = false;
   function closePanel() { if (closing) return; closing = true; document.removeEventListener("keydown", closeOnKey); if (panel.hoaRefresh) clearInterval(panel.hoaRefresh); panel.classList.add("is-closing"); backdrop.classList.add("is-closing"); setTimeout(() => { panel.remove(); backdrop.remove(); triggerButton.focus(); }, 290); }
   backdrop.addEventListener("click", closePanel); document.addEventListener("keydown", closeOnKey);
-  buildBody(body, panel);
+  buildBody(body, panel, tools);
   document.body.append(backdrop, panel);
   requestAnimationFrame(() => { const left = innerWidth / 2 - panel.offsetWidth / 2; const top = innerHeight / 2 - panel.offsetHeight / 2; panel.style.transformOrigin = `${rect.left + rect.width / 2 - left}px ${rect.top + rect.height / 2 - top}px`; backdrop.classList.add("is-open"); panel.classList.add("is-open"); close.focus(); });
 }
 
 function openPageDetails() {
   openPopover(pageDetailsToggle, "Page details", (body, panel) => {
+    let shown = "";
+    // Rows are built only once the answer is in and swapped in one step, and only when something changed,
+    // so the 2 s refresh never blanks the window.
+    const show = rows => {
+      const key = JSON.stringify(rows);
+      if (key === shown || !panel.isConnected) return;
+      shown = key;
+      const fragment = document.createDocumentFragment();
+      rows.forEach(([label, value]) => { const row = document.createElement("div"); row.className = "detail-row"; row.append(Object.assign(document.createElement("span"), { textContent: label }), Object.assign(document.createElement("strong"), { textContent: String(value) })); fragment.appendChild(row); });
+      body.replaceChildren(fragment);
+    };
+    const version = chrome.runtime.getManifest().version;
     const refresh = () => {
-      body.replaceChildren();
-      const add = (label, value) => { const row = document.createElement("div"); row.className = "detail-row"; row.append(Object.assign(document.createElement("span"), { textContent: label }), Object.assign(document.createElement("strong"), { textContent: value })); body.appendChild(row); };
-      if (!activeTab || !Number.isInteger(activeTab.id)) { add("Page script", "not answering"); add("Extension version", chrome.runtime.getManifest().version); return; }
+      if (!activeTab || !Number.isInteger(activeTab.id)) { show([["Page script", "not answering"], ["Extension version", version]]); return; }
       chrome.tabs.sendMessage(activeTab.id, { type: "hoa-status" }, reply => {
-        if (!panel.isConnected) return;
-        if (!reply) { add("Page script", "not answering"); add("Extension version", chrome.runtime.getManifest().version); return; }
-        add("Page script", `v${reply.version || "?"}`); add("Extension version", chrome.runtime.getManifest().version); add("Cards found", reply.cards || 0); add("Buttons shown", reply.overlays || 0); add("Hidden by you here", reply.hiddenHere || 0); add("Hidden by filters", `${reply.filteredVideos || 0} videos / ${reply.filteredSections || 0} sections`); add("From hidden channels", reply.channelVideos || 0); add("Watched detected", reply.watchedHere || 0); add("Watched labels shown", reply.watchedLabels || 0); if (reply.staleOverlays) add("Stale overlays", reply.staleOverlays);
+        if (chrome.runtime.lastError || !reply) { show([["Page script", "not answering"], ["Extension version", version]]); return; }
+        show([["Page script", `v${reply.version || "?"}`], ["Extension version", version], ["Cards found", reply.cards || 0], ["Buttons shown", reply.overlays || 0],
+          ["Hidden by you here", reply.hiddenHere || 0], ["Hidden by filters", `${reply.filteredVideos || 0} videos / ${reply.filteredSections || 0} sections`],
+          ["From hidden channels", reply.channelVideos || 0], ["Watched detected", reply.watchedHere || 0], ["Watched labels shown", reply.watchedLabels || 0],
+          ...(reply.staleOverlays ? [["Stale overlays", reply.staleOverlays]] : [])]);
       });
     };
     refresh(); panel.hoaRefresh = setInterval(refresh, 2000);
@@ -204,10 +217,9 @@ function appendFilterControls(container, catalogRule) {
   const launch = button("Hide on this site", openPanel);
   launch.className = "secondary-button filter-launch";
   launch.innerHTML = '<span class="filter-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7v5l-4 2v-7z"/></svg></span><span>Hide on this site</span><span class="filter-badge" hidden></span><span class="filter-chevron">›</span>';
-  const summary = document.createElement("p"); summary.className = "muted filter-summary";
-  const updateSummary = () => { const labels = categories.filter(c => kinds.includes(c.id)).map(c => c.label); const count = labels.length + keywords.length; summary.textContent = !count ? "Off" : [...labels, keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", "); const badge = launch.querySelector(".filter-badge"); badge.hidden = !count; badge.textContent = count; launch.classList.toggle("is-active", Boolean(count)); };
+  const updateSummary = () => { const labels = categories.filter(c => kinds.includes(c.id)).map(c => c.label); const count = labels.length + keywords.length; const what = [...labels, keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", "); launch.title = count ? `Hiding: ${what}` : "Nothing is hidden by type or word on this site"; const badge = launch.querySelector(".filter-badge"); badge.hidden = !count; badge.textContent = count; launch.classList.toggle("is-active", Boolean(count)); };
   updateSummary();
-  container.append(launch, summary);
+  container.append(launch);
   function save() {
     const hadWatched = HOA.normalizeHideKinds(siteRule(activeHost).hideKinds, categories.map(c => c.id)).includes("watched");
     const hasWatched = kinds.includes("watched");
@@ -218,9 +230,17 @@ function appendFilterControls(container, catalogRule) {
     window.setTimeout(() => refreshCount(), 400);
   }
   function openPanel() {
-    openPopover(launch, `Hide on ${HOA.siteDisplayName(activeHost)}`, (body, panel) => {
+    openPopover(launch, `Hide on ${HOA.siteDisplayName(activeHost)}`, (body, panel, tools) => {
+      const allIds = categories.map(c => c.id);
+      const eye = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+      const eyeOff = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+      const iconTool = (svg, label, action) => { const tool = button("", action); tool.className = "filter-tool"; tool.innerHTML = svg; tool.title = label; tool.setAttribute("aria-label", label); return tool; };
+      const hideAll = iconTool(eyeOff, "Hide all types on this site", () => { kinds = [...allIds]; save(); redraw(); });
+      const showAll = iconTool(eye, "Unhide all types on this site", () => { kinds = []; save(); redraw(); });
+      tools.prepend(hideAll, showAll);
       const redraw = () => {
         if (panel.hoaRefresh) { window.clearInterval(panel.hoaRefresh); panel.hoaRefresh = 0; }
+        hideAll.disabled = allIds.every(id => kinds.includes(id)); showAll.disabled = !kinds.length;
         body.replaceChildren();
         categories.forEach(category => { const label = document.createElement("label"); label.className = "switch-row"; label.title = category.hint;
           const toggle = document.createElement("input"); toggle.type = "checkbox"; toggle.setAttribute("role", "switch"); toggle.checked = kinds.includes(category.id);
