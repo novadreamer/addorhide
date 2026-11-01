@@ -104,7 +104,7 @@ const HOA_SITES = Object.freeze((() => {
       matches: [matchPattern(hostname, scheme)],
       js: ["shared.js", "catalog.js", "content.js"],
       css: ["content.css"],
-      runAt: "document_idle",
+      runAt: "document_start",
       persistAcrossSessions: true
     };
     chrome.scripting.registerContentScripts([details], () => {

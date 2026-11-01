@@ -120,11 +120,11 @@ var HOA_CATALOG = Object.freeze((() => {
           removeClimb: true
         }),
         Object.freeze({
-          cardSelector: '[data-observer-listener-key]:has(.web-content-tile__label-top-left):has(.web-attributes)',
+          cardSelector: 'div:has(> .web-content-tile__label-top-left):has(.web-attributes)',
           linkSelector: 'a[href^="/movies/"], a[href^="/series/"]',
           titleCandidates: Object.freeze(["h2", "a[title]", "img[alt]"]),
           meta: Object.freeze({ texts: Object.freeze([".web-attributes__year-duration"]), rating: ".web-attributes__rating-badge", genres: ".web-attributes__year-duration" }),
-          removeClimb: true
+          removeSlot: true
         })
       ])
     }),

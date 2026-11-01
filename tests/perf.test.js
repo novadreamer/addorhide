@@ -29,5 +29,5 @@ for (let i = 0; i < 20; i += 1) window.__hoaTest.apply();
 const perPass = (performance.now() - start) / 20;
 console.log(`perf.test.js${process.env.PERF_BASELINE ? " baseline" : ""}: ${perPass.toFixed(2)} ms/pass (400 cards, 10 shelves, 20 passes)`);
 // jsdom's selector engine is materially slower than Chromium's; this remains a regression guard rather than a UI SLA.
-if (!process.env.PERF_BASELINE) assert.ok(perPass < 240, `expected under 240 ms/pass, got ${perPass.toFixed(2)}`);
+if (!process.env.PERF_BASELINE) assert.ok(perPass < 150, `expected under 150 ms/pass, got ${perPass.toFixed(2)}`);
 window.close();

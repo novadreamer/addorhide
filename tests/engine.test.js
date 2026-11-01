@@ -33,12 +33,15 @@ function check(name, fn) {
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function load({ fixture, url, siteRules }) {
+async function load({ fixture, url, siteRules, noBody = false }) {
   const html = fs.readFileSync(path.join(__dirname, "fixtures", fixture), "utf8");
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
     url, runScripts: "outside-only", pretendToBeVisual: true
   });
   const { window } = dom;
+  if (noBody) {
+    window.document.body.remove();
+  }
   const store = { siteRules: siteRules || {} };
   const listeners = [];
   const messageListeners = [];
@@ -261,11 +264,6 @@ const CASES = [
       assert.strictEqual(entry.kind, "short");
       assert.strictEqual(entry.title, "Tiny robot learns to walk");
     }
-  },
-  {
-    name: "tubi featured", fixture: "sites/tubi-featured.html", url: "https://tubitv.com/", host: "tubitv.com",
-    cardSelector: '[data-observer-listener-key]:has(.web-content-tile__label-top-left):has(.web-attributes)', cards: 2, optIn: false,
-    expectAdd(key, entry) { assert.ok(/^https:\/\/tubitv\.com\/series\//.test(key), key); assert.ok(entry.title); }
   },
   ...[
     ["xumo movies", "sites/xumo.html", "https://play.xumo.com/free-movies/", "play.xumo.com", "li.card.titleCard:not(.promoCard)", 8],
@@ -586,10 +584,59 @@ const CASES = [
   }
   {
     const base = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/" });
-    check("Tubi featured cards receive buttons", () => assert.equal(base.document.querySelectorAll(".hoa-actions").length, 2));
+    // The real capture: two cards have links; the third (not yet in view on Tubi) has none, so it gets no buttons.
+    check("Tubi featured cards with links receive buttons", () => assert.equal(base.document.querySelectorAll(".hoa-actions").length, 2));
     base.window.close();
     const page = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/", siteRules: { "tubitv.com": { hideKeywords: ["Comedy"] } } });
     check("filters: Tubi featured cards match hidden genre text", () => assert.ok(page.document.querySelectorAll(".hoa-filtered").length >= 1));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/", siteRules: { "tubitv.com": { hideKeywords: ["Looney Tunes"] } } });
+    const looney = Array.from(page.document.querySelectorAll("img[alt='Looney Tunes']"))[0];
+    check("filters: a Tubi feature card without links still matches keywords (its slot is hidden)", () => assert.ok(looney && looney.closest(".hoa-filtered")));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "tubi-slot.synthetic.html", url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["series"] } } });
+    check("Tubi untracked feature card hides its carousel slot", () => assert.ok(
+      page.document.getElementById("slot-one").classList.contains("hoa-filtered")));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "tubi-collapse.synthetic.html", url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["movies"] } } });
+    check("empty sections collapse only when every card is filtered", () => {
+      assert.ok(page.document.getElementById("all-filtered").classList.contains("hoa-empty"));
+      assert.ok(!page.document.getElementById("one-visible").classList.contains("hoa-empty"));
+    });
+    page.window.chrome.storage.local.set({ siteRules: { "tubitv.com": { hideKinds: [] } } });
+    await wait(40);
+    check("empty sections reappear when filtering turns off", () => assert.ok(
+      !page.document.getElementById("all-filtered").classList.contains("hoa-empty")));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "tubi-collapse.synthetic.html", url: "https://tubitv.com/" });
+    const card = page.document.createElement("div");
+    card.setAttribute("data-test-id", "web-ui-content-tile");
+    card.innerHTML = '<a class="web-content-tile__poster-link" href="/movies/100000004/incremental"></a><a class="web-content-tile__title" href="/movies/100000004/incremental">Incremental</a>';
+    page.document.body.appendChild(card);
+    await Promise.resolve();
+    await Promise.resolve();
+    check("added cards are processed in the observer microtask", () => assert.ok(buttons(card, "hide")));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "tubi-collapse.synthetic.html", url: "https://tubitv.com/", noBody: true });
+    const body = page.document.createElement("body");
+    body.innerHTML = '<div data-test-id="web-ui-content-tile"><a class="web-content-tile__poster-link" href="/movies/100000005/late-body"></a><a class="web-content-tile__title" href="/movies/100000005/late-body">Late body</a></div>';
+    page.document.documentElement.appendChild(body);
+    page.document.dispatchEvent(new page.window.Event("DOMContentLoaded"));
+    await wait(40);
+    check("document-start initialization waits for body and storage before processing cards", () => assert.ok(
+      page.document.querySelector(".hoa-actions")));
     page.window.close();
   }
   {

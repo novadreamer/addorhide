@@ -44,7 +44,7 @@ window.__hoaLoaded = true;
     rootElement.dataset.hoaVersion = ownVersion;
     document.querySelectorAll(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner").forEach(node => node.remove());
     document.querySelectorAll("[data-hoa-watched]").forEach(node => node.removeAttribute("data-hoa-watched"));
-    document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-show"));
+    document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-empty, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-empty", "hoa-show"));
   }
 
   const ACTIVE_CLASS = "hoa-removed";
@@ -64,7 +64,9 @@ window.__hoaLoaded = true;
   let buttonEdge = "top";
   let buttonsEnabled = true;
   let lastApplyAt = 0;
-  let throttleTimer = 0;
+  let listsReady = false;
+  let siteRulesReady = false;
+  let waitingForBody = false;
   let filterVersion = 0;
   let filterSignature = "";
   const patternCache = new Map();
@@ -89,7 +91,7 @@ window.__hoaLoaded = true;
 
   function removeOwnUi() {
     document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"], .hoa-watched-label[data-hoa-owner="${ownInstance}"]`).forEach(node => node.remove());
-    document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-show"));
+    document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-empty, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-empty", "hoa-show"));
     document.querySelectorAll(`[data-hoa-watched="${ownInstance}"]`).forEach(node => node.removeAttribute("data-hoa-watched"));
     ["hoa-toast", "hoa-banner"].forEach(id => {
       const node = document.getElementById(id);
@@ -603,6 +605,14 @@ window.__hoaLoaded = true;
   }
 
   function removalTarget(card, rule) {
+    if (rule.removeSlot) {
+      let target = card;
+      while (target.parentElement && target.parentElement.children.length === 1
+        && !["BODY", "HTML", "MAIN"].includes(target.parentElement.tagName)) {
+        target = target.parentElement;
+      }
+      return target;
+    }
     if (rule.removeClosest) {
       return card.closest(rule.removeClosest) || card;
     }
@@ -1237,8 +1247,8 @@ window.__hoaLoaded = true;
   }
 
   function cleanup() {
-    document.querySelectorAll(".hoa-removed, .hoa-filtered, .hoa-host").forEach(card => {
-      card.classList.remove(ACTIVE_CLASS, FILTER_CLASS, "hoa-host", "hoa-show");
+    document.querySelectorAll(".hoa-removed, .hoa-filtered, .hoa-empty, .hoa-host").forEach(card => {
+      card.classList.remove(ACTIVE_CLASS, FILTER_CLASS, "hoa-empty", "hoa-host", "hoa-show");
       card.querySelectorAll(":scope > .hoa-actions").forEach(node => {
         if (node.hoaPlacementObserver) {
           node.hoaPlacementObserver.disconnect();
@@ -1255,11 +1265,163 @@ window.__hoaLoaded = true;
     }
   }
 
+  function variantsForRule(rule) {
+    return [rule, ...(rule.variants || []).filter(variant => {
+      try {
+        return !variant.pathPattern || new RegExp(variant.pathPattern).test(location.pathname);
+      } catch (error) {
+        return false;
+      }
+    }).map(variant => ({
+      ...rule,
+      ...variant,
+      meta: { ...(rule.meta || {}), ...(variant.meta || {}) }
+    }))];
+  }
+
+  function processCard(card, variant, state) {
+    const { categories, filtered, handled, cards } = state;
+    if (cards) cards.add(card);
+    let parent = card.parentElement;
+    while (parent && parent !== document.body) {
+      if (handled.has(parent)) return;
+      parent = parent.parentElement;
+    }
+    if (handled.has(card) || isAd(card, variant)) {
+      if (isAd(card, variant)) removeActions(card);
+      return;
+    }
+    const data = cardData(card, variant);
+    const target = removalTarget(card, variant);
+    if (!data) {
+      // No link yet (Tubi renders a feature card's links only once it has been in view): no buttons and no
+      // stored hiding, but types and keywords still apply, from the title and text the card already shows.
+      removeActions(card);
+      target.classList.remove(ACTIVE_CLASS);
+      let title = "";
+      for (const selector of variant.titleCandidates || []) {
+        try { title = textFrom(card.querySelector(selector)); } catch (error) { title = ""; }
+        if (title) break;
+      }
+      const image = title ? null : card.querySelector("img[alt]");
+      title = title || (image ? (image.getAttribute("alt") || "").trim() : "");
+      if (shouldFilterCard(card, variant, { key: "", title }, categories)) {
+        filtered.add(target);
+        card.dataset.hoaWhy = "filter";
+      } else {
+        delete card.dataset.hoaWhy;
+      }
+      handled.add(card);
+      return;
+    }
+    const isWatched = watchedCard(card, variant);
+    const cardCategories = isWatched && watchedShown[data.key]
+      ? { ...categories, selected: categories.selected.filter(category => category.id !== "watched") } : categories;
+    if (hiddenChannel(card, variant)) {
+      removeActions(card);
+      ensureWatchedLabel(card, variant, false);
+      target.classList.remove(ACTIVE_CLASS);
+      filtered.add(target);
+      card.dataset.hoaWhy = "channel";
+    } else if (hidden[data.key]) {
+      removeActions(card);
+      ensureWatchedLabel(card, variant, false);
+      target.classList.add(ACTIVE_CLASS);
+      target.classList.remove(FILTER_CLASS);
+      delete card.dataset.hoaWhy;
+    } else if (isWatched && watchedEnabled(categories) && !watchedShown[data.key]) {
+      queueWatched({ ...data, ...cardMeta(card, variant, data.key) });
+      removeActions(card);
+      ensureWatchedLabel(card, variant, false);
+      target.classList.add(ACTIVE_CLASS);
+      target.classList.remove(FILTER_CLASS);
+      delete card.dataset.hoaWhy;
+    } else {
+      const link = getLink(card, variant);
+      const decisionSignature = `${data.key}|${link ? (link.getAttribute("href") || link.href || "") : ""}|${filterVersion}`
+        + `|${card.getElementsByTagName("*").length}|${(card.textContent || "").length}`;
+      const cached = decisionCache.get(card);
+      const shouldFilter = cached && cached.signature === decisionSignature ? cached.outcome
+        : shouldFilterCard(card, variant, data, cardCategories);
+      if (!cached || cached.signature !== decisionSignature) decisionCache.set(card, { signature: decisionSignature, outcome: shouldFilter });
+      if (shouldFilter) {
+        removeActions(card);
+        ensureWatchedLabel(card, variant, false);
+        target.classList.remove(ACTIVE_CLASS);
+        filtered.add(target);
+        card.dataset.hoaWhy = "filter";
+      } else {
+        target.classList.remove(ACTIVE_CLASS, FILTER_CLASS);
+        delete card.dataset.hoaWhy;
+        ensureWatchedLabel(card, variant, isWatched);
+        ensureActions(card, data, variant);
+      }
+    }
+    handled.add(card);
+  }
+
+  function usableImage(node) {
+    const rect = node.getBoundingClientRect();
+    const hasLayout = Boolean(rect.width || rect.height);
+    const largeEnough = !hasLayout || rect.width > 40 || rect.height > 40;
+    if (node.matches("img")) return largeEnough;
+    const background = node.style && node.style.backgroundImage;
+    return Boolean(largeEnough && background && background !== "none" && /url\(/i.test(background));
+  }
+
+  function visibleForCollapse(node) {
+    for (let parent = node; parent; parent = parent.parentElement) {
+      if (parent.hidden || parent.classList.contains(ACTIVE_CLASS) || parent.classList.contains(FILTER_CLASS)) return false;
+    }
+    return true;
+  }
+
+  function collapseEmptySections(rule, variants, filtered, matchedCards = null) {
+    document.querySelectorAll(".hoa-empty").forEach(node => node.classList.remove("hoa-empty"));
+    const selector = variants.map(variant => variant.cardSelector).filter(Boolean).join(", ");
+    if (!selector) return;
+    const excluded = "html, body, main, [role=main], #root, #__next, #app, ytd-app, ytd-page-manager, ytd-browse, ytd-rich-grid-renderer, ytd-two-column-browse-results-renderer";
+    const candidates = new Set();
+    filtered.forEach(target => {
+      let parent = target;
+      for (let level = 0; level < 6 && parent; level += 1) {
+        parent = parent.parentElement;
+        if (!parent || parent.matches(excluded)) break;
+        const rect = parent.getBoundingClientRect();
+        if (rect.height && window.innerHeight && rect.height > window.innerHeight * 1.5) break;
+        candidates.add(parent);
+      }
+    });
+    const occupied = new Set();
+    const markAncestors = node => {
+      for (let parent = node.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+        if (candidates.has(parent)) occupied.add(parent);
+      }
+    };
+    (matchedCards || document.querySelectorAll(selector)).forEach(card => {
+      if (visibleForCollapse(card)) markAncestors(card);
+    });
+    document.querySelectorAll("img, [style*='background']").forEach(node => {
+      if (usableImage(node) && visibleForCollapse(node)) markAncestors(node);
+    });
+    const empty = new Set(Array.from(candidates).filter(section => !occupied.has(section)));
+    Array.from(empty).filter(section => !Array.from(empty).some(other => other !== section && other.contains(section)))
+      .forEach(section => section.classList.add("hoa-empty"));
+  }
+
   function apply() {
     if (!ensureContext()) {
       return;
     }
     scheduled = 0;
+    if (!listsReady || !siteRulesReady) return;
+    if (!document.body) {
+      if (!waitingForBody) {
+        waitingForBody = true;
+        document.addEventListener("DOMContentLoaded", () => { waitingForBody = false; scheduleApply(); }, { once: true });
+      }
+      return;
+    }
     passCardText = new WeakMap();
     passFilterText = new WeakMap();
     const rule = hostnameRule();
@@ -1278,27 +1440,8 @@ window.__hoaLoaded = true;
       filterSignature = nextSignature;
       filterVersion += 1;
     }
-    const variants = [rule, ...(rule.variants || []).filter(variant => {
-      // A variant can be limited to some pages (YouTube's creator-page lockups).
-      try {
-        return !variant.pathPattern || new RegExp(variant.pathPattern).test(location.pathname);
-      } catch (error) {
-        return false;
-      }
-    }).map(variant => ({
-      ...rule,
-      ...variant,
-      meta: { ...(rule.meta || {}), ...(variant.meta || {}) }
-    }))];
+    const variants = variantsForRule(rule);
     const handled = new Set();
-    const alreadyHandled = card => {
-      let parent = card.parentElement;
-      while (parent && parent !== document.body) {
-        if (handled.has(parent)) return true;
-        parent = parent.parentElement;
-      }
-      return false;
-    };
     if (rule.bulkHide && (!rule.bulkHidePattern || new RegExp(rule.bulkHidePattern).test(location.pathname))) {
       document.querySelectorAll(`.${FILTER_CLASS}`).forEach(node => node.classList.remove(FILTER_CLASS));
       // Whole-feed mode also takes cards that never get buttons (YouTube playlists, podcasts, courses).
@@ -1326,68 +1469,11 @@ window.__hoaLoaded = true;
     // YouTube is streaming mutations through its feed.
     const filtered = new Set();
     const categories = activeCategories(rule);
+    const cards = new Set();
+    const cardState = { categories, filtered, handled, cards };
     filterContainers(rule, categories, filtered);
-    variants.forEach(variant => Array.from(document.querySelectorAll(variant.cardSelector)).forEach(card => {
-      if (handled.has(card) || alreadyHandled(card)) {
-        return;
-      }
-      if (isAd(card, variant)) {
-        removeActions(card);
-        return;
-      }
-      const data = cardData(card, variant);
-      const target = removalTarget(card, variant);
-      if (!data) {
-        removeActions(card);
-        target.classList.remove(ACTIVE_CLASS);
-        return;
-      }
-      const isWatched = watchedCard(card, variant);
-      // A restored watched item is an explicit opt-out from the persistent Watched switch, not merely from the
-      // storage write.  Remove only that category for this card; other selected filters still apply.
-      const cardCategories = isWatched && watchedShown[data.key]
-        ? { ...categories, selected: categories.selected.filter(category => category.id !== "watched") } : categories;
-      if (hiddenChannel(card, variant)) {
-        removeActions(card);
-        ensureWatchedLabel(card, variant, false);
-        target.classList.remove(ACTIVE_CLASS);
-        filtered.add(target);
-        card.dataset.hoaWhy = "channel";
-      } else if (hidden[data.key]) {
-        removeActions(card);
-        ensureWatchedLabel(card, variant, false);
-        target.classList.add(ACTIVE_CLASS);
-        delete card.dataset.hoaWhy;
-      } else if (isWatched && watchedEnabled(categories) && !watchedShown[data.key]) {
-        queueWatched({ ...data, ...cardMeta(card, variant, data.key) });
-        removeActions(card);
-        ensureWatchedLabel(card, variant, false);
-        target.classList.add(ACTIVE_CLASS);
-        delete card.dataset.hoaWhy;
-      } else {
-        const link = getLink(card, variant);
-        // Badges and channel rows render after the title, so the card's size is part of the signature.
-        const decisionSignature = `${data.key}|${link ? (link.getAttribute("href") || link.href || "") : ""}|${filterVersion}`
-          + `|${card.getElementsByTagName("*").length}|${(card.textContent || "").length}`;
-        const cached = decisionCache.get(card);
-        const shouldFilter = cached && cached.signature === decisionSignature ? cached.outcome
-          : shouldFilterCard(card, variant, data, cardCategories);
-        if (!cached || cached.signature !== decisionSignature) decisionCache.set(card, { signature: decisionSignature, outcome: shouldFilter });
-        if (shouldFilter) {
-        removeActions(card);
-        ensureWatchedLabel(card, variant, false);
-        target.classList.remove(ACTIVE_CLASS);
-        filtered.add(target);
-        card.dataset.hoaWhy = "filter";
-        } else {
-        target.classList.remove(ACTIVE_CLASS);
-        delete card.dataset.hoaWhy;
-        ensureWatchedLabel(card, variant, isWatched);
-        ensureActions(card, data, variant);
-        }
-      }
-      handled.add(card);
-    }));
+    variants.forEach(variant => Array.from(document.querySelectorAll(variant.cardSelector))
+      .forEach(card => processCard(card, variant, cardState)));
     // Collection cards outside the normal video variants (notably playlist lockups) still expose a channel name.
     // They have no per-video hidden key, but a hidden channel should remove them just like videos and Shorts.
     if (rule.id === "youtube" && Object.keys(channels).length) {
@@ -1411,24 +1497,50 @@ window.__hoaLoaded = true;
     }
     document.querySelectorAll(`.${FILTER_CLASS}`).forEach(node => { if (!filtered.has(node)) node.classList.remove(FILTER_CLASS); });
     filtered.forEach(node => node.classList.add(FILTER_CLASS));
+    collapseEmptySections(rule, variants, filtered, cards);
   }
 
-  function scheduleApply(immediate = false) {
-    if (immediate) {
-      if (scheduled) window.cancelAnimationFrame(scheduled);
-      if (throttleTimer) window.clearTimeout(throttleTimer);
-      scheduled = 0; throttleTimer = 0;
+  function scheduleApply() {
+    if (scheduled) return;
+    scheduled = window.requestAnimationFrame(() => { lastApplyAt = Date.now(); apply(); });
+  }
+
+  function applyAdded(nodes) {
+    if (!listsReady || !siteRulesReady || !document.body || !ensureContext()) return;
+    const rule = hostnameRule();
+    if (!rule || (rule.bulkHide && (!rule.bulkHidePattern || new RegExp(rule.bulkHidePattern).test(location.pathname)))) {
+      scheduleApply();
+      return;
     }
-    if (scheduled || throttleTimer) return;
-    const delay = Math.max(0, 120 - (Date.now() - lastApplyAt));
-    if (delay) {
-      throttleTimer = window.setTimeout(() => { throttleTimer = 0; scheduled = window.requestAnimationFrame(() => { lastApplyAt = Date.now(); apply(); }); }, delay);
-    } else {
-      scheduled = window.requestAnimationFrame(() => { lastApplyAt = Date.now(); apply(); });
-    }
+    const variants = variantsForRule(rule);
+    const categories = activeCategories(rule);
+    const filtered = new Set();
+    const handled = new Set();
+    const cardState = { categories, filtered, handled };
+    filterContainers(rule, categories, filtered);
+    const matches = new Map();
+    const addMatches = (node, variant) => {
+      if (!node || node.nodeType !== 1) return;
+      try {
+        if (node.matches(variant.cardSelector)) matches.set(node, variant);
+        node.querySelectorAll(variant.cardSelector).forEach(card => matches.set(card, variant));
+        const parent = node.closest(variant.cardSelector);
+        if (parent) matches.set(parent, variant);
+      } catch (error) {
+        // A stale optional selector is handled by the next full pass.
+      }
+    };
+    nodes.forEach(node => {
+      const element = node.nodeType === 1 ? node : node.parentElement;
+      variants.forEach(variant => addMatches(element, variant));
+    });
+    matches.forEach((variant, card) => processCard(card, variant, cardState));
+    filtered.forEach(node => node.classList.add(FILTER_CLASS));
+    const allFiltered = new Set([...document.querySelectorAll(`.${FILTER_CLASS}`), ...filtered]);
+    collapseEmptySections(rule, variants, allFiltered);
   }
   // Narrow test seam: production pages never create __hoaTest.
-  if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, activeCategories, keywordMatch: HOA.keywordMatch });
+  if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, applyAdded, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, activeCategories, keywordMatch: HOA.keywordMatch });
 
   function isOwnMutation(mutation) {
     return mutation.target.closest && mutation.target.closest(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner");
@@ -1465,10 +1577,12 @@ window.__hoaLoaded = true;
     added = lists.added;
     channels = lists.channels;
     watchedShown = lists.watchedShown;
+    listsReady = true;
     scheduleApply();
   });
   chrome.storage.local.get({ [HOA.SITES_KEY]: {} }, result => {
     siteRules = result[HOA.SITES_KEY] && typeof result[HOA.SITES_KEY] === "object" ? result[HOA.SITES_KEY] : {};
+    siteRulesReady = true;
     scheduleApply();
   });
   chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -1531,10 +1645,14 @@ window.__hoaLoaded = true;
     if (!ensureContext()) {
       return;
     }
-    if (mutations.some(needsApply)) {
-      if (mutations.some(mutation => mutation.type === "childList")) containerFilterCache = null;
-      scheduleApply();
+    const childMutations = mutations.filter(mutation => mutation.type === "childList" && !isOwnMutation(mutation));
+    if (childMutations.length) {
+      containerFilterCache = null;
+      const addedNodes = childMutations.flatMap(mutation => Array.from(mutation.addedNodes));
+      if (addedNodes.length) applyAdded(addedNodes);
+      if (childMutations.some(mutation => mutation.removedNodes.length)) scheduleApply();
     }
+    if (mutations.some(mutation => mutation.type === "attributes" && needsApply(mutation))) scheduleApply();
   });
   observeRuleRoot(hostnameRule());
   // The popup asks this to show how many videos the active rule recognised on the current page.
@@ -1590,16 +1708,18 @@ window.__hoaLoaded = true;
         const cardTargets = new Set(rule ? matchedCards.map(card => removalTarget(card, rule)) : matchedCards);
         const hiddenHere = matchedCards.filter(card => (rule ? removalTarget(card, rule) : card).classList.contains(ACTIVE_CLASS));
         const filteredSections = outer(Array.from(document.querySelectorAll(`.${FILTER_CLASS}`)), `.${FILTER_CLASS}`)
-          .filter(node => !cardTargets.has(node) && !matchedCards.includes(node) && !(union && node.matches(union)));
+          .filter(node => !cardTargets.has(node) && !matchedCards.includes(node) && !(union && node.matches(union))
+            && !node.closest(".hoa-empty"));
+        const collapsedSections = outer(Array.from(document.querySelectorAll(".hoa-empty")), ".hoa-empty");
         sendResponse({
           active: Boolean(rule), cards, pathMatched, version, bulk: bulkApplied,
           overlays: Array.from(document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"]:not(.hoa-float)`))
             .filter(actions => actions.parentElement && actions.parentElement.getClientRects().length).length,
           staleOverlays: document.querySelectorAll(`.hoa-actions:not([data-hoa-owner="${ownInstance}"])`).length,
           hiddenHere: hiddenHere.length,
-          filteredHere: filteredVideos.length + filteredSections.length,
+          filteredHere: filteredVideos.length + filteredSections.length + collapsedSections.length,
           filteredVideos: filteredVideos.length,
-          filteredSections: filteredSections.length,
+          filteredSections: filteredSections.length + collapsedSections.length,
           channelVideos: channelVideos.length,
           watchedHere: rule ? matchedCards.filter(card => watchedCard(card, rule)).length : 0,
           watchedLabels: document.querySelectorAll(`[data-hoa-watched="${ownInstance}"]`).length
