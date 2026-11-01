@@ -19,6 +19,11 @@ var HOA_CATALOG = Object.freeze((() => {
     "#video-title", "a#video-title-link", "yt-formatted-string#video-title",
     ".yt-lockup-metadata-view-model-wiz__title", "h3 a[title]", "a[title]"
   ]);
+  const RECOMMENDED_SHELF_TITLE = "^(Recommended|For You|Top Picks|Picked for You|Because You Watched|Suggested|You Might Like|You May Also Like|More Like This)";
+  const FOREIGN_TEXT = "Foreign|International|Anime|Bollywood|K-Drama|Korean Drama|Telenovela|En Español|Español|Spanish|Latino|Subtitled|Subtitulado|Subbed|Doblad[oa]";
+  const FOREIGN_SHELF_TITLE = "Foreign|International|En Español|Español|Spanish|Latino|Anime|K-Drama|Bollywood|Telenovela";
+  const ENGLISH_DUB_TEXT = "\\(Dubbed\\)|English Dub(bed)?|\\bDub\\b";
+  const DUBBED_TEXT = "\\(Dubbed\\)|English Dub(bed)?|\\(Español\\)|Doblad[oa]|\\bDub(bed)?\\b";
   const rules = Object.freeze([
     Object.freeze({
       id: "youtube",
@@ -97,12 +102,17 @@ var HOA_CATALOG = Object.freeze((() => {
         rating: ".web-rating",
         genres: ".web-content-tile__tags"
       }),
+      sections: Object.freeze([{ container: 'section:has([data-test-id="web-ui-grid-container"])', title: "" }]),
       categories: Object.freeze([
         { id: "movies", label: "Movies", hint: "Movie tiles", card: { href: "^/movies/" } },
         { id: "series", label: "TV shows", hint: "Series tiles", card: { href: "^/series/" } },
         { id: "live", label: "Live TV", hint: "Live channels", card: { href: "^/live/", text: "\\bLive\\b" } },
         { id: "kids", label: "Kids & family", hint: "Kids, family and animation", card: { text: "Kids|Family|Animation" }, shelfTitle: "Kids|Family|Animation" },
         { id: "spanish", label: "En español", hint: "Spanish-language rows and tiles", card: { text: "Español|Spanish" }, shelfTitle: "Español|Spanish" },
+        { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", card: { text: "For You In" }, shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
         { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
         { id: "mature", label: "Mature only", hint: "Rated R, NC-17, TV-MA, X, or 18+", card: { ratings: ["R", "NC17", "TVMA", "X", "18+"] } }
       ]),
@@ -211,32 +221,47 @@ var HOA_CATALOG = Object.freeze((() => {
     Object.freeze({
       id: "xumo", name: "Xumo Play", builtIn: false, hosts: Object.freeze(["play.xumo.com"]), subdomains: false,
       cardSelector: "li.card.titleCard:not(.promoCard)", removeClosest: "li.card.titleCard", linkSelector: "a[href]", titleCandidates: Object.freeze(["a[aria-label]", "img[alt]"]),
+      sections: Object.freeze([{ container: "div.cardList", title: "div.listHeader" }]),
       categories: Object.freeze([
         { id: "movies", label: "Movies", hint: "On-demand movies", card: { href: "/free-movies/" } },
         { id: "tv", label: "TV shows", hint: "On-demand TV series", card: { href: "/tv-shows/" } },
-        { id: "live", label: "Live channels", hint: "Live guide and network channels", card: { href: "/live-guide/|/networks/" } }
+        { id: "live", label: "Live channels", hint: "Live guide and network channels", card: { href: "/live-guide/|/networks/" } },
+        { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
       ])
     }),
     Object.freeze({
       id: "pluto", name: "Pluto TV", builtIn: false, hosts: Object.freeze(["pluto.tv"]), subdomains: true,
       cardSelector: 'div.swiper-slide:has(a[data-testid="region-link"]), a[data-testid="region-link"]:not(div.swiper-slide a[data-testid="region-link"])', removeClosest: 'div.swiper-slide, a[data-testid="region-link"]', linkSelector: 'a[data-testid="region-link"]', titleCandidates: Object.freeze(["a[aria-label]", "img[alt]"]),
       pageData: Object.freeze({ script: "script#__NEXT_DATA__", idFromHref: "(?:movies|shows|series)/([0-9a-f]{24})", idKeys: Object.freeze(["id", "contentId", "movieId"]), fields: Object.freeze({ cast: "castNames", genres: "genre", description: "description", rating: "regionalRating.rating", kids: "isKidsContent" }) }),
+      sections: Object.freeze([{ container: "div.vds-carousel", title: ".vds-carousel__title-medium" }]),
       categories: Object.freeze([
         { id: "movies", label: "Movies", hint: "Movie tiles", card: { href: "/movies/" } },
         { id: "tv", label: "TV shows", hint: "Series tiles", card: { href: "/shows/|/series/" } },
         { id: "live", label: "Live TV", hint: "Live TV tiles", card: { href: "/live-tv/" } },
         { id: "kids", label: "Kids & family", hint: "Tiles marked as kids content", card: { kids: true } },
-        { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } }
+        { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
+        { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
       ])
     }),
     Object.freeze({
       id: "roku", name: "The Roku Channel", builtIn: false, hosts: Object.freeze(["therokuchannel.roku.com"]), subdomains: false,
       cardSelector: "li.movie, li.series, li[data-row][data-col]", removeClosest: "li.movie, li.series, li[data-row][data-col]", linkSelector: 'a[itemprop="url"]', titleCandidates: Object.freeze(["[aria-label]", 'meta[itemprop="name"]']),
       meta: Object.freeze({ texts: Object.freeze([".title-label", '[data-test-id="content-indicator-container"]']) }),
+      sections: Object.freeze([{ container: "div.roku-collection-row", title: ".roku-collection-row__title" }]),
       categories: Object.freeze([
         { id: "movies", label: "Movies", hint: "Movie tiles", card: { is: "li.movie" } },
         { id: "tv", label: "TV shows", hint: "Series tiles", card: { is: "li.series" } },
-        { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } }
+        { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
+        { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
       ])
     }),
     Object.freeze({
@@ -244,7 +269,11 @@ var HOA_CATALOG = Object.freeze((() => {
       cardSelector: '[class*="carousel-default-styles__item"]', removeClosest: '[class*="carousel-default-styles__item"]', linkSelector: 'a[href*="/content/browse/details/"]', titleCandidates: Object.freeze(["img[alt]", "a[aria-label]"]),
       categories: Object.freeze([
         { id: "free", label: "Free with ads", hint: "Free or Free to Watch titles", card: { text: "Free to Watch|\\bFree\\b" } },
-        { id: "paid", label: "Rent or buy", hint: "Titles that are not marked free", fallback: true }
+        { id: "paid", label: "Rent or buy", hint: "Titles that are not marked free", fallback: true },
+        { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
       ])
     }),
     Object.freeze({
@@ -253,7 +282,10 @@ var HOA_CATALOG = Object.freeze((() => {
       categories: Object.freeze([
         { id: "series", label: "Series", hint: "Series cards", card: { href: "/series/" } },
         { id: "movies", label: "Movies", hint: "Movies and movie labels", card: { href: "/watch/", text: "\\bMovie\\b" } },
-        { id: "dubbed", label: "Dubbed", hint: "Cards with a Dub label", card: { text: "\\bDub(bed)?\\b" } },
+        { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { has: "a[href]" }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { has: "a[href]", withoutText: ENGLISH_DUB_TEXT } },
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
         { id: "subbed", label: "Subtitled only", hint: "Cards marked Sub or Subtitled, without a dub", card: { text: "\\bSub(titled)?\\b", withoutText: "\\bDub(bed)?\\b" } }
       ])
     }),
@@ -292,7 +324,12 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "vix", name: "ViX", builtIn: false, hosts: Object.freeze(["vix.com"]), subdomains: true,
-      cardSelector: '[data-testid="content-card"]', removeClosest: '[data-testid="content-card"]', linkSelector: 'a[href^="/detail/"]', titleCandidates: Object.freeze(["img[alt]", "h3"]), categories: Object.freeze([])
+      cardSelector: '[data-testid="content-card"]', removeClosest: '[data-testid="content-card"]', linkSelector: 'a[href^="/detail/"]', titleCandidates: Object.freeze(["img[alt]", "h3"]), categories: Object.freeze([
+        { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { has: "a[href]" }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { has: "a[href]", withoutText: ENGLISH_DUB_TEXT } },
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
+      ])
     }),
     Object.freeze({
       id: "shout", name: "Shout! TV", builtIn: false, hosts: Object.freeze(["shout-tv.com"]), subdomains: true,
@@ -300,7 +337,11 @@ var HOA_CATALOG = Object.freeze((() => {
       categories: Object.freeze([
         { id: "live", label: "Live", hint: "Live channels", card: { has: '[data-card-type="LIVE"]' } },
         { id: "vod", label: "Movies & episodes", hint: "On-demand titles", card: { has: '[data-card-type="VOD"]' } },
-        { id: "signin", label: "Needs sign-up", hint: "Titles that require sign-in", card: { has: '[data-access-level="GRANTED_ON_SIGN_IN"]' } }
+        { id: "signin", label: "Needs sign-up", hint: "Titles that require sign-in", card: { has: '[data-access-level="GRANTED_ON_SIGN_IN"]' } },
+        { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
       ])
     }),
     Object.freeze({

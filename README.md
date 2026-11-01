@@ -65,6 +65,8 @@ Each supported site has optional per-site filters in the popup and Options page.
 
 Tubi, Pluto TV and The Roku Channel offer **Unsafe for children**. It filters cards rated PG-13, TV-14, R, NC-17, TV-MA, X, 16+/18+, or unrated, using card ratings and Pluto's page data where available. Tubi also offers **Mature only**, the stricter R/NC-17/TV-MA/X/18+ set. Filtered cards disappear only from the current page: they are not added to Hidden Videos, and turning a category off or removing a word brings them back on the next page update.
 
+Tubi, Pluto TV, Xumo Play, The Roku Channel, Fandango at Home, Crunchyroll, ViX and Shout! TV can also hide **Foreign movies & TV**, **Not in English**, and **Dubbed** versions. **Not in English** keeps English-dubbed versions while still matching Spanish dubs and subtitled titles. Their **Recommended** filter hides recommendation rows; on Tubi it also catches “For You In …” feature cards.
+
 On YouTube, Twitch, Odysee, Kick and Rumble, you can hide every video from a channel directly from a card. YouTube can also hide watched videos (detected from YouTube's progress bar) and comments. Watched videos are saved in **Hidden Videos** so they remain hidden until restored; restored watched videos are remembered so the switch does not immediately hide them again. The Hidden Videos window keeps hidden **Channels** and **Watched Videos** in their own sections.
 
 ## Support link

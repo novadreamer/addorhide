@@ -284,8 +284,7 @@ body.popup main { overflow: visible; scrollbar-width: auto; }
 /* The arrow buttons sit on the centre line (under Enable); "Position" hangs to their left. */
 .button-controls .position-row { display: grid; grid-template-columns: 1fr auto 1fr; justify-self: stretch; }
 .button-controls .position-row #position-label { justify-self: end; }
-/* Breathing room under the position arrows (popup footer / end of the options panel). */
-.button-controls { padding-bottom: 14px; }
+/* The popup applies breathing room under the position arrows only when it still fits. */
 .popup .popup-edge { margin-bottom: 14px; }
 
 /* Optional Ko-fi tip link: quiet text link, never a button that competes with the real controls. */
@@ -361,3 +360,4 @@ button.filter-tool { display: grid; width: 30px; min-width: 30px; min-height: 30
 button.filter-tool svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 button.filter-tool:disabled { opacity: .4; cursor: default; }
 .popup .popup-footer .footer-icon-button { width: 30px; min-width: 30px; padding: 3px; }
+.popup .button-controls.popup-position-room { padding-bottom: var(--popup-position-room, 14px); }

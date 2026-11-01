@@ -10,6 +10,7 @@ const siteContent = document.getElementById("site-content");
 const siteStatus = document.getElementById("site-status");
 const themeToggle = document.getElementById("theme-toggle");
 const pageDetailsToggle = document.getElementById("page-details-toggle");
+const popupMain = document.querySelector("body.popup main");
 
 let hidden = {};
 let added = {};
@@ -17,6 +18,28 @@ let channels = {};
 let activeTab = null;
 let activeHost = "";
 let siteRulesWrittenHere = false;
+let positionRoomFrame = 0;
+
+function fitPositionBreathingRoom() {
+  positionRoomFrame = 0;
+  const controls = document.querySelector(".popup .button-controls");
+  if (!controls || !popupMain) return;
+  controls.classList.remove("popup-position-room");
+  controls.style.removeProperty("--popup-position-room");
+  const mainOverflows = popupMain.clientHeight > 0 && popupMain.scrollHeight > popupMain.clientHeight + 1;
+  // Measure the content itself (the document's height is at least the window's, which can already be 600).
+  const used = Math.ceil(popupMain.getBoundingClientRect().bottom + (parseFloat(getComputedStyle(document.body).paddingBottom) || 0));
+  const space = 600 - used;
+  const padding = space >= 14 ? 14 : (space >= 6 ? space : 0);
+  if (!mainOverflows && padding >= 6) {
+    controls.style.setProperty("--popup-position-room", `${padding}px`);
+    controls.classList.add("popup-position-room");
+  }
+}
+
+function schedulePositionBreathingRoom() {
+  if (!positionRoomFrame) positionRoomFrame = requestAnimationFrame(fitPositionBreathingRoom);
+}
 
 // Permissions are requested for the scheme the tab is really on (https almost everywhere).
 // Asks the content script on the active tab how many videos it recognised, so a silent miss is visible.
@@ -27,6 +50,7 @@ function appendPageStatus(container) {
   container.appendChild(line);
   if (!activeTab || typeof activeTab.id !== "number") {
     line.textContent = "";
+    schedulePositionBreathingRoom();
     return;
   }
   chrome.tabs.sendMessage(activeTab.id, { type: "hoa-status" }, reply => {
@@ -60,6 +84,7 @@ function appendPageStatus(container) {
     } else {
       line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"} on this page. Move your mouse over one to see Add and Hide.`;
     }
+    schedulePositionBreathingRoom();
   });
 }
 
@@ -271,6 +296,7 @@ function renderSite() {
   setSiteStatus("");
   if (!activeTab || !HOA_SITES.isSupportedPageUrl(activeTab.url || "")) {
     siteContent.textContent = "AddOrHide can't run on this page.";
+    schedulePositionBreathingRoom();
     return;
   }
   const isBuiltIn = HOA_SITES.isBuiltIn(activeHost);
@@ -300,6 +326,7 @@ function renderSite() {
     label.appendChild(document.createTextNode(" Hide the whole feed"));
     siteContent.appendChild(label);
     appendFilterControls(siteContent, catalogRule);
+    schedulePositionBreathingRoom();
     return;
   }
   const renderEnabled = granted => {
@@ -331,6 +358,7 @@ function renderSite() {
         });
       }, activeScheme());
     }));
+    schedulePositionBreathingRoom();
     return;
   }
   const heading = document.createElement("p");
@@ -393,6 +421,7 @@ function renderSite() {
   forgetSite.className = "link-button";
   links.appendChild(forgetSite);
   siteContent.appendChild(links);
+  schedulePositionBreathingRoom();
   };
   chrome.permissions.contains({ origins: [HOA_SITES.matchPattern(activeHost, activeScheme())] }, renderEnabled);
 }
@@ -432,6 +461,7 @@ function render() {
   const addedCount = Object.keys(added || {}).length;
   openAddedButton.disabled = addedCount === 0;
   addedSummary.textContent = HOA.addedCountText(addedCount, HOA.groupBySite(added).length);
+  schedulePositionBreathingRoom();
 }
 
 openHiddenButton.addEventListener("click", () => {

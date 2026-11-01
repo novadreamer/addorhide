@@ -33,8 +33,8 @@ function check(name, fn) {
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function load({ fixture, url, siteRules, noBody = false }) {
-  const html = fs.readFileSync(path.join(__dirname, "fixtures", fixture), "utf8");
+async function load({ fixture, html: suppliedHtml, url, siteRules, noBody = false, testSeam = false }) {
+  const html = suppliedHtml === undefined ? fs.readFileSync(path.join(__dirname, "fixtures", fixture), "utf8") : suppliedHtml;
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
     url, runScripts: "outside-only", pretendToBeVisual: true
   });
@@ -68,6 +68,7 @@ async function load({ fixture, url, siteRules, noBody = false }) {
       onChanged: { addListener: listener => listeners.push(listener) }
     }
   };
+  if (testSeam) window.__hoaTest = {};
   window.eval(bundle);
   await wait(120);
   const status = () => new Promise(resolve => {
@@ -75,7 +76,7 @@ async function load({ fixture, url, siteRules, noBody = false }) {
     messageListeners.forEach(listener => listener({ type: "hoa-status" }, {}, reply => { if (!answered) { answered = true; resolve(reply); } }));
     if (!messageListeners.length) resolve(null);
   });
-  return { window, document: window.document, store, status };
+  return { window, document: window.document, store, status, test: window.__hoaTest };
 }
 
 const buttons = (card, action) => card.querySelector(`:scope > .hoa-actions [data-action="${action}"]`);
@@ -426,6 +427,105 @@ const CASES = [
       siteRules: { "tubitv.com": { hideKinds: ["movies"] } } });
     check("filters: Tubi movie links hide as movies", () => assert.strictEqual(
       page.document.querySelectorAll('[data-test-id="web-ui-grid-item"].hoa-filtered').length, 3));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/tubi-sections.html", url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["recommended"] } } });
+    const sectionFor = title => Array.from(page.document.querySelectorAll(".web-row-header__title"))
+      .find(node => node.textContent.trim() === title).closest("section");
+    check("filters: Recommended hides Tubi's Recommended section and keeps On Now", () => {
+      assert.ok(sectionFor("Recommended").classList.contains("hoa-filtered"));
+      assert.ok(!sectionFor("On Now").classList.contains("hoa-filtered"));
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ html: '<div class="cardList" id="recommended"><div class="listHeader">Recommended For You</div></div><div class="cardList" id="popular"><div class="listHeader">Most Popular</div></div>',
+      url: "https://play.xumo.com/", siteRules: { "play.xumo.com": { enabled: true, hideKinds: ["recommended"] } } });
+    check("filters: Recommended hides Xumo's Recommended For You row only", () => {
+      assert.ok(page.document.getElementById("recommended").classList.contains("hoa-filtered"));
+      assert.ok(!page.document.getElementById("popular").classList.contains("hoa-filtered"));
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/roku-sections.html", url: "https://therokuchannel.roku.com/",
+      siteRules: { "therokuchannel.roku.com": { enabled: true, hideKinds: ["recommended"] } } });
+    check("filters: Recommended hides Roku's Recommended for You row", () => assert.ok(
+      page.document.querySelector(".roku-collection-row__title").closest(".roku-collection-row").classList.contains("hoa-filtered")));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["recommended"] } } });
+    check("filters: Tubi For You In feature cards are Recommended", () => assert.ok(
+      page.document.querySelectorAll(".hoa-filtered").length >= 2));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/tubi-foreign.html", url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["foreign", "not-english"] } } });
+    check("filters: Tubi Foreign/International tiles match Foreign and Not in English", () => assert.ok(
+      page.document.querySelectorAll('[data-test-id="web-ui-grid-item"].hoa-filtered').length >= 3));
+    page.window.close();
+  }
+  {
+    const foreign = read("tests/fixtures/sites/tubi-foreign.html").replace(/Foreign\/International/g, "Drama")
+      .replace("The Human Centipede (First Sequence)", "X (English Dubbed)");
+    const notEnglish = await load({ html: foreign, url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["not-english"] } } });
+    check("filters: English-dubbed Tubi tile stays visible with Not in English", () => assert.ok(
+      !notEnglish.document.querySelector('[data-test-id="web-ui-grid-item"]').classList.contains("hoa-filtered")));
+    notEnglish.window.close();
+    const dubbed = await load({ html: foreign, url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["dubbed"] } } });
+    check("filters: English-dubbed Tubi tile is hidden by Dubbed", () => assert.ok(
+      dubbed.document.querySelector('[data-test-id="web-ui-grid-item"]').classList.contains("hoa-filtered")));
+    dubbed.window.close();
+  }
+  {
+    const spanish = read("tests/fixtures/sites/tubi-foreign.html").replace(/Foreign\/International/g, "Drama")
+      .replace("The Human Centipede (First Sequence)", "X (Español)");
+    for (const kind of ["not-english", "dubbed"]) {
+      const page = await load({ html: spanish, url: "https://tubitv.com/", siteRules: { "tubitv.com": { hideKinds: [kind] } } });
+      check(`filters: Spanish-dubbed Tubi tile is hidden by ${kind}`, () => assert.ok(
+        page.document.querySelector('[data-test-id="web-ui-grid-item"]').classList.contains("hoa-filtered")));
+      page.window.close();
+    }
+  }
+  {
+    const page = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["foreign", "not-english", "dubbed"] } } });
+    check("filters: plain English Tubi drama stays visible to language filters", () => assert.equal(
+      page.document.querySelectorAll(".hoa-filtered").length, 0));
+    page.window.close();
+  }
+  {
+    const crunchyroll = read("tests/fixtures/sites/crunchyroll.html").replace("Sub | Dub", "Subtitled");
+    const page = await load({ html: crunchyroll, url: "https://www.crunchyroll.com/browse",
+      siteRules: { "www.crunchyroll.com": { enabled: true, hideKinds: ["not-english"] } } });
+    const cards = Array.from(page.document.querySelectorAll('[class*="browse-card--"]:not([class*="hover"])'));
+    check("filters: Crunchyroll Not in English hides Subtitled-only and keeps Sub | Dub", () => {
+      assert.ok(cards.find(card => card.textContent.includes("Subtitled")).classList.contains("hoa-filtered"));
+      cards.filter(card => card.textContent.includes("Sub | Dub")).forEach(card => assert.ok(!card.classList.contains("hoa-filtered")));
+    });
+    page.window.close();
+  }
+  {
+    const html = '<div id="viewport" style="overflow:hidden"><div id="row" style="display:flex;transform:translateX(-100px)"><div id="hidden-slot" data-test-id="web-ui-grid-item"><div data-test-id="web-ui-content-tile"><a class="web-content-tile__poster-link" href="/movies/1/hidden"></a><a class="web-content-tile__title">Hidden</a></div></div><div id="visible-slot"><div data-test-id="web-ui-content-tile"><a class="web-content-tile__poster-link" href="/series/2/visible"></a><a class="web-content-tile__title">Visible</a></div></div></div></div>';
+    const page = await load({ html, url: "https://tubitv.com/", testSeam: true,
+      siteRules: { "tubitv.com": { hideKinds: ["movies"] } } });
+    const rect = (left, right) => () => ({ left, right, width: right - left, height: 80, top: 0, bottom: 80 });
+    page.document.getElementById("viewport").getBoundingClientRect = rect(0, 100);
+    page.document.getElementById("hidden-slot").getBoundingClientRect = rect(-40, 0);
+    page.document.getElementById("visible-slot").getBoundingClientRect = rect(20, 60);
+    page.test.apply();
+    check("carousel compensation fills an end gap with CSS translate", () => {
+      const row = page.document.getElementById("row");
+      assert.equal(row.dataset.hoaShift, "20");
+      assert.equal(row.style.translate, "20px");
+    });
     page.window.close();
   }
   {

@@ -76,6 +76,8 @@ window.__hoaLoaded = true;
   const shelfTitleCache = new WeakMap();
   const decisionCache = new WeakMap();
   let containerFilterCache = null;
+  const carouselObservers = new Map();
+  let carouselFrame = 0;
 
   function contextAlive() {
     try {
@@ -90,6 +92,7 @@ window.__hoaLoaded = true;
   }
 
   function removeOwnUi() {
+    clearCarouselCompensation();
     document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"], .hoa-watched-label[data-hoa-owner="${ownInstance}"]`).forEach(node => node.remove());
     document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-empty, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-empty", "hoa-show"));
     document.querySelectorAll(`[data-hoa-watched="${ownInstance}"]`).forEach(node => node.removeAttribute("data-hoa-watched"));
@@ -333,8 +336,13 @@ window.__hoaLoaded = true;
       const link = getLink(card, rule);
       results.push(Boolean(link && safePattern(test.href, (rule.linkAttribute && link.getAttribute(rule.linkAttribute)) || link.getAttribute("href") || link.href || "")));
     }
+    let categoryText = null;
+    const textForCategory = () => {
+      if (categoryText === null) categoryText = `${cardText(card)} ${filterText(card, rule, data)}`;
+      return categoryText;
+    };
     if (test.text) {
-      results.push(safePattern(test.text, cardText(card)));
+      results.push(safePattern(test.text, textForCategory()));
     }
     if (test.channel) {
       results.push(safePattern(test.channel, channelText(card, rule)));
@@ -353,7 +361,7 @@ window.__hoaLoaded = true;
       results.push(Boolean(match && Number(match[1]) < test.scoreBelow));
     }
     // Conditions are alternatives. This lets catalog rules recognise old and new markup without site-specific code.
-    return !test.withoutText || !safePattern(test.withoutText, cardText(card)) ? results.some(Boolean) : false;
+    return !test.withoutText || !safePattern(test.withoutText, textForCategory()) ? results.some(Boolean) : false;
   }
 
   function safeQuery(card, selector) {
@@ -576,6 +584,30 @@ window.__hoaLoaded = true;
     return clean;
   }
 
+  function sectionTitle(section, config, rule) {
+    let title = null;
+    if (config.title) {
+      try { title = section.querySelector(config.title); } catch (error) { title = null; }
+    }
+    if (title) return (title.textContent || "").replace(/\s+/g, " ").trim();
+    const cardSelectors = [rule.cardSelector, ...(rule.variants || []).map(variant => variant.cardSelector)]
+      .filter(Boolean).join(", ");
+    const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const text = (node.nodeValue || "").replace(/\s+/g, " ").trim();
+      if (!text || !node.parentElement) continue;
+      let inCard = false;
+      try { inCard = Boolean(cardSelectors && node.parentElement.closest(cardSelectors)); } catch (error) { inCard = false; }
+      const grid = node.parentElement.closest('[data-test-id="web-ui-grid-container"], .swiper-wrapper');
+      const inGrid = grid && (grid.classList.contains("swiper-wrapper") || grid.classList.contains("web-carousel")
+        || Array.from(grid.children).some(child => child.matches('[data-test-id="web-ui-grid-item"]')
+          || (cardSelectors && safeQuery(child, cardSelectors))));
+      if (!inCard && !inGrid) return text;
+    }
+    return "";
+  }
+
   function filterContainers(rule, categories, filtered) {
     const cacheKey = `${filterVersion}|${location.pathname}`;
     if (containerFilterCache && containerFilterCache.key === cacheKey) {
@@ -599,6 +631,16 @@ window.__hoaLoaded = true;
             }
           });
         } catch (error) { /* stale selector */ }
+        (rule.sections || []).forEach(config => {
+          if (!config || !config.container) return;
+          try {
+            document.querySelectorAll(config.container).forEach(section => {
+              if (safePattern(category.shelfTitle, sectionTitle(section, config, rule))) {
+                filtered.add(section); nodes.add(section);
+              }
+            });
+          } catch (error) { /* stale optional section selector */ }
+        });
       }
     });
     containerFilterCache = { key: cacheKey, nodes };
@@ -1247,6 +1289,7 @@ window.__hoaLoaded = true;
   }
 
   function cleanup() {
+    clearCarouselCompensation();
     document.querySelectorAll(".hoa-removed, .hoa-filtered, .hoa-empty, .hoa-host").forEach(card => {
       card.classList.remove(ACTIVE_CLASS, FILTER_CLASS, "hoa-empty", "hoa-host", "hoa-show");
       card.querySelectorAll(":scope > .hoa-actions").forEach(node => {
@@ -1263,6 +1306,122 @@ window.__hoaLoaded = true;
     if (toast) {
       toast.remove();
     }
+  }
+
+  function isCarouselRow(row) {
+    if (!row || row.nodeType !== 1) return false;
+    if (row.classList.contains("swiper-wrapper")) return true;
+    const inline = row.style && row.style.transform || "";
+    const computed = getComputedStyle(row);
+    const transform = computed.transform || inline;
+    const display = computed.display || row.style.display || "";
+    return /flex/.test(display) && (/translate(?:3d|X)?\(/i.test(inline) || /^matrix(?:3d)?\(/.test(transform));
+  }
+
+  function carouselTranslateX(row) {
+    const transform = getComputedStyle(row).transform || row.style.transform || "";
+    const matrix = /^matrix\(([^)]+)\)/.exec(transform);
+    if (matrix) return Number(matrix[1].split(",")[4]) || 0;
+    const matrix3d = /^matrix3d\(([^)]+)\)/.exec(transform);
+    if (matrix3d) return Number(matrix3d[1].split(",")[12]) || 0;
+    const translate = /translate(?:3d|X)?\(\s*(-?[\d.]+)px/i.exec(transform);
+    return translate ? Number(translate[1]) || 0 : 0;
+  }
+
+  function clippingViewport(row) {
+    for (let parent = row.parentElement; parent; parent = parent.parentElement) {
+      const style = getComputedStyle(parent);
+      if (/(hidden|clip)/.test(`${style.overflow} ${style.overflowX} ${style.overflowY}`)) return parent;
+    }
+    return null;
+  }
+
+  function restoreCarouselRow(row) {
+    const observer = carouselObservers.get(row);
+    if (observer) observer.disconnect();
+    carouselObservers.delete(row);
+    if (row && row.dataset.hoaShift !== undefined) {
+      row.style.translate = row.dataset.hoaShiftRestore || "";
+      delete row.dataset.hoaShift;
+      delete row.dataset.hoaShiftRestore;
+    }
+  }
+
+  // A compensated row observes site-owned transform updates. Temporarily pausing that
+  // observer keeps our own translate write from scheduling an endless compensation loop.
+  function setCarouselTranslate(row, value) {
+    const observer = carouselObservers.get(row);
+    if (observer) observer.disconnect();
+    row.style.translate = value;
+    if (observer && row.isConnected) observer.observe(row, { attributes: true, attributeFilter: ["style"] });
+  }
+
+  function clearCarouselCompensation() {
+    Array.from(carouselObservers.keys()).forEach(restoreCarouselRow);
+    document.querySelectorAll("[data-hoa-shift]").forEach(restoreCarouselRow);
+  }
+
+  function scheduleCarouselCompensation(rows) {
+    if (carouselFrame) return;
+    carouselFrame = window.requestAnimationFrame(() => {
+      carouselFrame = 0;
+      compensateCarousels(rows);
+    });
+  }
+
+  function watchCarouselRow(row) {
+    if (carouselObservers.has(row)) return;
+    const observer = new MutationObserver(mutations => {
+      if (mutations.some(mutation => mutation.attributeName === "style")) scheduleCarouselCompensation();
+    });
+    observer.observe(row, { attributes: true, attributeFilter: ["style"] });
+    carouselObservers.set(row, observer);
+  }
+
+  function compensateCarousel(row) {
+    const viewport = clippingViewport(row);
+    if (!viewport) {
+      restoreCarouselRow(row);
+      return;
+    }
+    const originalTranslate = row.dataset.hoaShiftRestore;
+    if (row.dataset.hoaShift !== undefined) setCarouselTranslate(row, originalTranslate || "");
+    const children = Array.from(row.children).filter(child => visibleForCollapse(child));
+    const first = children[0];
+    const last = children[children.length - 1];
+    const viewportRect = viewport.getBoundingClientRect();
+    const firstRect = first && first.getBoundingClientRect();
+    const lastRect = last && last.getBoundingClientRect();
+    if (!firstRect || !lastRect || !viewportRect.width || !lastRect.width) {
+      restoreCarouselRow(row);
+      return;
+    }
+    const allowance = firstRect.left >= viewportRect.left ? firstRect.left - viewportRect.left : 80;
+    const gap = viewportRect.right - allowance - lastRect.right;
+    const maxShift = Math.max(0, -carouselTranslateX(row));
+    const shift = Math.min(Math.max(0, gap), maxShift);
+    if (shift > 0.5) {
+      if (row.dataset.hoaShift === undefined) row.dataset.hoaShiftRestore = row.style.translate || "";
+      setCarouselTranslate(row, `${Math.ceil(shift)}px`);
+      row.dataset.hoaShift = String(Math.ceil(shift));
+      watchCarouselRow(row);
+    } else {
+      restoreCarouselRow(row);
+    }
+  }
+
+  function compensateCarousels(rows = null) {
+    const candidates = new Set(rows || []);
+    document.querySelectorAll(`.${ACTIVE_CLASS}, .${FILTER_CLASS}, .hoa-empty`).forEach(target => {
+      for (let parent = target.parentElement, level = 0; parent && level < 8; parent = parent.parentElement, level += 1) {
+        if (isCarouselRow(parent)) candidates.add(parent);
+      }
+    });
+    document.querySelectorAll("[data-hoa-shift]").forEach(row => candidates.add(row));
+    candidates.forEach(row => {
+      if (!row.isConnected || !isCarouselRow(row)) restoreCarouselRow(row);
+      else compensateCarousel(row);
+    });
   }
 
   function variantsForRule(rule) {
@@ -1498,6 +1657,7 @@ window.__hoaLoaded = true;
     document.querySelectorAll(`.${FILTER_CLASS}`).forEach(node => { if (!filtered.has(node)) node.classList.remove(FILTER_CLASS); });
     filtered.forEach(node => node.classList.add(FILTER_CLASS));
     collapseEmptySections(rule, variants, filtered, cards);
+    compensateCarousels();
   }
 
   function scheduleApply() {
@@ -1538,9 +1698,10 @@ window.__hoaLoaded = true;
     filtered.forEach(node => node.classList.add(FILTER_CLASS));
     const allFiltered = new Set([...document.querySelectorAll(`.${FILTER_CLASS}`), ...filtered]);
     collapseEmptySections(rule, variants, allFiltered);
+    compensateCarousels();
   }
   // Narrow test seam: production pages never create __hoaTest.
-  if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, applyAdded, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, activeCategories, keywordMatch: HOA.keywordMatch });
+  if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, applyAdded, compensateCarousels, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, activeCategories, keywordMatch: HOA.keywordMatch });
 
   function isOwnMutation(mutation) {
     return mutation.target.closest && mutation.target.closest(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner");
@@ -1866,6 +2027,7 @@ window.__hoaLoaded = true;
     schedulePointerUpdate();
   }, { capture: true, passive: true });
   window.addEventListener("scroll", schedulePointerUpdate, { capture: true, passive: true });
+  window.addEventListener("resize", () => scheduleCarouselCompensation(), { passive: true });
   document.documentElement.addEventListener("pointerleave", () => {
     pointerPoint = null;
     schedulePointerUpdate();
