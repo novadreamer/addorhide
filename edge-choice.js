@@ -19,13 +19,13 @@ function bindButtonControls(toggle, edgeGroup) {
     if (!toggle.querySelector("svg")) {
       toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8"/><path d="M6.6 7.2a7.5 7.5 0 1 0 10.8 0"/></svg>';
     }
-    toggle.setAttribute("aria-label", enabled ? "Disable" : "Enable");
-    toggle.title = enabled ? "Disable: hide the hover buttons on thumbnails" : "Enable: show the hover buttons on thumbnails";
+    toggle.setAttribute("aria-label", enabled ? "Turn off" : "Turn on");
+    toggle.title = enabled ? "Turn off: hide the hover buttons on thumbnails" : "Turn on: show the hover buttons on thumbnails";
     toggle.dataset.enabled = String(enabled);
     const note = document.getElementById("buttons-toggle-note");
     if (note) {
-      note.textContent = enabled ? "Disable to hide the hover buttons on thumbnails"
-        : "Enable to show the hover buttons on thumbnails";
+      note.textContent = enabled ? "Click to turn off the hover buttons on thumbnails"
+        : "Click to turn on the hover buttons on thumbnails";
     }
     // Position only matters while the buttons are shown.
     edgeButtons.forEach(button => {

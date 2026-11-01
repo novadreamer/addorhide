@@ -183,10 +183,18 @@ function button(label, action) {
   return node;
 }
 
+let siteStatusTimer = 0;
+// A short toast over the popup (it takes no room in the layout, so it can never cause a scrollbar).
 function setSiteStatus(message, kind = "") {
   siteStatus.textContent = message;
-  siteStatus.className = `status ${kind}`.trim();
+  siteStatus.className = `status site-toast ${kind}`.trim();
+  window.clearTimeout(siteStatusTimer);
+  if (message) siteStatusTimer = window.setTimeout(() => { siteStatus.textContent = ""; }, 2600);
 }
+
+// renderSite waits for a permission check before drawing; only the newest render may draw, or two quick
+// renders (load + a storage change) would each append a copy of the site controls.
+let renderGeneration = 0;
 
 function clearNode(node) {
   while (node.firstChild) {
@@ -305,6 +313,7 @@ function appendFilterControls(container, catalogRule) {
 }
 
 function renderSite() {
+  const generation = ++renderGeneration;
   clearNode(siteContent);
   setSiteStatus("");
   if (!activeTab || !HOA_SITES.isSupportedPageUrl(activeTab.url || "")) {
@@ -343,6 +352,8 @@ function renderSite() {
     return;
   }
   const renderEnabled = granted => {
+  if (generation !== renderGeneration) return;
+  clearNode(siteContent);
   if (!granted || rule.enabled !== true) {
     if (isCatalog) {
       const supported = document.createElement("p");
@@ -415,12 +426,13 @@ function renderSite() {
   const links = document.createElement("div");
   links.className = "site-links";
   addLearnedControl(activeHost, isCatalog, rule, links);
-  const disable = button("Disable on this site", () => HOA_SITES.disableSite(activeHost, result => {
+  const disable = button("Turn off here", () => HOA_SITES.disableSite(activeHost, result => {
     if (result.ok) {
       siteRules = { ...siteRules, [activeHost]: { ...siteRule(activeHost), enabled: false } };
       renderSite();
     }
   }));
+  disable.title = "Turn AddOrHide off on this site (your settings are kept)";
   disable.className = "link-button";
   links.appendChild(disable);
   const forgetSite = button("Forget this site", () => HOA_SITES.forgetSite(activeHost, result => {

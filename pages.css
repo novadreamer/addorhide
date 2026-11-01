@@ -362,3 +362,20 @@ button.filter-tool[aria-pressed="false"] { color: var(--muted); }
 button.filter-tool:disabled { opacity: .4; cursor: default; }
 .popup .popup-footer .footer-icon-button { width: 30px; min-width: 30px; padding: 3px; }
 .popup .button-controls.popup-position-room { padding-bottom: var(--popup-position-room, 14px); }
+
+/* Round 9. Centred tooltips (tooltip.js). */
+.hoa-tip { position: fixed; z-index: 2147483000; max-width: 260px; padding: 5px 9px; color: var(--surface, #fff); background: var(--text, #222);
+  border-radius: 7px; font-size: 12px; line-height: 1.35; text-align: center; pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+/* Site links on one line (taught sites have three), and the status line as a toast that takes no room. */
+.popup .site-links { flex-wrap: nowrap; justify-content: center; gap: 12px; white-space: nowrap; }
+.popup .site-links .link-button { font-size: 12px; }
+.popup .site-toast { position: fixed; left: 50%; bottom: 14px; z-index: 9000; max-width: 320px; margin: 0; padding: 6px 12px; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,.16); font-size: 12px; text-align: center; }
+.popup .site-toast:empty { display: none; }
+/* Smaller power and position buttons: more room before the popup would need to scroll. */
+.popup .button-controls .press-button.toggle-button { width: 46px; height: 46px; margin-bottom: 3px; }
+.popup .button-controls .press-button.toggle-button::before { top: 4px; right: 7px; left: 7px; height: 14px; }
+.popup .button-controls .press-button.toggle-button svg { width: 21px; height: 21px; }
+.popup .button-controls .press-button.edge-button { width: 38px; min-width: 38px; min-height: 24px; }
+.popup .button-controls .press-button.edge-button svg { width: 38px; height: 25px; }
+.popup .position-buttons { gap: 4px; }
