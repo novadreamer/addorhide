@@ -87,7 +87,7 @@ var HOA_CATALOG = Object.freeze((() => {
       bulkExtraSelector: "yt-lockup-view-model, grid-shelf-view-model, ytd-reel-shelf-renderer, ytd-rich-section-renderer, ytd-shelf-renderer"
     }),
     Object.freeze({
-      id: "tubi",
+      id: "tubi", carousels: true,
       name: "Tubi",
       builtIn: true,
       hosts: Object.freeze(["tubitv.com"]),
@@ -220,7 +220,7 @@ var HOA_CATALOG = Object.freeze((() => {
       ])
     }),
     Object.freeze({
-      id: "xumo", name: "Xumo Play", builtIn: false, hosts: Object.freeze(["play.xumo.com"]), subdomains: false,
+      id: "xumo", carousels: true, name: "Xumo Play", builtIn: false, hosts: Object.freeze(["play.xumo.com"]), subdomains: false,
       cardSelector: "li.card.titleCard:not(.promoCard)", removeClosest: "li.card.titleCard", linkSelector: "a[href]", titleCandidates: Object.freeze(["a[aria-label]", "img[alt]"]),
       sections: Object.freeze([{ container: "div.cardList", title: "div.listHeader" }]),
       categories: Object.freeze([
@@ -234,7 +234,7 @@ var HOA_CATALOG = Object.freeze((() => {
       ])
     }),
     Object.freeze({
-      id: "pluto", name: "Pluto TV", builtIn: false, hosts: Object.freeze(["pluto.tv"]), subdomains: true,
+      id: "pluto", carousels: true, name: "Pluto TV", builtIn: false, hosts: Object.freeze(["pluto.tv"]), subdomains: true,
       cardSelector: 'div.swiper-slide:has(a[data-testid="region-link"]), a[data-testid="region-link"]:not(div.swiper-slide a[data-testid="region-link"])', removeClosest: 'div.swiper-slide, a[data-testid="region-link"]', linkSelector: 'a[data-testid="region-link"]', titleCandidates: Object.freeze(["a[aria-label]", "img[alt]"]),
       pageData: Object.freeze({ script: "script#__NEXT_DATA__", idFromHref: "(?:movies|shows|series)/([0-9a-f]{24})", idKeys: Object.freeze(["id", "contentId", "movieId"]), fields: Object.freeze({ cast: "castNames", genres: "genre", description: "description", rating: "regionalRating.rating", kids: "isKidsContent" }) }),
       sections: Object.freeze([{ container: "div.vds-carousel", title: ".vds-carousel__title-medium" }]),
@@ -251,7 +251,7 @@ var HOA_CATALOG = Object.freeze((() => {
       ])
     }),
     Object.freeze({
-      id: "roku", name: "The Roku Channel", builtIn: false, hosts: Object.freeze(["therokuchannel.roku.com"]), subdomains: false,
+      id: "roku", carousels: true, name: "The Roku Channel", builtIn: false, hosts: Object.freeze(["therokuchannel.roku.com"]), subdomains: false,
       cardSelector: "li.movie, li.series, li.featured, li[data-row][data-col]", removeClosest: "li.movie, li.series, li.featured, li[data-row][data-col]", featuredSelector: "li.featured", linkSelector: 'a[itemprop="url"]', titleCandidates: Object.freeze(["[aria-label]", 'meta[itemprop="name"]']),
       meta: Object.freeze({ texts: Object.freeze([".title-label", '[data-test-id="content-indicator-container"]']) }),
       sections: Object.freeze([{ container: "div.roku-collection-row", title: ".roku-collection-row__title" }]),
@@ -266,7 +266,7 @@ var HOA_CATALOG = Object.freeze((() => {
       ])
     }),
     Object.freeze({
-      id: "fandango", name: "Fandango at Home", builtIn: false, hosts: Object.freeze(["athome.fandango.com", "fandangoathome.com", "vudu.com"]), subdomains: true,
+      id: "fandango", carousels: true, name: "Fandango at Home", builtIn: false, hosts: Object.freeze(["athome.fandango.com", "fandangoathome.com", "vudu.com"]), subdomains: true,
       cardSelector: '[class*="carousel-default-styles__item"]', removeClosest: '[class*="carousel-default-styles__item"]', linkSelector: 'a[href*="/content/browse/details/"]', titleCandidates: Object.freeze(["img[alt]", "a[aria-label]"]),
       categories: Object.freeze([
         { id: "free", label: "Free with ads", hint: "Free or Free to Watch titles", card: { text: "Free to Watch|\\bFree\\b" } },
@@ -278,7 +278,7 @@ var HOA_CATALOG = Object.freeze((() => {
       ])
     }),
     Object.freeze({
-      id: "crunchyroll", name: "Crunchyroll", builtIn: false, hosts: Object.freeze(["crunchyroll.com"]), subdomains: true,
+      id: "crunchyroll", carousels: true, name: "Crunchyroll", builtIn: false, hosts: Object.freeze(["crunchyroll.com"]), subdomains: true,
       cardSelector: '[class*="browse-card--"]:not([class*="hover"])', removeClosest: '[class*="browse-card--"]:not([class*="hover"])', linkSelector: 'a[href^="/series/"], a[href^="/watch/"]', titleCandidates: Object.freeze(['[class*="browse-card-hover"] [class*="title"]', "img[alt]", "a[aria-label]"]),
       categories: Object.freeze([
         { id: "series", label: "Series", hint: "Series cards", card: { href: "/series/" } },
@@ -324,7 +324,7 @@ var HOA_CATALOG = Object.freeze((() => {
       cardSelector: 'a[class*="show_poster__link"]', removeClosest: 'a[class*="show_poster__link"]', linkSelector: 'a[class*="show_poster__link"]', titleCandidates: Object.freeze(["img[alt]"]), categories: Object.freeze([])
     }),
     Object.freeze({
-      id: "vix", name: "ViX", builtIn: false, hosts: Object.freeze(["vix.com"]), subdomains: true,
+      id: "vix", carousels: true, name: "ViX", builtIn: false, hosts: Object.freeze(["vix.com"]), subdomains: true,
       cardSelector: '[data-testid="content-card"]', removeClosest: '[data-testid="content-card"]', linkSelector: 'a[href^="/detail/"]', titleCandidates: Object.freeze(["img[alt]", "h3"]), categories: Object.freeze([
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
         { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { has: "a[href]" }, shelfTitle: FOREIGN_SHELF_TITLE },
@@ -333,7 +333,7 @@ var HOA_CATALOG = Object.freeze((() => {
       ])
     }),
     Object.freeze({
-      id: "shout", name: "Shout! TV", builtIn: false, hosts: Object.freeze(["shout-tv.com"]), subdomains: true,
+      id: "shout", carousels: true, name: "Shout! TV", builtIn: false, hosts: Object.freeze(["shout-tv.com"]), subdomains: true,
       cardSelector: "div.content-pager__item", removeClosest: "div.content-pager__item", linkSelector: "a[data-content-type]", titleCandidates: Object.freeze(["a[aria-label]", "img[alt]", ".card-title__title"]),
       categories: Object.freeze([
         { id: "live", label: "Live", hint: "Live channels", card: { has: '[data-card-type="LIVE"]' } },

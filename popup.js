@@ -265,10 +265,12 @@ function appendFilterControls(container, catalogRule) {
       const allOn = () => allIds.every(id => kinds.includes(id));
       const toggleAll = button("", () => { kinds = allOn() ? [] : [...allIds]; save(); redraw(); });
       toggleAll.className = "filter-tool";
-      const paintToggleAll = () => { const on = allOn(); const label = on ? "Unhide all types on this site" : "Hide all types on this site";
+      const paintToggleAll = () => { if (categories.length < 2) return; const on = allOn(); const label = on ? "Unhide all types on this site" : "Hide all types on this site";
         toggleAll.innerHTML = on ? eye : eyeOff; toggleAll.title = label; toggleAll.setAttribute("aria-label", label); toggleAll.setAttribute("aria-pressed", String(on)); };
-      tools.prepend(toggleAll);
-      if (categories.length) {
+      // Neither tool means anything without types (keyword-only and taught sites), and the carousel switch only
+      // on sites that have big rotating featured rows.
+      if (categories.length > 1) tools.prepend(toggleAll);
+      if (categories.length && catalogRule && (catalogRule.carousels || catalogRule.featuredSelector)) {
         const toggleFeatured = button("", () => { featuredCarousels = !featuredCarousels; save(); paintFeatured(); });
         toggleFeatured.className = "filter-tool";
         const paintFeatured = () => { const label = featuredCarousels ? "Featured carousels are included — click to leave them alone" : "Featured carousels are left alone — click to include them";

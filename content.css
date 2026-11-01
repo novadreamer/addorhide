@@ -122,3 +122,6 @@
 
 /* Enable/Disable in the popup or Options: buttons off on every site, hidden videos stay hidden. */
 .hoa-buttons-off .hoa-actions { display: none !important; }
+
+/* Right-to-left pages (Arabic, Hebrew…) must not flip our controls: always Add then Hide, left to right. */
+.hoa-actions, .hoa-float, #hoa-toast, #hoa-banner { direction: ltr !important; unicode-bidi: isolate !important; }

@@ -300,7 +300,7 @@ function renderFilterSites() {
       label.append(toggle, document.createTextNode(` ${category.label}`));
       body.appendChild(label);
     });
-    if (categories.length) {
+    if (categories.length && (catalogRule.carousels || catalogRule.featuredSelector)) {
       const label = document.createElement("label");
       label.className = "switch-row";
       label.title = "Leave big rotating featured rows alone when hiding types or words.";
