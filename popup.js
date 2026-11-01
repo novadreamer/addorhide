@@ -237,19 +237,20 @@ function appendFilterControls(container, catalogRule) {
   const categories = catalogRule && Array.isArray(catalogRule.categories) ? catalogRule.categories : [];
   let kinds = HOA.normalizeHideKinds(siteRule(activeHost).hideKinds, categories.map(category => category.id));
   let keywords = HOA.normalizeKeywords(siteRule(activeHost).hideKeywords);
+  let featuredCarousels = siteRule(activeHost).featuredCarousels !== false;
   let duplicateMessage = "";
   let refreshCount = () => {};   // set while the popover is open
   const launch = button("Hide on this site", openPanel);
   launch.className = "secondary-button filter-launch";
   launch.innerHTML = '<span class="filter-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7v5l-4 2v-7z"/></svg></span><span>Hide on this site</span><span class="filter-badge" hidden></span><span class="filter-chevron">›</span>';
-  const updateSummary = () => { const labels = categories.filter(c => kinds.includes(c.id)).map(c => c.label); const count = labels.length + keywords.length; const what = [...labels, keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", "); launch.title = count ? `Hiding: ${what}` : "Nothing is hidden by type or word on this site"; const badge = launch.querySelector(".filter-badge"); badge.hidden = !count; badge.textContent = count; launch.classList.toggle("is-active", Boolean(count)); };
+  const updateSummary = () => { const labels = categories.filter(c => kinds.includes(c.id)).map(c => c.label); const count = labels.length + keywords.length; const what = [...labels, keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", "); const summary = count ? `Hiding: ${what}` : "Nothing is hidden by type or word on this site"; launch.title = `${summary}${featuredCarousels ? "" : " · not in featured carousels"}`; const badge = launch.querySelector(".filter-badge"); badge.hidden = !count; badge.textContent = count; launch.classList.toggle("is-active", Boolean(count)); };
   updateSummary();
   container.append(launch);
   function save() {
     const hadWatched = HOA.normalizeHideKinds(siteRule(activeHost).hideKinds, categories.map(c => c.id)).includes("watched");
     const hasWatched = kinds.includes("watched");
     saveSiteRules({ ...siteRules, [activeHost]: { ...siteRule(activeHost), enabled: siteRule(activeHost).enabled !== false,
-      hideKinds: HOA.normalizeHideKinds(kinds, categories.map(c => c.id)), hideKeywords: HOA.normalizeKeywords(keywords) } }, "Filter settings saved.");
+      hideKinds: HOA.normalizeHideKinds(kinds, categories.map(c => c.id)), hideKeywords: HOA.normalizeKeywords(keywords), featuredCarousels } }, "Filter settings saved.");
     updateSummary();
     if (hadWatched && !hasWatched) HOA.clearAutoWatched(activeHost);
     window.setTimeout(() => refreshCount(), 400);
@@ -259,6 +260,7 @@ function appendFilterControls(container, catalogRule) {
       const allIds = categories.map(c => c.id);
       const eye = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
       const eyeOff = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+      const featuredIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="14" height="10" rx="1"/><path d="M2 12h3M19 12h3M3 10l-2 2 2 2M21 10l2 2-2 2"/></svg>';
       // One toggle: while every type is on it unhides them all, otherwise it hides them all.
       const allOn = () => allIds.every(id => kinds.includes(id));
       const toggleAll = button("", () => { kinds = allOn() ? [] : [...allIds]; save(); redraw(); });
@@ -266,6 +268,15 @@ function appendFilterControls(container, catalogRule) {
       const paintToggleAll = () => { const on = allOn(); const label = on ? "Unhide all types on this site" : "Hide all types on this site";
         toggleAll.innerHTML = on ? eye : eyeOff; toggleAll.title = label; toggleAll.setAttribute("aria-label", label); toggleAll.setAttribute("aria-pressed", String(on)); };
       tools.prepend(toggleAll);
+      if (categories.length) {
+        const toggleFeatured = button("", () => { featuredCarousels = !featuredCarousels; save(); paintFeatured(); });
+        toggleFeatured.className = "filter-tool";
+        const paintFeatured = () => { const label = featuredCarousels ? "Featured carousels are included — click to leave them alone" : "Featured carousels are left alone — click to include them";
+          // Left alone: the same carousel icon, struck through.
+          toggleFeatured.innerHTML = featuredCarousels ? featuredIcon : featuredIcon.replace("</svg>", '<path d="M4 3l16 18"/></svg>'); toggleFeatured.title = label; toggleFeatured.setAttribute("aria-label", label); toggleFeatured.setAttribute("aria-pressed", String(featuredCarousels)); };
+        tools.insertBefore(toggleFeatured, toggleAll.nextSibling);
+        paintFeatured();
+      }
       const redraw = () => {
         if (panel.hoaRefresh) { window.clearInterval(panel.hoaRefresh); panel.hoaRefresh = 0; }
         paintToggleAll();

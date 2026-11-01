@@ -358,6 +358,7 @@ body.popup, body.popup main { overflow-x: hidden; }
 .filter-popover-tools { display: flex; align-items: center; gap: 4px; }
 button.filter-tool { display: grid; width: 30px; min-width: 30px; min-height: 30px; padding: 0; place-items: center; color: var(--text); background: var(--surface-2); border-color: var(--border); border-radius: 8px; }
 button.filter-tool svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+button.filter-tool[aria-pressed="false"] { color: var(--muted); }
 button.filter-tool:disabled { opacity: .4; cursor: default; }
 .popup .popup-footer .footer-icon-button { width: 30px; min-width: 30px; padding: 3px; }
 .popup .button-controls.popup-position-room { padding-bottom: var(--popup-position-room, 14px); }

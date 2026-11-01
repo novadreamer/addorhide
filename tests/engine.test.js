@@ -698,6 +698,71 @@ const CASES = [
     page.window.close();
   }
   {
+    // This is a real feature-card copy with Tubi's delayed links removed. Its visible duration,
+    // rather than an href, must identify it as a movie; the real Everybody Hates Chris card is a series.
+    const movie = read("tests/fixtures/sites/tubi-featured.html")
+      .replace(/\/series\/300015509\/everybody-hates-chris/g, "/movies/300015509/example-movie")
+      .replace(/Everybody Hates Chris/g, "Example Movie")
+      .replace("Comedy · 2009 ·  4 Seasons", "Comedy · 2008 · 1 hr 47 min")
+      .replace(/<\/?a\b[^>]*>/g, "");
+    const moviePage = await load({ html: movie, url: "https://tubitv.com/", siteRules: { "tubitv.com": { hideKinds: ["movies"] } } });
+    check("filters: Tubi link-less feature movie is typed from its running time", () => assert.ok(
+      Array.from(moviePage.document.querySelectorAll("h2")).find(node => node.textContent === "Example Movie").closest(".PQ8zO").classList.contains("hoa-filtered")));
+    moviePage.window.close();
+    const seriesPage = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/", siteRules: { "tubitv.com": { hideKinds: ["series"] } } });
+    check("filters: Tubi feature series is typed from Seasons and never as a movie", () => assert.ok(
+      Array.from(seriesPage.document.querySelectorAll("h2")).find(node => node.textContent === "Everybody Hates Chris").closest(".PQ8zO").classList.contains("hoa-filtered")));
+    seriesPage.window.close();
+    const notMovie = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/", siteRules: { "tubitv.com": { hideKinds: ["movies"] } } });
+    check("filters: Everybody Hates Chris does not match Tubi Movies", () => assert.ok(
+      !Array.from(notMovie.document.querySelectorAll("h2")).find(node => node.textContent === "Everybody Hates Chris").closest(".PQ8zO").classList.contains("hoa-filtered")));
+    notMovie.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["series"], featuredCarousels: false } } });
+    check("filters: excluded Tubi feature carousel ignores series and Recommended types", () => {
+      assert.equal(page.document.querySelectorAll(".hoa-filtered").length, 0);
+      assert.ok(page.document.querySelector("h2").closest(".PQ8zO").querySelector('[data-action="hide"]'));
+    });
+    page.document.querySelector("h2").closest(".PQ8zO").querySelector('[data-action="hide"]').click();
+    await wait(30);
+    check("filters: Hide button still hides an excluded feature card", () => assert.ok(
+      page.document.querySelector("h2").closest(".PQ8zO").classList.contains("hoa-removed")));
+    page.window.close();
+    const recommended = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["recommended"], featuredCarousels: false } } });
+    check("filters: excluded Tubi feature carousel ignores Recommended", () => assert.equal(recommended.document.querySelectorAll(".hoa-filtered").length, 0));
+    recommended.window.close();
+    const normal = await load({ fixture: "sites/tubi-sections.html", url: "https://tubitv.com/",
+      siteRules: { "tubitv.com": { hideKinds: ["series"], featuredCarousels: false } } });
+    check("filters: excluded featured carousels do not disable ordinary-row filtering", () => assert.ok(
+      normal.document.querySelector('a[title="Watch The Neighborhood Show"]').closest('[data-test-id="web-ui-grid-item"]').classList.contains("hoa-filtered")));
+    normal.window.close();
+    const included = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/", siteRules: { "tubitv.com": { hideKinds: ["series"] } } });
+    check("filters: featured carousels are included by default", () => assert.ok(included.document.querySelectorAll(".hoa-filtered").length >= 2));
+    included.window.close();
+  }
+  {
+    const page = await load({ html: '<ul><li id="featured" class="featured series"><a itemprop="url" href="/series/example">Featured series</a></li></ul>',
+      url: "https://therokuchannel.roku.com/", siteRules: { "therokuchannel.roku.com": { enabled: true, hideKinds: ["tv"], featuredCarousels: false } } });
+    check("filters: Roku li.featured is a featured carousel card via featuredSelector", () => assert.ok(
+      !page.document.getElementById("featured").classList.contains("hoa-filtered")));
+    page.window.close();
+  }
+  {
+    const html = '<div id="viewport" style="overflow:hidden"><div id="row" style="display:flex;flex-wrap:nowrap;transform:translateX(-1px)"><div id="slot"><div data-test-id="web-ui-content-tile"><a class="web-content-tile__poster-link" href="/series/1/large"></a><a class="web-content-tile__title">Large series</a></div></div></div></div>';
+    const page = await load({ html, url: "https://tubitv.com/", testSeam: true,
+      siteRules: { "tubitv.com": { hideKinds: ["series"], featuredCarousels: false } } });
+    const rect = width => () => ({ left: 0, right: width, width, height: 80, top: 0, bottom: 80 });
+    page.document.getElementById("viewport").getBoundingClientRect = rect(100);
+    page.document.getElementById("slot").getBoundingClientRect = rect(45);
+    page.test.apply();
+    check("filters: a large flex carousel slot is featured without a site selector", () => assert.ok(
+      !page.document.getElementById("slot").classList.contains("hoa-filtered")));
+    page.window.close();
+  }
+  {
     const page = await load({ fixture: "tubi-slot.synthetic.html", url: "https://tubitv.com/",
       siteRules: { "tubitv.com": { hideKinds: ["series"] } } });
     check("Tubi untracked feature card hides its carousel slot", () => assert.ok(

@@ -93,6 +93,7 @@ var HOA_CATALOG = Object.freeze((() => {
       hosts: Object.freeze(["tubitv.com"]),
       subdomains: true,
       cardSelector: '[data-test-id="web-ui-content-tile"]',
+      featuredSelector: 'div:has(> .web-content-tile__label-top-left):has(.web-attributes)',
       linkSelector: "a.web-content-tile__poster-link",
       titleCandidates: Object.freeze([".web-content-tile__title"]),
       adMarkers: Object.freeze([]),
@@ -104,8 +105,8 @@ var HOA_CATALOG = Object.freeze((() => {
       }),
       sections: Object.freeze([{ container: 'section:has([data-test-id="web-ui-grid-container"])', title: "" }]),
       categories: Object.freeze([
-        { id: "movies", label: "Movies", hint: "Movie tiles", card: { href: "^/movies/" } },
-        { id: "series", label: "TV shows", hint: "Series tiles", card: { href: "^/series/" } },
+        { id: "movies", label: "Movies", hint: "Movie tiles", card: { href: "^/movies/", text: "\\b\\d+\\s?(?:h|hr|hrs)\\b(?:\\s?\\d+\\s?(?:m|min)\\b)?|\\b\\d+\\s?min\\b" } },
+        { id: "series", label: "TV shows", hint: "Series tiles", card: { href: "^/series/", text: "\\b\\d+\\s+Seasons?\\b" } },
         { id: "live", label: "Live TV", hint: "Live channels", card: { href: "^/live/", text: "\\bLive\\b" } },
         { id: "kids", label: "Kids & family", hint: "Kids, family and animation", card: { text: "Kids|Family|Animation" }, shelfTitle: "Kids|Family|Animation" },
         { id: "spanish", label: "En español", hint: "Spanish-language rows and tiles", card: { text: "Español|Spanish" }, shelfTitle: "Español|Spanish" },
@@ -251,7 +252,7 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "roku", name: "The Roku Channel", builtIn: false, hosts: Object.freeze(["therokuchannel.roku.com"]), subdomains: false,
-      cardSelector: "li.movie, li.series, li[data-row][data-col]", removeClosest: "li.movie, li.series, li[data-row][data-col]", linkSelector: 'a[itemprop="url"]', titleCandidates: Object.freeze(["[aria-label]", 'meta[itemprop="name"]']),
+      cardSelector: "li.movie, li.series, li.featured, li[data-row][data-col]", removeClosest: "li.movie, li.series, li.featured, li[data-row][data-col]", featuredSelector: "li.featured", linkSelector: 'a[itemprop="url"]', titleCandidates: Object.freeze(["[aria-label]", 'meta[itemprop="name"]']),
       meta: Object.freeze({ texts: Object.freeze([".title-label", '[data-test-id="content-indicator-container"]']) }),
       sections: Object.freeze([{ container: "div.roku-collection-row", title: ".roku-collection-row__title" }]),
       categories: Object.freeze([

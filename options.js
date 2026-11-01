@@ -259,6 +259,12 @@ function saveFilterRule(host, categories, kinds, keywords) {
   if (wasWatched && !nextKinds.includes("watched")) HOA.clearAutoWatched(host);
 }
 
+function saveFeaturedCarousels(host, included) {
+  siteRules = { ...siteRules, [host]: { ...siteRule(host), featuredCarousels: included } };
+  siteRulesWrittenHere = true;
+  chrome.storage.local.set({ [HOA.SITES_KEY]: siteRules }, () => renderFilterSites());
+}
+
 function renderFilterSites() {
   const scrollTop = window.scrollY;
   const openSites = new Set(Array.from(filterSites.querySelectorAll("details[open]")).map(node => node.dataset.host));
@@ -294,6 +300,18 @@ function renderFilterSites() {
       label.append(toggle, document.createTextNode(` ${category.label}`));
       body.appendChild(label);
     });
+    if (categories.length) {
+      const label = document.createElement("label");
+      label.className = "switch-row";
+      label.title = "Leave big rotating featured rows alone when hiding types or words.";
+      const toggle = document.createElement("input");
+      toggle.type = "checkbox";
+      toggle.setAttribute("role", "switch");
+      toggle.checked = rule.featuredCarousels !== false;
+      toggle.addEventListener("change", () => saveFeaturedCarousels(host, toggle.checked));
+      label.append(toggle, document.createTextNode(" Include featured carousels (big rotating rows like Tubi's For You)"));
+      body.appendChild(label);
+    }
     const words = document.createElement("div");
     words.className = "filter-words";
     const input = document.createElement("input");

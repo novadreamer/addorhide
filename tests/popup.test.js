@@ -1,0 +1,66 @@
+// Exercises the featured-carousel control in the real popup DOM. jsdom stays dev-only,
+// like the other DOM tests; set JSDOM_PATH when it is installed elsewhere.
+const assert = require("node:assert");
+const fs = require("node:fs");
+const path = require("node:path");
+
+let JSDOM;
+try {
+  JSDOM = require(process.env.JSDOM_PATH || "jsdom").JSDOM;
+} catch (error) {
+  console.log("popup.test.js: SKIPPED (jsdom not installed; set JSDOM_PATH to run it)");
+  process.exit(0);
+}
+
+const root = path.join(__dirname, "..");
+const read = file => fs.readFileSync(path.join(root, file), "utf8");
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function loadPopup() {
+  const dom = new JSDOM(read("popup.html"), { url: "https://extension.test/popup.html", runScripts: "outside-only", pretendToBeVisual: true });
+  const { window } = dom;
+  const store = { siteRules: { "tubitv.com": { enabled: true } } };
+  const listeners = [];
+  const clone = value => JSON.parse(JSON.stringify(value));
+  window.matchMedia = () => ({ matches: false, addEventListener() {} });
+  window.chrome = {
+    runtime: { lastError: null, getURL: value => value, getManifest: () => ({ version: "1.1.0" }), sendMessage(_message, callback) { if (callback) callback(); } },
+    storage: { local: {
+      get(defaults, callback) {
+        const result = {};
+        Object.keys(defaults).forEach(key => { result[key] = key in store ? clone(store[key]) : defaults[key]; });
+        setTimeout(() => callback(result), 0);
+      },
+      set(values, callback) {
+        const changes = {};
+        Object.entries(values).forEach(([key, value]) => { changes[key] = { oldValue: store[key], newValue: clone(value) }; store[key] = clone(value); });
+        setTimeout(() => { listeners.forEach(listener => listener(changes, "local")); if (callback) callback(); }, 0);
+      }
+    }, onChanged: { addListener: listener => listeners.push(listener) } },
+    tabs: { query(_query, callback) { callback([{ id: 1, url: "https://tubitv.com/" }]); }, sendMessage(_id, _message, callback) { if (callback) callback({ active: true, cards: 1, overlays: 1 }); }, create() {}, reload() {} },
+    permissions: { contains(_details, callback) { callback(true); }, request(_details, callback) { callback(true); } },
+    windows: { getCurrent(callback) { callback({ id: 1, incognito: false }); } }
+  };
+  window.eval(["theme.js", "shared.js", "edge-choice.js", "catalog.js", "sites.js", "popup.js"].map(read).join("\n;\n"));
+  await wait(40);
+  return { window, document: window.document, store };
+}
+
+(async () => {
+  const page = await loadPopup();
+  const launch = page.document.querySelector(".filter-launch");
+  assert.ok(launch, "the Tubi popup exposes filtering controls");
+  launch.click();
+  const panel = page.document.querySelector(".filter-popover");
+  const toggle = Array.from(panel.querySelectorAll(".filter-tool")).find(node => node.title.startsWith("Featured carousels"));
+  assert.ok(toggle, "the featured-carousel header control is present");
+  assert.equal(toggle.getAttribute("aria-pressed"), "true");
+  toggle.click();
+  await wait(10);
+  assert.equal(page.store.siteRules["tubitv.com"].featuredCarousels, false);
+  assert.equal(toggle.getAttribute("aria-pressed"), "false");
+  assert.equal(page.document.querySelector(".filter-popover"), panel, "saving leaves the popover open");
+  assert.match(launch.title, /not in featured carousels/);
+  page.window.close();
+  console.log("popup.test.js: 6 passed, 0 failed");
+})().catch(error => { console.error(error); process.exitCode = 1; });

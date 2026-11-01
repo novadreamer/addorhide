@@ -72,6 +72,7 @@ window.__hoaLoaded = true;
   const patternCache = new Map();
   let passCardText = new WeakMap();
   let passFilterText = new WeakMap();
+  let passFeaturedCarousel = new WeakMap();
   const pageDataCache = new Map();
   const shelfTitleCache = new WeakMap();
   const decisionCache = new WeakMap();
@@ -192,7 +193,7 @@ window.__hoaLoaded = true;
     if (!catalogRule && (!validPicks.length || !stored || stored.enabled !== true)) {
       return null;
     }
-    const merged = { ...base, catalog: Boolean(catalogRule), userPicked: validPicks.length > 0, hideKinds: [], hideKeywords: [] };
+    const merged = { ...base, catalog: Boolean(catalogRule), userPicked: validPicks.length > 0, hideKinds: [], hideKeywords: [], featuredCarousels: true };
     if (stored && typeof stored === "object") {
       // Enable stores linkSelector: "" for every site; an empty value must not wipe a catalog rule's link.
       if (typeof stored.linkSelector === "string" && stored.linkSelector && stored.linkSelector.length <= 500
@@ -205,6 +206,7 @@ window.__hoaLoaded = true;
       const allowedKinds = (base.categories || []).map(category => category.id);
       merged.hideKinds = HOA.normalizeHideKinds(stored.hideKinds, allowedKinds);
       merged.hideKeywords = HOA.normalizeKeywords(stored.hideKeywords);
+      if (typeof stored.featuredCarousels === "boolean") merged.featuredCarousels = stored.featuredCarousels;
     }
     merged.pickedSelectors = validPicks;
     merged.variants = [...(Array.isArray(base.variants) ? base.variants : []), ...validPicks.map(cardSelector => ({
@@ -558,6 +560,11 @@ window.__hoaLoaded = true;
   }
 
   function shouldFilterCard(card, rule, data, categories) {
+    // A site's large rotating feature row is an editorial unit: leaving it alone skips only
+    // type/word filtering. Explicit hides, channels and watched cards are handled elsewhere.
+    if (rule.featuredCarousels === false && isFeaturedCarousel(card, rule)) {
+      return false;
+    }
     const keywords = Array.isArray(rule.hideKeywords) ? rule.hideKeywords : [];
     // Nothing switched on for this site: no work at all (this runs for every card on every pass).
     if (!categories.selected.length && !keywords.length) {
@@ -608,6 +615,58 @@ window.__hoaLoaded = true;
     return "";
   }
 
+  function matchesOptionalSelector(node, selector) {
+    if (!node || !selector) return false;
+    try { return node.matches(selector); } catch (error) { return false; }
+  }
+
+  function featuredViewport(row) {
+    for (let parent = row && row.parentElement, level = 0; parent && level < 6; parent = parent.parentElement, level += 1) {
+      const style = getComputedStyle(parent);
+      const horizontalOverflow = /(auto|scroll|hidden|clip)/.test(`${style.overflowX} ${style.overflow}`)
+        || parent.scrollWidth > parent.clientWidth;
+      if (horizontalOverflow) return parent;
+    }
+    return row && row.parentElement;
+  }
+
+  function featuredRow(row) {
+    if (!row || row.nodeType !== 1) return false;
+    if (row.classList.contains("swiper-wrapper")) return true;
+    const style = getComputedStyle(row);
+    const display = style.display || row.style.display || "";
+    const flexRow = /flex/.test(display) && /row/.test(style.flexDirection || row.style.flexDirection || "row")
+      && /nowrap/.test(style.flexWrap || row.style.flexWrap || "nowrap");
+    const gridColumns = /grid/.test(display) && /column/.test(style.gridAutoFlow || row.style.gridAutoFlow || "");
+    const transform = `${row.style.transform || ""} ${style.transform || ""}`;
+    return flexRow || gridColumns || /translate(?:3d|X)?\(/i.test(transform) || /^\s*matrix(?:3d)?\(/.test(transform);
+  }
+
+  function isFeaturedCarousel(card, rule) {
+    const cached = passFeaturedCarousel.get(card);
+    if (cached !== undefined) return cached;
+    let featured = matchesOptionalSelector(card, rule.featuredSelector);
+    for (let row = card.parentElement, level = 0; !featured && row && level < 6; row = row.parentElement, level += 1) {
+      let slot = card;
+      while (slot.parentElement && slot.parentElement !== row) slot = slot.parentElement;
+      if (matchesOptionalSelector(slot, rule.featuredSelector)) { featured = true; break; }
+      if (!featuredRow(row)) continue;
+      const viewport = featuredViewport(row);
+      const slotBox = slot.getBoundingClientRect();
+      const viewportBox = viewport && viewport.getBoundingClientRect();
+      if (viewportBox && viewportBox.width > 0 && slotBox.width >= viewportBox.width * 0.38) featured = true;
+    }
+    passFeaturedCarousel.set(card, featured);
+    return featured;
+  }
+
+  function sectionHasFeaturedCarousel(section, rule) {
+    const selectors = [rule.cardSelector, ...(rule.variants || []).map(variant => variant.cardSelector)].filter(Boolean).join(", ");
+    if (!selectors) return false;
+    try { return Array.from(section.querySelectorAll(selectors)).some(card => isFeaturedCarousel(card, rule)); }
+    catch (error) { return false; }
+  }
+
   function filterContainers(rule, categories, filtered) {
     const cacheKey = `${filterVersion}|${location.pathname}`;
     if (containerFilterCache && containerFilterCache.key === cacheKey) {
@@ -627,7 +686,7 @@ window.__hoaLoaded = true;
           document.querySelectorAll(shelves).forEach(shelf => {
             if (safePattern(category.shelfTitle, shelfTitle(shelf))) {
               const node = shelf.closest("ytd-rich-section-renderer") || shelf;
-              filtered.add(node); nodes.add(node);
+              if (rule.featuredCarousels !== false || !sectionHasFeaturedCarousel(node, rule)) { filtered.add(node); nodes.add(node); }
             }
           });
         } catch (error) { /* stale selector */ }
@@ -636,7 +695,7 @@ window.__hoaLoaded = true;
           try {
             document.querySelectorAll(config.container).forEach(section => {
               if (safePattern(category.shelfTitle, sectionTitle(section, config, rule))) {
-                filtered.add(section); nodes.add(section);
+                if (rule.featuredCarousels !== false || !sectionHasFeaturedCarousel(section, rule)) { filtered.add(section); nodes.add(section); }
               }
             });
           } catch (error) { /* stale optional section selector */ }
@@ -1583,6 +1642,7 @@ window.__hoaLoaded = true;
     }
     passCardText = new WeakMap();
     passFilterText = new WeakMap();
+    passFeaturedCarousel = new WeakMap();
     const rule = hostnameRule();
     observeRuleRoot(rule);
     if (!rule) {
@@ -1594,7 +1654,7 @@ window.__hoaLoaded = true;
       cleanup();
     }
     lastRule = rule;
-    const nextSignature = JSON.stringify([rule.hideKinds, rule.hideKeywords, Object.keys(hidden), Object.keys(channels), Object.keys(watchedShown)]);
+    const nextSignature = JSON.stringify([rule.hideKinds, rule.hideKeywords, rule.featuredCarousels, Object.keys(hidden), Object.keys(channels), Object.keys(watchedShown)]);
     if (nextSignature !== filterSignature) {
       filterSignature = nextSignature;
       filterVersion += 1;
@@ -1673,6 +1733,7 @@ window.__hoaLoaded = true;
       return;
     }
     const variants = variantsForRule(rule);
+    passFeaturedCarousel = new WeakMap();
     const categories = activeCategories(rule);
     const filtered = new Set();
     const handled = new Set();
