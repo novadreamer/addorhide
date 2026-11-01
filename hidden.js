@@ -335,6 +335,7 @@
       if (href) { title.href = href; title.addEventListener("click", event => { event.preventDefault(); openLink(href); }); }
       info.appendChild(title);
       info.appendChild(element("span", "hidden-kind hidden-channel", "Channel"));
+      if (entry.site) info.appendChild(element("span", "hidden-kind", HOA.siteDisplayName(entry.site)));
       row.appendChild(info);
       const actions = element("div", "hidden-actions");
       const unhide = iconButton("restore-button", RESTORE_ICON, "Show this channel's videos again");

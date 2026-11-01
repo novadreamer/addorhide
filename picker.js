@@ -130,7 +130,25 @@ if (typeof window !== "undefined") {
   function workableMatches(selector) {
     try {
       const matches = Array.from(document.querySelectorAll(selector));
-      return matches.length >= 2 && matches.length <= 300 ? matches : null;
+      if (matches.length < 2 || matches.length > 3000) return null;
+      // Rows and panels often have a perfectly stable selector too.  They are not cards: a representative
+      // one contains several destinations or several poster-sized images.  jsdom has no layout, so the image
+      // count is deliberately the fallback there.
+      const sample = matches.slice(0, Math.min(matches.length, 9));
+      const values = sample.map(match => {
+        const hrefs = new Set(Array.from(match.querySelectorAll("a[href]")).map(link => {
+          try { const url = new URL(link.href || link.getAttribute("href"), location.href); return `${url.pathname}${url.search}`; }
+          catch (error) { return link.getAttribute("href") || ""; }
+        }).filter(Boolean));
+        const images = Array.from(match.querySelectorAll("img"));
+        const sizeable = images.filter(image => {
+          const rect = image.getBoundingClientRect();
+          return rect.width || rect.height ? rect.width >= 60 && rect.height >= 40 : true;
+        });
+        return { hrefs: hrefs.size, images: sizeable.length };
+      }).sort((left, right) => left.hrefs - right.hrefs || left.images - right.images);
+      const median = values[Math.floor(values.length / 2)];
+      return median && median.hrefs <= 2 && median.images <= 2 ? matches : null;
     } catch (error) {
       return null;
     }
@@ -170,24 +188,30 @@ if (typeof window !== "undefined") {
     let node = element;
     // Class/attribute patterns describe the card itself; structural :has() patterns also catch menus and
     // footers that merely link to the same section, so they are only a fallback.
-    const best = { plain: null, structural: null };
+    let structural = null;
     for (let level = 0; node && node !== document.documentElement && node !== document.body && level < 12; level += 1) {
       if (hasAnchor(node)) {
+        let plain = null;
         candidateSelectors(node).forEach(selector => {
           const scored = scoreCandidate(selector, node);
           const kind = selector.includes(":has(") ? "structural" : "plain";
-          const current = best[kind];
+          const current = kind === "plain" ? plain : structural;
           if (scored && (!current || scored.matches.length > current.matches.length
             || (scored.matches.length === current.matches.length && scored.parts < current.parts))) {
-            best[kind] = scored;
+            if (kind === "plain") plain = scored;
+            else structural = scored;
           }
         });
+        // The closest level with an ordinary selector is the card.  Continuing upward merely favours a row.
+        if (plain) return plain.selector;
       }
       node = node.parentElement;
     }
-    const chosen = best.plain || best.structural;
-    return chosen ? chosen.selector : null;
+    return structural ? structural.selector : null;
   }
+
+  // Narrow test seam; production pages never set this flag.
+  if (window.__hoaPickerTest) window.__hoaPickerTest = { buildSelector, workableMatches };
 
   function setPanel(text) {
     message.textContent = text;

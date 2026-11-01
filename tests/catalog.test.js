@@ -60,10 +60,11 @@ catalog.rules.forEach(rule => {
     assert.equal(typeof category.hint, "string");
     assert.ok(category.hint.length > 0);
     [category.pathPattern, category.shelfTitle].filter(Boolean).forEach(source => assert.doesNotThrow(() => new RegExp(source, "iu")));
-    ["href", "text", "channel"].map(key => category.card && category.card[key]).filter(Boolean)
+    ["href", "text", "withoutText", "channel"].map(key => category.card && category.card[key]).filter(Boolean)
       .forEach(source => assert.doesNotThrow(() => new RegExp(source, "iu")));
     [category.containers, category.card && category.card.has, category.card && category.card.is].filter(Boolean)
       .forEach(selector => assert.equal(typeof selector, "string"));
+    if (category.card && category.card.ratings) category.card.ratings.forEach(rating => assert.match(rating, /^(TVY7?|TVG|TVPG|TV14|TVMA|G|PG|PG13|R|NC17|X|7\+|12\+|16\+|18\+|NR)$/));
   }));
 });
 
@@ -93,5 +94,9 @@ check("YouTube gaming category has title terms", () => {
   const gaming = catalog.byId("youtube").categories.find(category => category.id === "gaming");
   assert.ok(Array.isArray(gaming.titleTerms) && gaming.titleTerms.includes("minecraft"));
 });
+check("TMDB retains Movies and TV categories", () => assert.deepEqual(
+  catalog.byId("tmdb").categories.map(category => category.id), ["movies", "tv"]));
+check("new ready-made site ids are present", () => ["xumo", "pluto", "roku", "fandango", "crunchyroll", "odysee", "kick", "rumble", "pbs", "vix", "shout", "justwatch", "rottentomatoes", "letterboxd"]
+  .forEach(id => assert.ok(catalog.byId(id), id)));
 
 console.log(`catalog.test.js: ${passed} passed, 0 failed`);

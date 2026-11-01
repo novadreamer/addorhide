@@ -21,7 +21,9 @@ Moving between the store copy and a Developer-mode copy: they are separate exten
 
 ## Supported sites
 
-YouTube (home feed, subscriptions and creators' Home/Videos/Shorts/Live tabs) and Tubi are built in. IMDb charts/lists, TMDB lists, Dailymotion home, explore, video pages and search, and the Twitch directory can be enabled in one click with **Enable on this site**. Any other site can use the card picker. Sites that need a login or show a CAPTCHA or consent wall were not checked and should use the picker.
+YouTube (home feed, subscriptions and creators' Home/Videos/Shorts/Live tabs) and Tubi are built in. IMDb charts/lists, TMDB lists, Dailymotion home, explore, video pages and search, Twitch, Xumo Play, Pluto TV, The Roku Channel, Fandango at Home, Crunchyroll, Odysee, Kick, Rumble, PBS, ViX, Shout! TV, JustWatch, Rotten Tomatoes and Letterboxd can be enabled in one click with **Enable on this site**. Any other site can use the card picker. Sites that need a login or show a CAPTCHA or consent wall were not checked and should use the picker.
+
+Ready-made type filters include Xumo movies/TV/live channels; Pluto movies/TV/live/kids; Roku movies/TV; Fandango free or paid; Crunchyroll series, movies, dubbed and subtitled; Odysee live and short videos; Kick gambling, chatting and gaming; Rumble live, Shorts and videos; Shout! live/VOD/sign-in; JustWatch and Rotten Tomatoes movies/TV (plus Rotten scores); and Letterboxd adult-themed films. ViX and PBS provide keyword filtering where their captured cards did not expose a reliable type.
 
 The Add/Hide buttons appear centred at the top of a card (or at the bottom of its video picture, chosen with the up/down arrowhead buttons under **Position** in the popup or Options) whenever the mouse is anywhere over it. The round power button turns them off and on for every site without un-hiding anything: red while the hover buttons show (click to disable), green while they are off (click to enable); its tooltip and the line under it say which. While they are off the toolbar icon turns grey with an OFF badge. If the site's own controls sit there, the buttons slide past them; if a site lays its own hover preview over the card (YouTube), the buttons are drawn above it.
 
@@ -59,9 +61,11 @@ Storage is local to this browser and is not synced between devices. Added items 
 
 ## Hide by type and keyword
 
-Each supported site has optional per-site filters in the popup and Options page. Choose categories such as YouTube Shorts, live streams, playlists, movies or Tubi TV shows, or enter comma-separated words and phrases. A word matches whole words (including non-English text) in the title, channel and available card tags. Filtered cards disappear only from the current page: they are not added to Hidden Videos, and turning a category off or removing a word brings them back on the next page update.
+Each supported site has optional per-site filters in the popup and Options page. Choose categories such as YouTube Shorts, live streams, playlists, movies or Tubi TV shows, or enter comma-separated words and phrases. A word matches whole words (including non-English text) in the title, channel and available card tags; outside YouTube it also checks the card's visible or hidden text and labelled image/ARIA/title fields. Pluto's embedded page data also makes listed actor names, genres and descriptions searchable, so an actor name works as a keyword there.
 
-On YouTube, you can hide every video from a channel directly from a card, hide watched videos (detected from YouTube's progress bar), and hide comments. Watched videos are saved in **Hidden Videos** so they remain hidden until restored; restored watched videos are remembered so the switch does not immediately hide them again. The Hidden Videos window keeps hidden **Channels** and **Watched Videos** in their own sections.
+Tubi, Pluto TV and The Roku Channel offer **Unsafe for children**. It filters cards rated PG-13, TV-14, R, NC-17, TV-MA, X, 16+/18+, or unrated, using card ratings and Pluto's page data where available. Tubi also offers **Mature only**, the stricter R/NC-17/TV-MA/X/18+ set. Filtered cards disappear only from the current page: they are not added to Hidden Videos, and turning a category off or removing a word brings them back on the next page update.
+
+On YouTube, Twitch, Odysee, Kick and Rumble, you can hide every video from a channel directly from a card. YouTube can also hide watched videos (detected from YouTube's progress bar) and comments. Watched videos are saved in **Hidden Videos** so they remain hidden until restored; restored watched videos are remembered so the switch does not immediately hide them again. The Hidden Videos window keeps hidden **Channels** and **Watched Videos** in their own sections.
 
 ## Support link
 

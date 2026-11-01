@@ -102,7 +102,9 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "series", label: "TV shows", hint: "Series tiles", card: { href: "^/series/" } },
         { id: "live", label: "Live TV", hint: "Live channels", card: { href: "^/live/", text: "\\bLive\\b" } },
         { id: "kids", label: "Kids & family", hint: "Kids, family and animation", card: { text: "Kids|Family|Animation" }, shelfTitle: "Kids|Family|Animation" },
-        { id: "spanish", label: "En español", hint: "Spanish-language rows and tiles", card: { text: "Español|Spanish" }, shelfTitle: "Español|Spanish" }
+        { id: "spanish", label: "En español", hint: "Spanish-language rows and tiles", card: { text: "Español|Spanish" }, shelfTitle: "Español|Spanish" },
+        { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
+        { id: "mature", label: "Mature only", hint: "Rated R, NC-17, TV-MA, X, or 18+", card: { ratings: ["R", "NC17", "TVMA", "X", "18+"] } }
       ]),
       removeClosest: '[data-test-id="web-ui-grid-item"]',
       gridSelector: "",
@@ -115,6 +117,13 @@ var HOA_CATALOG = Object.freeze((() => {
           titleCandidates: Object.freeze(["h3"]),
           meta: Object.freeze({ texts: Object.freeze([".web-attributes__year-duration"]), rating: ".web-attributes__rating-badge" }),
           removeClosest: "",
+          removeClimb: true
+        }),
+        Object.freeze({
+          cardSelector: '[data-observer-listener-key]:has(.web-content-tile__label-top-left):has(.web-attributes)',
+          linkSelector: 'a[href^="/movies/"], a[href^="/series/"]',
+          titleCandidates: Object.freeze(["h2", "a[title]", "img[alt]"]),
+          meta: Object.freeze({ texts: Object.freeze([".web-attributes__year-duration"]), rating: ".web-attributes__rating-badge", genres: ".web-attributes__year-duration" }),
           removeClimb: true
         })
       ])
@@ -167,7 +176,6 @@ var HOA_CATALOG = Object.freeze((() => {
           meta: Object.freeze({ year: ".release_date" })
         })
       ]),
-      categories: Object.freeze([{ id: "live", label: "Live", hint: "Live videos", card: { text: "\\bLive\\b" } }])
     }),
     Object.freeze({
       id: "dailymotion", name: "Dailymotion", builtIn: false, hosts: Object.freeze(["dailymotion.com"]), subdomains: true,
@@ -192,12 +200,130 @@ var HOA_CATALOG = Object.freeze((() => {
       linkSelector: 'a[data-a-target="preview-card-image-link"]', titleCandidates: Object.freeze(["h4", "h3"]),
       typeFixed: "live", removeClimb: true,
       meta: Object.freeze({ texts: Object.freeze(["*"]), genres: 'a[data-a-target="preview-card-game-link"]' }),
+      channelLinkSelector: 'a[data-a-target="preview-card-channel-link"]',
       channelCandidates: Object.freeze(["h4", "h3", 'a[data-a-target="preview-card-channel-link"]']),
       categories: Object.freeze([
         { id: "live", label: "Live channels", hint: "Channels currently streaming", card: { has: 'a[data-a-target="preview-card-image-link"]', text: "\\bLIVE\\b" } },
         { id: "videos", label: "Past broadcasts & videos", hint: "Recorded Twitch videos", card: { href: "/videos/" } },
         { id: "clips", label: "Clips", hint: "Short Twitch clips", card: { href: "/clip/" } }
       ])
+    }),
+    Object.freeze({
+      id: "xumo", name: "Xumo Play", builtIn: false, hosts: Object.freeze(["play.xumo.com"]), subdomains: false,
+      cardSelector: "li.card.titleCard:not(.promoCard)", removeClosest: "li.card.titleCard", linkSelector: "a[href]", titleCandidates: Object.freeze(["a[aria-label]", "img[alt]"]),
+      categories: Object.freeze([
+        { id: "movies", label: "Movies", hint: "On-demand movies", card: { href: "/free-movies/" } },
+        { id: "tv", label: "TV shows", hint: "On-demand TV series", card: { href: "/tv-shows/" } },
+        { id: "live", label: "Live channels", hint: "Live guide and network channels", card: { href: "/live-guide/|/networks/" } }
+      ])
+    }),
+    Object.freeze({
+      id: "pluto", name: "Pluto TV", builtIn: false, hosts: Object.freeze(["pluto.tv"]), subdomains: true,
+      cardSelector: 'div.swiper-slide:has(a[data-testid="region-link"]), a[data-testid="region-link"]:not(div.swiper-slide a[data-testid="region-link"])', removeClosest: 'div.swiper-slide, a[data-testid="region-link"]', linkSelector: 'a[data-testid="region-link"]', titleCandidates: Object.freeze(["a[aria-label]", "img[alt]"]),
+      pageData: Object.freeze({ script: "script#__NEXT_DATA__", idFromHref: "(?:movies|shows|series)/([0-9a-f]{24})", idKeys: Object.freeze(["id", "contentId", "movieId"]), fields: Object.freeze({ cast: "castNames", genres: "genre", description: "description", rating: "regionalRating.rating", kids: "isKidsContent" }) }),
+      categories: Object.freeze([
+        { id: "movies", label: "Movies", hint: "Movie tiles", card: { href: "/movies/" } },
+        { id: "tv", label: "TV shows", hint: "Series tiles", card: { href: "/shows/|/series/" } },
+        { id: "live", label: "Live TV", hint: "Live TV tiles", card: { href: "/live-tv/" } },
+        { id: "kids", label: "Kids & family", hint: "Tiles marked as kids content", card: { kids: true } },
+        { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } }
+      ])
+    }),
+    Object.freeze({
+      id: "roku", name: "The Roku Channel", builtIn: false, hosts: Object.freeze(["therokuchannel.roku.com"]), subdomains: false,
+      cardSelector: "li.movie, li.series, li[data-row][data-col]", removeClosest: "li.movie, li.series, li[data-row][data-col]", linkSelector: 'a[itemprop="url"]', titleCandidates: Object.freeze(["[aria-label]", 'meta[itemprop="name"]']),
+      meta: Object.freeze({ texts: Object.freeze([".title-label", '[data-test-id="content-indicator-container"]']) }),
+      categories: Object.freeze([
+        { id: "movies", label: "Movies", hint: "Movie tiles", card: { is: "li.movie" } },
+        { id: "tv", label: "TV shows", hint: "Series tiles", card: { is: "li.series" } },
+        { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } }
+      ])
+    }),
+    Object.freeze({
+      id: "fandango", name: "Fandango at Home", builtIn: false, hosts: Object.freeze(["athome.fandango.com", "fandangoathome.com", "vudu.com"]), subdomains: true,
+      cardSelector: '[class*="carousel-default-styles__item"]', removeClosest: '[class*="carousel-default-styles__item"]', linkSelector: 'a[href*="/content/browse/details/"]', titleCandidates: Object.freeze(["img[alt]", "a[aria-label]"]),
+      categories: Object.freeze([
+        { id: "free", label: "Free with ads", hint: "Free or Free to Watch titles", card: { text: "Free to Watch|\\bFree\\b" } },
+        { id: "paid", label: "Rent or buy", hint: "Titles that are not marked free", fallback: true }
+      ])
+    }),
+    Object.freeze({
+      id: "crunchyroll", name: "Crunchyroll", builtIn: false, hosts: Object.freeze(["crunchyroll.com"]), subdomains: true,
+      cardSelector: '[class*="browse-card--"]:not([class*="hover"])', removeClosest: '[class*="browse-card--"]:not([class*="hover"])', linkSelector: 'a[href^="/series/"], a[href^="/watch/"]', titleCandidates: Object.freeze(['[class*="browse-card-hover"] [class*="title"]', "img[alt]", "a[aria-label]"]),
+      categories: Object.freeze([
+        { id: "series", label: "Series", hint: "Series cards", card: { href: "/series/" } },
+        { id: "movies", label: "Movies", hint: "Movies and movie labels", card: { href: "/watch/", text: "\\bMovie\\b" } },
+        { id: "dubbed", label: "Dubbed", hint: "Cards with a Dub label", card: { text: "\\bDub(bed)?\\b" } },
+        { id: "subbed", label: "Subtitled only", hint: "Cards marked Sub or Subtitled, without a dub", card: { text: "\\bSub(titled)?\\b", withoutText: "\\bDub(bed)?\\b" } }
+      ])
+    }),
+    Object.freeze({
+      id: "odysee", name: "Odysee", builtIn: false, hosts: Object.freeze(["odysee.com"]), subdomains: true,
+      cardSelector: "li.claim-preview__wrapper", removeClosest: "li.claim-preview__wrapper", linkSelector: 'a[href^="/@"]:has(.claim-preview__title), .claim-tile__header a[href^="/@"]', titleCandidates: Object.freeze([".claim-preview__title", "a[aria-label]"]),
+      channelLinkSelector: 'a[href^="/@"]:not(:has(.claim-preview__title))', channelCandidates: Object.freeze([".channel-name"]), meta: Object.freeze({ duration: ".claim-preview__overlay-properties span" }),
+      categories: Object.freeze([
+        { id: "live", label: "Live", hint: "Live streams", card: { text: "\\bLIVE\\b" } },
+        { id: "shorts", label: "Shorts", hint: "Videos one minute or shorter", card: { maxSeconds: 60 } }
+      ])
+    }),
+    Object.freeze({
+      id: "kick", name: "Kick", builtIn: false, hosts: Object.freeze(["kick.com"]), subdomains: true,
+      cardSelector: 'div:has(> a[data-testid="media-card-thumbnail"])', removeClosest: 'div:has(> a[data-testid="media-card-thumbnail"])', linkSelector: 'a[data-testid="media-card-thumbnail"]', titleCandidates: Object.freeze(["a[data-card-link]", "a[title]"]),
+      channelLinkSelector: 'a[data-card-link]', channelCandidates: Object.freeze(['a[href^="/"]:not([data-testid="media-card-thumbnail"])']),
+      categories: Object.freeze([
+        { id: "gambling", label: "Gambling", hint: "Casino, betting and gambling streams", card: { text: "Slots & Casino|\\bCasino\\b|\\bSlots\\b|\\bPoker\\b|Blackjack|Roulette|Gambling|Plinko|Sports betting" } },
+        { id: "chatting", label: "Just Chatting / IRL", hint: "Chatting and IRL streams", card: { text: "Just Chatting|\\bIRL\\b" } },
+        { id: "gaming", label: "Gaming", hint: "Streams not marked gambling or chatting", fallback: true }
+      ])
+    }),
+    Object.freeze({
+      id: "rumble", name: "Rumble", builtIn: false, hosts: Object.freeze(["rumble.com"]), subdomains: true,
+      cardSelector: "rum-video-thumbnail", removeClosest: "rum-video-thumbnail", linkSelector: 'a[href*=".html"], a[href*="/shorts/"]', linkAttribute: "url", stripQuery: true, titleCandidates: Object.freeze(["[video-title]"]),
+      channelHrefAttribute: "creator-url", channelNameAttribute: "name",
+      categories: Object.freeze([
+        { id: "live", label: "Live", hint: "Live streams", card: { text: "\\bLIVE\\b" } },
+        { id: "shorts", label: "Shorts", hint: "Rumble Shorts", card: { href: "/shorts/" } },
+        { id: "videos", label: "Videos", hint: "Videos that are not live or Shorts", fallback: true }
+      ])
+    }),
+    Object.freeze({
+      id: "pbs", name: "PBS", builtIn: false, hosts: Object.freeze(["pbs.org"]), subdomains: true,
+      cardSelector: 'a[class*="show_poster__link"]', removeClosest: 'a[class*="show_poster__link"]', linkSelector: 'a[class*="show_poster__link"]', titleCandidates: Object.freeze(["img[alt]"]), categories: Object.freeze([])
+    }),
+    Object.freeze({
+      id: "vix", name: "ViX", builtIn: false, hosts: Object.freeze(["vix.com"]), subdomains: true,
+      cardSelector: '[data-testid="content-card"]', removeClosest: '[data-testid="content-card"]', linkSelector: 'a[href^="/detail/"]', titleCandidates: Object.freeze(["img[alt]", "h3"]), categories: Object.freeze([])
+    }),
+    Object.freeze({
+      id: "shout", name: "Shout! TV", builtIn: false, hosts: Object.freeze(["shout-tv.com"]), subdomains: true,
+      cardSelector: "div.content-pager__item", removeClosest: "div.content-pager__item", linkSelector: "a[data-content-type]", titleCandidates: Object.freeze(["a[aria-label]", "img[alt]", ".card-title__title"]),
+      categories: Object.freeze([
+        { id: "live", label: "Live", hint: "Live channels", card: { has: '[data-card-type="LIVE"]' } },
+        { id: "vod", label: "Movies & episodes", hint: "On-demand titles", card: { has: '[data-card-type="VOD"]' } },
+        { id: "signin", label: "Needs sign-up", hint: "Titles that require sign-in", card: { has: '[data-access-level="GRANTED_ON_SIGN_IN"]' } }
+      ])
+    }),
+    Object.freeze({
+      id: "justwatch", name: "JustWatch", builtIn: false, hosts: Object.freeze(["justwatch.com"]), subdomains: true,
+      cardSelector: '[data-testid="titleItem"]', removeClosest: '[data-testid="titleItem"]', linkSelector: "a[href]", titleCandidates: Object.freeze(['[data-title]']),
+      categories: Object.freeze([
+        { id: "movies", label: "Movies", hint: "Movie titles", card: { href: "/movie/" } },
+        { id: "tv", label: "TV shows", hint: "TV titles", card: { href: "/tv-show/" } }
+      ])
+    }),
+    Object.freeze({
+      id: "rottentomatoes", name: "Rotten Tomatoes", builtIn: false, hosts: Object.freeze(["rottentomatoes.com"]), subdomains: true,
+      cardSelector: "div.discovery-tiles__wrap > div.flex-container", removeClosest: "div.discovery-tiles__wrap > div.flex-container", linkSelector: 'a[href^="/m/"], a[href^="/tv/"]', titleCandidates: Object.freeze(["rt-img[alt]", "a[aria-label]"]),
+      categories: Object.freeze([
+        { id: "movies", label: "Movies", hint: "Movie tiles", card: { href: "/m/" } },
+        { id: "tv", label: "TV shows", hint: "TV tiles", card: { href: "/tv/" } },
+        { id: "rotten", label: "Rotten", hint: "Critics scores below 60%", card: { scoreBelow: 60 } }
+      ])
+    }),
+    Object.freeze({
+      id: "letterboxd", name: "Letterboxd", builtIn: false, hosts: Object.freeze(["letterboxd.com"]), subdomains: true,
+      cardSelector: "li.posteritem", removeClosest: "li.posteritem", linkSelector: 'a[href^="/film/"]', titleCandidates: Object.freeze(['[data-item-name]', "a[title]"]),
+      categories: Object.freeze([{ id: "adult", label: "Adult themed", hint: "Adult-themed films", card: { has: '[data-resolvable-poster-path*="\\\"isAdultThemed\\\":true"]' } }])
     })
   ]);
 

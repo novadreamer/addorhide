@@ -261,7 +261,32 @@ const CASES = [
       assert.strictEqual(entry.kind, "short");
       assert.strictEqual(entry.title, "Tiny robot learns to walk");
     }
-  }
+  },
+  {
+    name: "tubi featured", fixture: "sites/tubi-featured.html", url: "https://tubitv.com/", host: "tubitv.com",
+    cardSelector: '[data-observer-listener-key]:has(.web-content-tile__label-top-left):has(.web-attributes)', cards: 2, optIn: false,
+    expectAdd(key, entry) { assert.ok(/^https:\/\/tubitv\.com\/series\//.test(key), key); assert.ok(entry.title); }
+  },
+  ...[
+    ["xumo movies", "sites/xumo.html", "https://play.xumo.com/free-movies/", "play.xumo.com", "li.card.titleCard:not(.promoCard)", 8],
+    ["xumo TV", "sites/xumo-tv.html", "https://play.xumo.com/tv-shows/", "play.xumo.com", "li.card.titleCard:not(.promoCard)", 6],
+    ["pluto", "sites/pluto.html", "https://pluto.tv/us/movies/", "pluto.tv", 'div.swiper-slide:has(a[data-testid="region-link"]), a[data-testid="region-link"]:not(div.swiper-slide a[data-testid="region-link"])', 8],
+    ["roku", "sites/roku.html", "https://therokuchannel.roku.com/", "therokuchannel.roku.com", "li.movie, li.series, li[data-row][data-col]", 6],
+    ["fandango", "sites/fandango.html", "https://athome.fandango.com/", "athome.fandango.com", '[class*="carousel-default-styles__item"]', 8],
+    ["crunchyroll", "sites/crunchyroll.html", "https://www.crunchyroll.com/browse", "www.crunchyroll.com", '[class*="browse-card--"]:not([class*="hover"])', 3],
+    ["odysee", "sites/odysee.html", "https://odysee.com/", "odysee.com", "li.claim-preview__wrapper", 5],
+    ["kick", "sites/kick.html", "https://kick.com/categories", "kick.com", 'div:has(> a[data-testid="media-card-thumbnail"])', 3],
+    ["rumble", "sites/rumble.html", "https://rumble.com/", "rumble.com", "rum-video-thumbnail", 5],
+    ["pbs", "sites/pbs.html", "https://www.pbs.org/shows/", "www.pbs.org", 'a[class*="show_poster__link"]', 6],
+    ["vix", "sites/vix.html", "https://vix.com/", "vix.com", '[data-testid="content-card"]', 3],
+    ["shout", "sites/shout.html", "https://watch.shout-tv.com/", "watch.shout-tv.com", "div.content-pager__item", 8],
+    ["justwatch", "sites/justwatch.html", "https://www.justwatch.com/us", "www.justwatch.com", '[data-testid="titleItem"]', 6],
+    ["rottentomatoes", "sites/rottentomatoes.html", "https://www.rottentomatoes.com/browse/movies_at_home/", "www.rottentomatoes.com", "div.discovery-tiles__wrap > div.flex-container", 6],
+    ["letterboxd", "sites/letterboxd.html", "https://letterboxd.com/films/", "letterboxd.com", "li.posteritem", 6]
+  ].map(([name, fixture, url, host, cardSelector, cards]) => ({
+    name, fixture, url, host, cardSelector, cards, optIn: true,
+    expectAdd(key, entry) { assert.ok(key && /^https:\/\//.test(key), key); assert.ok(entry && entry.title, name); }
+  }))
 ];
 
 (async () => {
@@ -514,6 +539,68 @@ const CASES = [
     check("hidden channels do not hide cards on their own channel page", () => assert.ok(!page.document.getElementById("blocked").classList.contains("hoa-filtered")));
     check("channel pages do not offer a hide-channel action", () => assert.equal(buttons(page.document.getElementById("blocked"), "channel"), null));
     check("comments category hides the comments container", () => assert.ok(page.document.getElementById("comments").classList.contains("hoa-filtered")));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/xumo.html", url: "https://play.xumo.com/free-movies/",
+      siteRules: { "play.xumo.com": { enabled: true, hideKinds: ["movies"] } } });
+    check("filters: Xumo Movies hides captured movie cards", () => assert.equal(
+      page.document.querySelectorAll("li.card.titleCard.hoa-filtered").length, 8));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/roku.html", url: "https://therokuchannel.roku.com/",
+      siteRules: { "therokuchannel.roku.com": { enabled: true, hideKinds: ["unsafe-kids"] } } });
+    check("filters: Roku unsafe ratings hide TV14 cards and keep TVG", () => {
+      assert.ok(page.document.querySelector('li[aria-label="Forensic Files"].hoa-filtered'));
+      assert.ok(!page.document.querySelector('li[aria-label="Bewitched"].hoa-filtered'));
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/pluto.html", url: "https://pluto.tv/us/movies/",
+      siteRules: { "pluto.tv": { enabled: true, hideKeywords: ["Ice Cube"] } } });
+    check("filters: Pluto page-data cast names are keyword searchable", () => assert.ok(
+      page.document.querySelector('a[aria-label="Friday"]').closest(".swiper-slide").classList.contains("hoa-filtered")));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/pluto.html", url: "https://pluto.tv/us/movies/",
+      siteRules: { "pluto.tv": { enabled: true, hideKinds: ["unsafe-kids"] } } });
+    check("filters: Pluto unsafe ratings use embedded page data", () => {
+      assert.ok(page.document.querySelector('a[aria-label="Friday"]').closest(".swiper-slide").classList.contains("hoa-filtered"));
+      assert.ok(page.document.querySelector('a[aria-label="Little Nicky"]').closest(".swiper-slide").classList.contains("hoa-filtered"));
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/kick.html", url: "https://kick.com/categories", siteRules: { "kick.com": { enabled: true, hideKinds: ["gambling"] } } });
+    check("filters: Kick gambling category filters captured gambling cards", () => assert.ok(page.document.querySelectorAll(".hoa-filtered").length >= 1));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/rumble.html", url: "https://rumble.com/", siteRules: { "rumble.com": { enabled: true, hideKinds: ["live"] } } });
+    check("filters: Rumble Live filters live cards", () => assert.ok(page.document.querySelectorAll("rum-video-thumbnail.hoa-filtered").length >= 1));
+    check("Rumble keys strip every query parameter", () => page.document.querySelectorAll(".hoa-actions").forEach(actions => assert.ok(!actions.hoaData.key.includes("?"))));
+    page.window.close();
+  }
+  {
+    const base = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/" });
+    check("Tubi featured cards receive buttons", () => assert.equal(base.document.querySelectorAll(".hoa-actions").length, 2));
+    base.window.close();
+    const page = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/", siteRules: { "tubitv.com": { hideKeywords: ["Comedy"] } } });
+    check("filters: Tubi featured cards match hidden genre text", () => assert.ok(page.document.querySelectorAll(".hoa-filtered").length >= 1));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/odysee.html", url: "https://odysee.com/", siteRules: { "odysee.com": { enabled: true } } });
+    const first = page.document.querySelector("li.claim-preview__wrapper");
+    buttons(first, "channel").click();
+    await wait(100);
+    check("Odysee Hide channel filters that creator while keeping others", () => {
+      assert.ok(first.classList.contains("hoa-filtered"));
+      assert.ok(page.document.querySelectorAll("li.claim-preview__wrapper:not(.hoa-filtered)").length >= 1);
+    });
     page.window.close();
   }
   console.log(`engine.test.js: ${passed} passed, 0 failed`);

@@ -69,6 +69,8 @@ window.__hoaLoaded = true;
   let filterSignature = "";
   const patternCache = new Map();
   let passCardText = new WeakMap();
+  let passFilterText = new WeakMap();
+  const pageDataCache = new Map();
   const shelfTitleCache = new WeakMap();
   const decisionCache = new WeakMap();
   let containerFilterCache = null;
@@ -224,7 +226,85 @@ window.__hoaLoaded = true;
     return (rule.adMarkers || []).some(marker => card.matches(marker) || card.querySelector(marker) || card.closest(marker));
   }
 
-  function categoryMatches(card, rule, category) {
+  function valueAt(object, path) {
+    return String(path || "").split(".").filter(Boolean).reduce((value, key) => value && value[key], object);
+  }
+
+  function pageDataForRule(rule) {
+    const config = rule && rule.pageData;
+    if (!config || !config.script || !config.idFromHref) return null;
+    let script;
+    try { script = document.querySelector(config.script); } catch (error) { script = null; }
+    const source = script && script.textContent || "";
+    const cacheKey = `${location.href}|${config.script}|${source.length}`;
+    if (pageDataCache.has(cacheKey)) return pageDataCache.get(cacheKey);
+    const values = new Map();
+    try {
+      const root = JSON.parse(source);
+      const stack = [root];
+      const seen = new Set();
+      while (stack.length && seen.size < 50000) {
+        const value = stack.pop();
+        if (!value || typeof value !== "object" || seen.has(value)) continue;
+        seen.add(value);
+        if (!Array.isArray(value)) {
+          const id = (config.idKeys || []).map(key => value[key]).find(candidate => typeof candidate === "string" && candidate);
+          if (id) {
+            const record = {};
+            Object.entries(config.fields || {}).forEach(([name, field]) => {
+              const candidate = valueAt(value, field);
+              if (candidate !== undefined && candidate !== null) record[name] = candidate;
+            });
+            if (Object.keys(record).length) values.set(id.toLowerCase(), record);
+          }
+        }
+        Object.values(value).forEach(child => { if (child && typeof child === "object") stack.push(child); });
+      }
+    } catch (error) {
+      // Embedded page data is optional; a changed or partial script must not stop filtering.
+    }
+    pageDataCache.set(cacheKey, values);
+    return values;
+  }
+
+  function pageDataForCard(card, rule, link = getLink(card, rule)) {
+    const map = pageDataForRule(rule);
+    if (!map || !link) return null;
+    let match;
+    try { match = new RegExp(rule.pageData.idFromHref, "i").exec(link.getAttribute("href") || link.href || ""); }
+    catch (error) { return null; }
+    return match && match[1] ? map.get(match[1].toLowerCase()) || null : null;
+  }
+
+  function normalizeRating(value) {
+    const text = String(value || "").trim().toUpperCase();
+    if (/^(?:NOT\s*RATED|UNRATED|NR|UR)$/.test(text)) return "NR";
+    const normalized = text.replace(/[\s-]/g, "");
+    return /^(?:TVY7?|TVG|TVPG|TV14|TVMA|G|PG|PG13|R|NC17|X|12\+|16\+|18\+|7\+)$/.test(normalized) ? normalized : "";
+  }
+
+  function cardRatings(card, rule, data) {
+    const values = [];
+    const add = value => { const normalized = normalizeRating(value); if (normalized && !values.includes(normalized)) values.push(normalized); };
+    const meta = rule.meta || {};
+    const selectors = [meta.rating, rule.ratingSelector].flat().filter(Boolean);
+    selectors.forEach(selector => {
+      try { card.querySelectorAll(selector).forEach(node => add(elementText(node))); } catch (error) { /* optional selector */ }
+    });
+    if (data && data.pageData && data.pageData.rating) add(data.pageData.rating);
+    const text = cardText(card);
+    const multi = /\b(?:TV-?Y7?|TV-?G|TV-?PG|TV-?14|TV-?MA|PG-?13|NC-?17|NR|Not\s+Rated|Unrated|1[2368]\+|7\+)\b/giu;
+    let match;
+    while ((match = multi.exec(text))) add(match[0]);
+    const standalone = /(?:^|[•·|])\s*(G|R|X)\s*(?=$|[•·|])/giu;
+    while ((match = standalone.exec(text))) add(match[1]);
+    selectors.forEach(selector => {
+      try { card.querySelectorAll(selector).forEach(node => add(elementText(node))); } catch (error) { /* optional selector */ }
+    });
+    return values;
+  }
+
+  function categoryMatches(card, rule, category, data) {
     if (!category || category.fallback || (category.pathPattern && !safePattern(category.pathPattern, location.pathname))) {
       return false;
     }
@@ -249,7 +329,7 @@ window.__hoaLoaded = true;
     }
     if (test.href) {
       const link = getLink(card, rule);
-      results.push(Boolean(link && safePattern(test.href, link.getAttribute("href") || link.href || "")));
+      results.push(Boolean(link && safePattern(test.href, (rule.linkAttribute && link.getAttribute(rule.linkAttribute)) || link.getAttribute("href") || link.href || "")));
     }
     if (test.text) {
       results.push(safePattern(test.text, cardText(card)));
@@ -257,8 +337,21 @@ window.__hoaLoaded = true;
     if (test.channel) {
       results.push(safePattern(test.channel, channelText(card, rule)));
     }
+    if (Array.isArray(test.ratings)) {
+      const ratings = cardRatings(card, rule, data);
+      results.push(test.ratings.some(rating => ratings.includes(normalizeRating(rating))));
+    }
+    if (test.kids === true) results.push(Boolean(data && data.pageData && data.pageData.kids === true));
+    if (Number.isFinite(test.maxSeconds)) {
+      const durations = allLeafTexts(card).map(HOA.parseDuration).filter(Number.isFinite);
+      results.push(durations.some(duration => duration <= test.maxSeconds));
+    }
+    if (Number.isFinite(test.scoreBelow)) {
+      const match = cardText(card).match(/\b(\d{1,3})%/);
+      results.push(Boolean(match && Number(match[1]) < test.scoreBelow));
+    }
     // Conditions are alternatives. This lets catalog rules recognise old and new markup without site-specific code.
-    return results.some(Boolean);
+    return !test.withoutText || !safePattern(test.withoutText, cardText(card)) ? results.some(Boolean) : false;
   }
 
   function safeQuery(card, selector) {
@@ -277,9 +370,15 @@ window.__hoaLoaded = true;
   function cardText(card) {
     const cached = passCardText.get(card);
     if (cached !== undefined) return cached;
-    const actions = Array.from(card.querySelectorAll(".hoa-actions"));
-    const actionText = actions.map(node => node.textContent || "").join(" ");
-    const text = (card.textContent || "").replace(actionText, "").replace(/\s+/g, " ").trim();
+    // Text nodes joined with spaces: textContent glues neighbouring elements together ("Sub | Dub" + "Frieren"
+    // becomes "DubFrieren"), which breaks whole-word types and keywords. No cloning: feeds have hundreds of cards.
+    let text = "";
+    const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (!node.parentElement || !node.parentElement.closest(".hoa-actions")) text += ` ${node.nodeValue || ""}`;
+    }
+    text = text.replace(/\s+/g, " ").trim();
     passCardText.set(card, text);
     return text;
   }
@@ -297,7 +396,19 @@ window.__hoaLoaded = true;
   }
 
   function channelIdentity(card, rule) {
-    if (!rule || rule.id !== "youtube") return null;
+    if (!rule) return null;
+    if (rule.id !== "youtube") {
+      let link = null;
+      try { link = rule.channelLinkSelector && card.querySelector(rule.channelLinkSelector); } catch (error) { link = null; }
+      if (!link && rule.channelHrefAttribute && card.getAttribute(rule.channelHrefAttribute)) link = card;
+      if (!link) return null;
+      const site = (rule.hosts && rule.hosts[0]) || HOA.siteOf(location.href);
+      const url = (rule.channelHrefAttribute && link.getAttribute(rule.channelHrefAttribute)) || link.href || link.getAttribute("href") || "";
+      const linkKey = HOA.channelLinkKey(site, url);
+      const name = (rule.channelNameAttribute && card.getAttribute(rule.channelNameAttribute)) || elementText(link) || channelText(card, rule);
+      const nameKey = HOA.channelNameKey(name, site);
+      return linkKey || nameKey ? { key: linkKey || nameKey, linkKey, nameKey, name, url, site } : null;
+    }
     const links = [
       'ytd-channel-name a[href], ytd-channel-name a#text[href]',
       '.ytContentMetadataViewModelMetadataRow a[href]',
@@ -312,12 +423,12 @@ window.__hoaLoaded = true;
     const url = link ? (link.href || link.getAttribute("href") || "") : "";
     const key = HOA.youtubeChannelKey(url);
     const nameKey = HOA.channelNameKey(name);
-    return key || nameKey ? { key: key || nameKey, linkKey: key, nameKey, name, url } : null;
+    return key || nameKey ? { key: key || nameKey, linkKey: key, nameKey, name, url, site: "youtube.com" } : null;
   }
 
   function isOwnChannelPage(identity) {
     if (!identity || !identity.linkKey) return false;
-    const path = identity.linkKey.slice("youtube.com|".length);
+    const path = identity.linkKey.slice(`${identity.site || "youtube.com"}|`.length);
     const here = location.pathname.toLowerCase();
     // "/@foo" and "/@foo/videos", but not another channel "/@foobar".
     return here === path || here.startsWith(`${path}/`);
@@ -386,6 +497,27 @@ window.__hoaLoaded = true;
   }
 
   function filterText(card, rule, data) {
+    if (rule.id !== "youtube") {
+      const cached = passFilterText.get(card);
+      if (cached !== undefined) return cached;
+      const values = [cardText(card), ...allLeafTexts(card)];
+      const attributes = ["alt", "aria-label", "title", "data-title", "video-title", "data-item-name"];
+      [card, ...Array.from(card.querySelectorAll("*"))].forEach(node => {
+        if (node.closest && node.closest(".hoa-actions")) return;
+        attributes.forEach(attribute => {
+          const value = node.getAttribute && node.getAttribute(attribute);
+          if (value) values.push(value);
+        });
+      });
+      const page = data && data.pageData;
+      if (page) [page.cast, page.genres, page.description].forEach(value => {
+        if (Array.isArray(value)) values.push(...value);
+        else if (value) values.push(String(value));
+      });
+      const text = values.filter(Boolean).join(" ");
+      passFilterText.set(card, text);
+      return text;
+    }
     const text = [data && data.title, channelText(card, rule)];
     const meta = rule.meta || {};
     ["genres", "texts", "metaTexts"].forEach(name => {
@@ -421,11 +553,12 @@ window.__hoaLoaded = true;
     if (!categories.selected.length && !keywords.length) {
       return false;
     }
-    let kindMatch = categories.selected.some(category => !category.fallback && categoryMatches(card, rule, category));
+    let kindMatch = categories.selected.some(category => !category.fallback && categoryMatches(card, rule, category, data));
     const fallback = categories.selected.find(category => category.fallback);
-    if (!kindMatch && fallback && (!fallback.pathPattern || safePattern(fallback.pathPattern, location.pathname))
-      && isOrdinaryVideo(card, rule)) {
-      kindMatch = !categories.all.some(category => !category.fallback && categoryMatches(card, rule, category));
+    if (!kindMatch && fallback && (!fallback.pathPattern || safePattern(fallback.pathPattern, location.pathname))) {
+      kindMatch = rule.id === "youtube"
+        ? isOrdinaryVideo(card, rule) && !categories.all.some(category => !category.fallback && categoryMatches(card, rule, category, data))
+        : true;
     }
     return kindMatch || (keywords.length > 0 && HOA.keywordMatch(filterText(card, rule, data), keywords));
   }
@@ -504,6 +637,9 @@ window.__hoaLoaded = true;
       // Picked cards can be the link itself (a.poster-card).
       link = card;
     }
+    if (!link && rule.linkAttribute && card.getAttribute(rule.linkAttribute)) {
+      link = card;
+    }
     if (!link) {
       link = Array.from(card.querySelectorAll("a[href]"))
         .find(candidate => !candidate.closest(".hoa-actions, #hoa-toast, #hoa-banner"));
@@ -559,7 +695,8 @@ window.__hoaLoaded = true;
       copy.querySelectorAll(".hoa-actions").forEach(node => node.remove());
       ownText = copy.textContent;
     }
-    const candidates = [ownText, element.getAttribute("aria-label"), element.getAttribute("title")];
+    const candidates = [ownText, element.getAttribute("aria-label"), element.getAttribute("title"),
+      element.getAttribute("data-title"), element.getAttribute("video-title"), element.getAttribute("data-item-name"), element.getAttribute("content")];
     for (const candidate of candidates) {
       const text = (candidate || "").trim();
       if (text && !looksLikeBadge(text)) {
@@ -574,7 +711,11 @@ window.__hoaLoaded = true;
     if (!link) {
       return null;
     }
-    const key = HOA.canonicalUrl(link.href || link.getAttribute("href"), location.href);
+    let href = (rule.linkAttribute && link.getAttribute(rule.linkAttribute)) || link.href || link.getAttribute("href");
+    if (rule.stripQuery) {
+      try { const url = new URL(href, location.href); url.search = ""; href = url.href; } catch (error) { /* canonicalUrl rejects malformed links */ }
+    }
+    const key = HOA.canonicalUrl(href, location.href);
     if (!key) {
       return null;
     }
@@ -582,7 +723,7 @@ window.__hoaLoaded = true;
     for (const selector of rule.titleCandidates || []) {
       let candidate;
       try {
-        candidate = card.querySelector(selector);
+        candidate = card.matches(selector) ? card : card.querySelector(selector);
       } catch (error) {
         candidate = null;
       }
@@ -607,7 +748,8 @@ window.__hoaLoaded = true;
       const source = image && (image.currentSrc || image.src || image.getAttribute("src"));
       thumb = typeof source === "string" && /^https?:\/\//i.test(source) && source.length <= HOA.MAX_URL ? source : "";
     }
-    return { key, title, thumb, kind: HOA.kindOf(key), site: HOA.siteOf(key), ts: Date.now() };
+    const pageData = pageDataForCard(card, rule, link);
+    return { key, title, thumb, kind: HOA.kindOf(key), site: HOA.siteOf(key), ts: Date.now(), ...(pageData ? { pageData } : {}) };
   }
 
   function elementText(element) {
@@ -808,9 +950,9 @@ window.__hoaLoaded = true;
       ...channels,
       [key]: {
         key,
-        name: identity.name || key.replace(/^youtube\.com\|name:/, ""),
+        name: identity.name || key.replace(/^[^|]+\|name:/, ""),
         url: identity.url || "",
-        site: "youtube.com",
+        site: identity.site || "youtube.com",
         ts: Date.now(),
         ...(identity.nameKey ? { nameKey: identity.nameKey } : {}),
         ...(identity.linkKey ? { linkKey: identity.linkKey } : {})
@@ -999,7 +1141,7 @@ window.__hoaLoaded = true;
     actions.hoaRule = rule;
     const identity = channelIdentity(card, rule);
     let channel = actions.querySelector('[data-action="channel"]');
-    const isChannelPage = /^\/(?:@|channel\/|c\/|user\/)/.test(location.pathname);
+    const isChannelPage = isOwnChannelPage(identity);
     if (identity && !isChannelPage && !channel) {
       channel = actionButton("Hide channel", () => hideChannel(channel.hoaIdentity));
       channel.dataset.action = "channel";
@@ -1119,6 +1261,7 @@ window.__hoaLoaded = true;
     }
     scheduled = 0;
     passCardText = new WeakMap();
+    passFilterText = new WeakMap();
     const rule = hostnameRule();
     observeRuleRoot(rule);
     if (!rule) {
@@ -1285,7 +1428,7 @@ window.__hoaLoaded = true;
     }
   }
   // Narrow test seam: production pages never create __hoaTest.
-  if (window.__hoaTest) window.__hoaTest.apply = apply;
+  if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, activeCategories, keywordMatch: HOA.keywordMatch });
 
   function isOwnMutation(mutation) {
     return mutation.target.closest && mutation.target.closest(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner");

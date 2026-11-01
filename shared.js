@@ -138,7 +138,21 @@ var HOA = Object.freeze((() => {
     "peacocktv.com": "Peacock",
     "pluto.tv": "Pluto TV",
     "crunchyroll.com": "Crunchyroll",
-    "dailymotion.com": "Dailymotion"
+    "dailymotion.com": "Dailymotion",
+    "play.xumo.com": "Xumo Play",
+    "therokuchannel.roku.com": "The Roku Channel",
+    "athome.fandango.com": "Fandango at Home",
+    "fandangoathome.com": "Fandango at Home",
+    "vudu.com": "Fandango at Home",
+    "odysee.com": "Odysee",
+    "kick.com": "Kick",
+    "rumble.com": "Rumble",
+    "pbs.org": "PBS",
+    "vix.com": "ViX",
+    "shout-tv.com": "Shout! TV",
+    "justwatch.com": "JustWatch",
+    "rottentomatoes.com": "Rotten Tomatoes",
+    "letterboxd.com": "Letterboxd"
   });
 
   function isObject(value) {
@@ -859,9 +873,20 @@ var HOA = Object.freeze((() => {
     return match ? `youtube.com|${match[0].toLowerCase()}` : "";
   }
 
-  function channelNameKey(name) {
+  function channelNameKey(name, site = "youtube.com") {
     const text = typeof name === "string" ? name.trim().replace(/\s+/g, " ").toLowerCase() : "";
-    return text ? `youtube.com|name:${text}` : "";
+    const host = siteHostname(site);
+    return text && host ? `${host}|name:${text}` : "";
+  }
+
+  function channelLinkKey(site, href) {
+    const host = siteHostname(site);
+    if (!host || typeof href !== "string" || !href.trim()) return "";
+    let url;
+    try { url = new URL(href, `https://${host}`); } catch (error) { return ""; }
+    if (siteHostname(url.hostname) !== host) return "";
+    const pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return `${host}|${pathname.toLowerCase()}`;
   }
 
   function normalizeChannels(value) {
@@ -871,12 +896,14 @@ var HOA = Object.freeze((() => {
       const raw = value[key];
       if (!isObject(raw) || !Number.isFinite(raw.ts) || typeof raw.name !== "string") return;
       const name = raw.name.trim().replace(/\s+/g, " ");
-      const linkKey = youtubeChannelKey(raw.url || key);
-      const nameKey = channelNameKey(name);
-      const validKey = /^youtube\.com\|(?:\/(?:@[^/?#]+|channel\/[^/?#]+|c\/[^/?#]+|user\/[^/?#]+)|name:.+)$/i.test(key);
+      const site = siteHostname(raw.site || String(key).split("|")[0]) || "youtube.com";
+      const linkKey = site === "youtube.com" ? youtubeChannelKey(raw.url || key) : channelLinkKey(site, raw.url || key);
+      const nameKey = channelNameKey(name, site);
+      const validKey = new RegExp(`^${site.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\|(?:\\/.+|name:.+)$`, "i").test(key);
       if (!validKey || !name || name.length > MAX_TITLE) return;
-      const url = typeof raw.url === "string" && youtubeChannelKey(raw.url) ? new URL(raw.url, "https://www.youtube.com").href.replace(/[?#].*$/, "") : "";
-      normalized[key.toLowerCase()] = { key: key.toLowerCase(), name, url, site: "youtube.com", ts: raw.ts };
+      const validUrl = site === "youtube.com" ? youtubeChannelKey(raw.url) : channelLinkKey(site, raw.url);
+      const url = typeof raw.url === "string" && validUrl ? new URL(raw.url, `https://${site}`).href.replace(/[?#].*$/, "") : "";
+      normalized[key.toLowerCase()] = { key: key.toLowerCase(), name, url, site, ts: raw.ts };
       if (nameKey) normalized[key.toLowerCase()].nameKey = nameKey;
       if (linkKey && linkKey !== key.toLowerCase()) normalized[key.toLowerCase()].linkKey = linkKey;
     });
@@ -1529,6 +1556,7 @@ var HOA = Object.freeze((() => {
     youtubeChannelKey,
     channelKeyFromHref: youtubeChannelKey,
     channelNameKey,
+    channelLinkKey,
     markWatchedShown,
     withoutAutoWatched,
     clearAutoWatched,

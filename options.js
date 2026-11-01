@@ -317,6 +317,9 @@ function renderFilterSites() {
     input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); addWords(); } });
     words.append(input, save);
     body.appendChild(words);
+    if (catalogRule.pageData && catalogRule.pageData.fields && catalogRule.pageData.fields.cast) {
+      body.appendChild(Object.assign(document.createElement("p"), { className: "filter-note muted", textContent: "Tip: type an actor's name — it matches wherever the site lists the cast." }));
+    }
     const chips = document.createElement("div");
     chips.className = "filter-chips";
     keywords.forEach(word => {
