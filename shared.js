@@ -8,6 +8,7 @@ var HOA = Object.freeze((() => {
   const WATCHED_SHOWN_KEY = "watchedShown";
   const ADDED_KEY = "addedItems";
   const SITES_KEY = "siteRules";
+  const SEEN_ROWS_KEY = "seenRows";
   const MAX_HIDDEN = 1000;
   const MAX_CHANNELS = 500;
   const MAX_WATCHED_SHOWN = 1000;
@@ -879,6 +880,22 @@ var HOA = Object.freeze((() => {
     return text && host ? `${host}|name:${text}` : "";
   }
 
+  // Row names are user data: keep them small, stable and insensitive to harmless spacing/case changes.
+  function normalizeSectionTitles(list) {
+    if (!Array.isArray(list)) return [];
+    const result = [];
+    const seen = new Set();
+    list.forEach(value => {
+      if (typeof value !== "string") return;
+      const title = value.trim().replace(/\s+/g, " ").slice(0, 80);
+      const key = title.toLocaleLowerCase();
+      if (!title || seen.has(key) || result.length >= 100) return;
+      seen.add(key);
+      result.push(title);
+    });
+    return result;
+  }
+
   function channelLinkKey(site, href) {
     const host = siteHostname(site);
     if (!host || typeof href !== "string" || !href.trim()) return "";
@@ -1242,7 +1259,7 @@ var HOA = Object.freeze((() => {
       }
       const raw = value[host];
       const rule = {};
-      ["enabled", "pendingPick", "bulkHide"].forEach(field => {
+      ["enabled", "pendingPick", "bulkHide", "featuredCarousels"].forEach(field => {
         if (typeof raw[field] === "boolean") {
           rule[field] = raw[field];
         }
@@ -1268,6 +1285,7 @@ var HOA = Object.freeze((() => {
       if (Array.isArray(raw.hideKeywords)) {
         rule.hideKeywords = hideKeywords;
       }
+      if (Array.isArray(raw.hideSections)) rule.hideSections = normalizeSectionTitles(raw.hideSections);
       result[host] = rule;
     });
     return result;
@@ -1496,6 +1514,7 @@ var HOA = Object.freeze((() => {
     WATCHED_SHOWN_KEY,
     ADDED_KEY,
     SITES_KEY,
+    SEEN_ROWS_KEY,
     PREFS_KEY,
     THEME_KEY,
     BUTTON_EDGE_KEY,
@@ -1504,6 +1523,7 @@ var HOA = Object.freeze((() => {
     buttonEdgeOf,
     themeOf,
     normalizeHideKinds,
+    normalizeSectionTitles,
     normalizeKeywords,
     keywordMatch,
     MAX_HIDDEN,

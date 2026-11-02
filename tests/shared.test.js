@@ -430,6 +430,8 @@ check("added summary text", () => assert.deepEqual([
 
 check("normalize hide kinds keeps allowed unique ids", () => assert.deepEqual(
   HOA.normalizeHideKinds(["shorts", " shorts ", "bad", 4], ["shorts", "live"]), ["shorts"]));
+check("normalize section titles collapses space and deduplicates case-insensitively", () => assert.deepEqual(
+  HOA.normalizeSectionTitles(["  Sci-Fi   & Fantasy ", "sci-fi & fantasy", 4, "Comedy"]), ["Sci-Fi & Fantasy", "Comedy"]));
 check("normalize keywords trims, folds spaces and deduplicates case-insensitively", () => assert.deepEqual(
   HOA.normalizeKeywords(["  Space   Robot ", "space robot", "", 4]), ["Space Robot"]));
 check("normalize keywords keeps at most ten words", () => assert.equal(
@@ -441,10 +443,10 @@ check("keyword matching uses Unicode whole-word boundaries", () => {
 });
 check("backup keeps filter settings", () => {
   const result = HOA.parseBackup(JSON.stringify(HOA.buildBackup({ hidden: {}, added: {}, siteRules: {
-    "www.youtube.com": { hideKinds: ["shorts", "live"], hideKeywords: [" Robot ", "robot"] }
+    "www.youtube.com": { hideKinds: ["shorts", "live"], hideKeywords: [" Robot ", "robot"], hideSections: [" Comedy ", "comedy"], featuredCarousels: false }
   }, prefs: {} }, "1.1.0", now)));
   assert.equal(result.ok, true);
-  assert.deepEqual(result.backup.siteRules["www.youtube.com"], { hideKinds: ["shorts", "live"], hideKeywords: ["Robot"] });
+  assert.deepEqual(result.backup.siteRules["www.youtube.com"], { hideKinds: ["shorts", "live"], hideKeywords: ["Robot"], hideSections: ["Comedy"], featuredCarousels: false });
 });
 check("YouTube channel keys strip query strings and normalize handles", () => assert.equal(
   HOA.youtubeChannelKey("/@Handle?si=x"), "youtube.com|/@handle"));

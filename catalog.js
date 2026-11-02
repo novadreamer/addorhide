@@ -111,6 +111,7 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "kids", label: "Kids & family", hint: "Kids, family and animation", card: { text: "Kids|Family|Animation" }, shelfTitle: "Kids|Family|Animation" },
         { id: "spanish", label: "En español", hint: "Spanish-language rows and tiles", card: { text: "Español|Spanish" }, shelfTitle: "Español|Spanish" },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", card: { text: "For You In" }, shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
         { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
@@ -221,16 +222,18 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "xumo", carousels: true, name: "Xumo Play", builtIn: false, hosts: Object.freeze(["play.xumo.com"]), subdomains: false,
-      cardSelector: "li.card.titleCard:not(.promoCard)", removeClosest: "li.card.titleCard", linkSelector: "a[href]", titleCandidates: Object.freeze(["a[aria-label]", "img[alt]"]),
-      sections: Object.freeze([{ container: "div.cardList", title: "div.listHeader" }]),
+      cardSelector: "li.card.titleCard, li.card.promoCard", removeClosest: "li.card", featuredSelector: "li.promoCard", linkSelector: "a[href]", titleCandidates: Object.freeze(["a[aria-label]", "img[alt]"]),
+      titleFromSlug: "^/(?:free-movies|tv-shows)/([^/#?]+)",
+      sections: Object.freeze([{ container: "div.cardList", title: "div.listHeader h2" }]), sectionNav: "div.railNav ul.buttonRow > li",
       categories: Object.freeze([
-        { id: "movies", label: "Movies", hint: "On-demand movies", card: { href: "/free-movies/" } },
-        { id: "tv", label: "TV shows", hint: "On-demand TV series", card: { href: "/tv-shows/" } },
-        { id: "live", label: "Live channels", hint: "Live guide and network channels", card: { href: "/live-guide/|/networks/" } },
-        { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
-        { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
-        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
+        { id: "popular", label: "Most Popular", hint: "The Most Popular row", shelfTitle: "^Most Popular\\s*$" },
+        { id: "special", label: "Tributes & special rows", hint: "Rows that come and go, such as Remembering Patrick Stewart or Season of Scares", shelfTitle: "^(?:(?:Remembering|In Memoriam|In Memory|Celebrating|Honoring|Tribute|Spotlight)\\b|Season of|Halloween|Spooky|Christmas|Holiday|Thanksgiving|Valentine|\\bMonth\\b|Summer of|Awards?).*", rowsAbove: "^Editor.?s Picks$" },
+        { id: "originals", label: "XUMO Originals", hint: "The XUMO Originals row", shelfTitle: "^XUMO Originals\\s*$" },
+        { id: "exclusives", label: "Xumo Exclusives", hint: "The Xumo Exclusives row", shelfTitle: "^Xumo Exclusives\\s*$" },
+        { id: "recent", label: "Recently added", hint: "The Recently added row", shelfTitle: "^Recently Added\\s*$" },
+        { id: "recommended", label: "Recommended for you", hint: "The Recommended For You row", shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "editors", label: "Editor's Picks", hint: "The Editor's Picks row", shelfTitle: "^Editor.?s Picks\\s*$" },
+        { id: "genres", label: "Genres", hint: "Hide rows by their heading" }
       ])
     }),
     Object.freeze({
@@ -245,6 +248,7 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "kids", label: "Kids & family", hint: "Tiles marked as kids content", card: { kids: true } },
         { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
         { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
@@ -260,6 +264,7 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "tv", label: "TV shows", hint: "Series tiles", card: { is: "li.series" } },
         { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
         { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }

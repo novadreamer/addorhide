@@ -23,6 +23,7 @@ const filterSites = document.getElementById("filter-sites");
 let hidden = {};
 let added = {};
 let siteRules = {};
+let seenRows = {};
 let siteRulesWrittenHere = false;
 const filterDuplicateNotes = {};
 
@@ -143,8 +144,9 @@ function renderHidden() {
 }
 
 function loadRules() {
-  chrome.storage.local.get({ [HOA.SITES_KEY]: {} }, result => {
+  chrome.storage.local.get({ [HOA.SITES_KEY]: {}, [HOA.SEEN_ROWS_KEY]: {} }, result => {
     siteRules = result[HOA.SITES_KEY] && typeof result[HOA.SITES_KEY] === "object" ? result[HOA.SITES_KEY] : {};
+    seenRows = result[HOA.SEEN_ROWS_KEY] && typeof result[HOA.SEEN_ROWS_KEY] === "object" ? result[HOA.SEEN_ROWS_KEY] : {};
     bulkHideInput.checked = (siteRules["www.youtube.com"] || siteRules["youtube.com"] || {}).bulkHide === true;
     bulkHideTubiInput.checked = (siteRules["tubitv.com"] || siteRules["www.tubitv.com"] || {}).bulkHide === true;
     renderSites();
@@ -246,13 +248,14 @@ function filterHost(catalogRule) {
   return catalogRule.id === "youtube" ? "www.youtube.com" : catalogRule.hosts[0];
 }
 
-function saveFilterRule(host, categories, kinds, keywords) {
+function saveFilterRule(host, categories, kinds, keywords, hideSections = siteRule(host).hideSections) {
   const wasWatched = HOA.normalizeHideKinds(siteRule(host).hideKinds, categories.map(category => category.id)).includes("watched");
   const nextKinds = HOA.normalizeHideKinds(kinds, categories.map(category => category.id));
   siteRules = { ...siteRules, [host]: {
     ...siteRule(host),
     hideKinds: nextKinds,
-    hideKeywords: HOA.normalizeKeywords(keywords)
+    hideKeywords: HOA.normalizeKeywords(keywords),
+    hideSections: HOA.normalizeSectionTitles(hideSections)
   } };
   siteRulesWrittenHere = true;
   chrome.storage.local.set({ [HOA.SITES_KEY]: siteRules }, () => renderFilterSites());
@@ -277,6 +280,7 @@ function renderFilterSites() {
     const rule = siteRule(host);
     const kinds = HOA.normalizeHideKinds(rule.hideKinds, categories.map(category => category.id));
     const keywords = HOA.normalizeKeywords(rule.hideKeywords);
+    const hideSections = HOA.normalizeSectionTitles(rule.hideSections);
     const details = document.createElement("details");
     details.className = "hide-filters";
     details.dataset.host = host;
@@ -287,7 +291,7 @@ function renderFilterSites() {
     details.appendChild(summary);
     const body = document.createElement("div");
     body.className = "hide-filters-body";
-    categories.forEach(category => {
+    categories.filter(category => category.id !== "genres").forEach(category => {
       const label = document.createElement("label");
       label.className = "switch-row";
       label.title = category.hint;
@@ -300,6 +304,16 @@ function renderFilterSites() {
       label.append(toggle, document.createTextNode(` ${category.label}`));
       body.appendChild(label);
     });
+    const rowPicker = categories.find(category => category.id === "genres");
+    if (rowPicker) {
+      const rowDetails = document.createElement("details"); rowDetails.className = "row-picker";
+      const rowSummary = document.createElement("summary"); rowSummary.textContent = `${rowPicker.label} — ${hideSections.length} hidden`; rowDetails.appendChild(rowSummary);
+      const titles = HOA.normalizeSectionTitles([...(seenRows[host] || []), ...hideSections]);
+      if (!titles.length) rowDetails.appendChild(Object.assign(document.createElement("p"), { className: "filter-note muted", textContent: "Open the site once to list its rows." }));
+      titles.forEach(title => { const label = document.createElement("label"); label.className = "switch-row"; const toggle = document.createElement("input"); toggle.type = "checkbox"; toggle.checked = hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0);
+        toggle.addEventListener("change", () => saveFilterRule(host, categories, kinds, keywords, toggle.checked ? [...hideSections, title] : hideSections.filter(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) !== 0))); label.append(toggle, document.createTextNode(` ${title}`)); rowDetails.appendChild(label); });
+      body.appendChild(rowDetails);
+    }
     if (categories.length && (catalogRule.carousels || catalogRule.featuredSelector)) {
       const label = document.createElement("label");
       label.className = "switch-row";

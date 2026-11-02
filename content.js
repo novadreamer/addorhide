@@ -193,7 +193,7 @@ window.__hoaLoaded = true;
     if (!catalogRule && (!validPicks.length || !stored || stored.enabled !== true)) {
       return null;
     }
-    const merged = { ...base, catalog: Boolean(catalogRule), userPicked: validPicks.length > 0, hideKinds: [], hideKeywords: [], featuredCarousels: true };
+    const merged = { ...base, catalog: Boolean(catalogRule), userPicked: validPicks.length > 0, hideKinds: [], hideKeywords: [], hideSections: [], featuredCarousels: true };
     if (stored && typeof stored === "object") {
       // Enable stores linkSelector: "" for every site; an empty value must not wipe a catalog rule's link.
       if (typeof stored.linkSelector === "string" && stored.linkSelector && stored.linkSelector.length <= 500
@@ -206,6 +206,7 @@ window.__hoaLoaded = true;
       const allowedKinds = (base.categories || []).map(category => category.id);
       merged.hideKinds = HOA.normalizeHideKinds(stored.hideKinds, allowedKinds);
       merged.hideKeywords = HOA.normalizeKeywords(stored.hideKeywords);
+      merged.hideSections = HOA.normalizeSectionTitles(stored.hideSections);
       if (typeof stored.featuredCarousels === "boolean") merged.featuredCarousels = stored.featuredCarousels;
     }
     merged.pickedSelectors = validPicks;
@@ -667,6 +668,61 @@ window.__hoaLoaded = true;
     catch (error) { return false; }
   }
 
+  function rowLabel(node) {
+    if (!node) return "";
+    const labelled = node.querySelector && node.querySelector("[aria-label]");
+    return ((labelled && labelled.getAttribute("aria-label")) || node.getAttribute && node.getAttribute("aria-label") || node.textContent || "")
+      .replace(/\s+/g, " ").trim();
+  }
+
+  function rowKey(title) {
+    const normalized = HOA.normalizeSectionTitles([title]);
+    return normalized.length ? normalized[0].toLocaleLowerCase() : "";
+  }
+
+  // Sections are classified as a group once per pass.  In particular, this keeps the Xumo rail useful while
+  // its lower rows have not been lazy-rendered yet.
+  function sectionRows(rule) {
+    const rows = [];
+    (rule.sections || []).forEach(config => {
+      if (!config || !config.container) return;
+      try { document.querySelectorAll(config.container).forEach(section => {
+        const title = sectionTitle(section, config, rule);
+        if (title) rows.push({ section, title, featured: sectionHasFeaturedCarousel(section, rule) });
+      }); } catch (error) { /* stale optional selector */ }
+    });
+    let navTitles = [];
+    if (rule.sectionNav) {
+      try { navTitles = Array.from(document.querySelectorAll(rule.sectionNav)).map(rowLabel).filter(Boolean); } catch (error) { navTitles = []; }
+    }
+    const order = navTitles.length ? navTitles : rows.map(row => row.title);
+    const categories = (rule.categories || []).filter(category => category.id !== "genres" && (category.shelfTitle || category.rowsAbove));
+    const anchorIndex = category => category.rowsAbove ? order.findIndex(title => safePattern(category.rowsAbove, title)) : -1;
+    const orderIndex = new Map();
+    order.forEach((title, index) => { const key = rowKey(title); if (key && !orderIndex.has(key)) orderIndex.set(key, index); });
+    const classify = (title, index, featured) => {
+      const direct = categories.filter(category => category.shelfTitle && safePattern(category.shelfTitle, title));
+      // A positional category is the fallback for rows with no title category at all; it never overrides a match.
+      const positional = direct.length || featured ? [] : categories.filter(category => category.rowsAbove && index >= 0 && index < anchorIndex(category));
+      const kinds = [...direct, ...positional].map(category => category.id);
+      return { kinds, kind: kinds[0] || (featured ? "featured" : "genre") };
+    };
+    rows.forEach((row, index) => {
+      const position = navTitles.length ? orderIndex.get(rowKey(row.title)) : index;
+      Object.assign(row, classify(row.title, Number.isInteger(position) ? position : -1, row.featured));
+    });
+    return { rows, navTitles, categories, anchorIndex, classify };
+  }
+
+  function hideSectionNav(rule, rows, filtered, nodes) {
+    if (!rule.sectionNav) return;
+    const hiddenTitles = new Set(rows.filter(row => filtered.has(row.section)).map(row => rowKey(row.title)).filter(Boolean));
+    try { document.querySelectorAll(rule.sectionNav).forEach(node => {
+      const key = rowKey(rowLabel(node));
+      if (key && hiddenTitles.has(key)) { filtered.add(node); if (nodes) nodes.add(node); }
+    }); } catch (error) { /* optional nav */ }
+  }
+
   function filterContainers(rule, categories, filtered) {
     const cacheKey = `${filterVersion}|${location.pathname}`;
     if (containerFilterCache && containerFilterCache.key === cacheKey) {
@@ -690,18 +746,17 @@ window.__hoaLoaded = true;
             }
           });
         } catch (error) { /* stale selector */ }
-        (rule.sections || []).forEach(config => {
-          if (!config || !config.container) return;
-          try {
-            document.querySelectorAll(config.container).forEach(section => {
-              if (safePattern(category.shelfTitle, sectionTitle(section, config, rule))) {
-                if (rule.featuredCarousels !== false || !sectionHasFeaturedCarousel(section, rule)) { filtered.add(section); nodes.add(section); }
-              }
-            });
-          } catch (error) { /* stale optional section selector */ }
-        });
       }
     });
+    const info = sectionRows(rule);
+    const selectedIds = new Set(categories.selected.map(category => category.id));
+    const hiddenNames = new Set(HOA.normalizeSectionTitles(rule.hideSections).map(rowKey).filter(Boolean));
+    info.rows.forEach(row => {
+      const byType = row.kinds.some(id => selectedIds.has(id));
+      const byName = row.kind === "genre" && hiddenNames.has(rowKey(row.title));
+      if ((byType || byName) && (rule.featuredCarousels !== false || !row.featured)) { filtered.add(row.section); nodes.add(row.section); }
+    });
+    hideSectionNav(rule, info.rows, filtered, nodes);
     containerFilterCache = { key: cacheKey, nodes };
   }
 
@@ -842,6 +897,11 @@ window.__hoaLoaded = true;
       if (title) {
         break;
       }
+    }
+    if (rule.titleFromSlug && (!title || /\.(?:png|jpe?g|webp)$/i.test(title))) {
+      const rawHref = link.getAttribute("href") || href || "";
+      const match = rawHref.match(new RegExp(rule.titleFromSlug, "i"));
+      if (match && match[1]) title = match[1].replace(/[-_]+/g, " ").replace(/\b\w/g, letter => letter.toUpperCase());
     }
     if (!title && rule.userPicked) {
       title = pickedTitle(card, link);
@@ -1509,8 +1569,19 @@ window.__hoaLoaded = true;
       if (isAd(card, variant)) removeActions(card);
       return;
     }
-    const data = cardData(card, variant);
     const target = removalTarget(card, variant);
+    // A Xumo Featured promo may point at a row (#id), not a video.  It follows that row's visibility and has
+    // no hover controls or stored-item identity of its own.
+    const promoLink = variant.id === "xumo" && card.matches(".promoCard") && getLink(card, variant);
+    const promoHash = promoLink && (promoLink.getAttribute("href") || "").match(/#([^/?#]+)$/);
+    if (promoHash) {
+      removeActions(card);
+      const row = document.getElementById(promoHash[1]);
+      if (variant.featuredCarousels !== false && row && (filtered.has(row) || (state.applyAdded && row.classList.contains(FILTER_CLASS)))) filtered.add(target);
+      handled.add(card);
+      return;
+    }
+    const data = cardData(card, variant);
     if (!data) {
       // No link yet (Tubi renders a feature card's links only once it has been in view): no buttons and no
       // stored hiding, but types and keywords still apply, from the title and text the card already shows.
@@ -1654,7 +1725,7 @@ window.__hoaLoaded = true;
       cleanup();
     }
     lastRule = rule;
-    const nextSignature = JSON.stringify([rule.hideKinds, rule.hideKeywords, rule.featuredCarousels, Object.keys(hidden), Object.keys(channels), Object.keys(watchedShown)]);
+    const nextSignature = JSON.stringify([rule.hideKinds, rule.hideKeywords, rule.hideSections, rule.featuredCarousels, Object.keys(hidden), Object.keys(channels), Object.keys(watchedShown)]);
     if (nextSignature !== filterSignature) {
       filterSignature = nextSignature;
       filterVersion += 1;
@@ -1737,7 +1808,7 @@ window.__hoaLoaded = true;
     const categories = activeCategories(rule);
     const filtered = new Set();
     const handled = new Set();
-    const cardState = { categories, filtered, handled };
+    const cardState = { categories, filtered, handled, applyAdded: true };
     filterContainers(rule, categories, filtered);
     const matches = new Map();
     const addMatches = (node, variant) => {
@@ -1933,6 +2004,17 @@ window.__hoaLoaded = true;
           .filter(node => !cardTargets.has(node) && !matchedCards.includes(node) && !(union && node.matches(union))
             && !node.closest(".hoa-empty"));
         const collapsedSections = outer(Array.from(document.querySelectorAll(".hoa-empty")), ".hoa-empty");
+        let rows = [];
+        if (rule && rule.sections && rule.sections.length) {
+          const info = sectionRows(rule);
+          const titles = info.navTitles.length ? info.navTitles : info.rows.map(row => row.title);
+          const renderedByKey = new Map(info.rows.map(row => [rowKey(row.title), row]));
+          rows = titles.slice(0, 120).map((title, index) => {
+            const rendered = renderedByKey.get(rowKey(title));
+            const classified = info.classify(title, index, Boolean(rendered && rendered.featured));
+            return { title, kind: classified.kind };
+          });
+        }
         sendResponse({
           active: Boolean(rule), cards, pathMatched, version, bulk: bulkApplied,
           overlays: Array.from(document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"]:not(.hoa-float)`))
@@ -1944,7 +2026,8 @@ window.__hoaLoaded = true;
           filteredSections: filteredSections.length + collapsedSections.length,
           channelVideos: channelVideos.length,
           watchedHere: rule ? matchedCards.filter(card => watchedCard(card, rule)).length : 0,
-          watchedLabels: document.querySelectorAll(`[data-hoa-watched="${ownInstance}"]`).length
+          watchedLabels: document.querySelectorAll(`[data-hoa-watched="${ownInstance}"]`).length,
+          rows
         });
       }
     });

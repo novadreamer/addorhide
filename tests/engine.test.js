@@ -640,10 +640,84 @@ const CASES = [
     page.window.close();
   }
   {
-    const page = await load({ fixture: "sites/xumo.html", url: "https://play.xumo.com/free-movies/",
-      siteRules: { "play.xumo.com": { enabled: true, hideKinds: ["movies"] } } });
-    check("filters: Xumo Movies hides captured movie cards", () => assert.equal(
-      page.document.querySelectorAll("li.card.titleCard.hoa-filtered").length, 8));
+    const page = await load({ fixture: "sites/xumo-rows.html", url: "https://play.xumo.com/free-movies/",
+      siteRules: { "play.xumo.com": { enabled: true, hideKinds: ["popular"] } } });
+    check("filters: Xumo Most Popular hides only its row", () => {
+      assert.ok(page.document.getElementById("582924").classList.contains("hoa-filtered"));
+      assert.ok(!page.document.getElementById("582926").classList.contains("hoa-filtered"));
+      assert.ok(page.document.querySelector('li a[aria-label="Most Popular"]').closest("li").classList.contains("hoa-filtered"));
+    });
+    check("filters: Xumo section title excludes View All", () => assert.equal(page.document.getElementById("582924").querySelector("h2").textContent, "Most Popular"));
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/xumo-rows.html", url: "https://play.xumo.com/free-movies/",
+      siteRules: { "play.xumo.com": { enabled: true, hideKinds: ["special"], hideSections: ["Comedy", "sci-fi & fantasy"] } } });
+    check("filters: Xumo special and named genre rows hide", () => {
+      assert.ok(page.document.getElementById("582926").classList.contains("hoa-filtered"));
+      ["Comedy", "Sci-Fi & Fantasy"].forEach(title => assert.ok(Array.from(page.document.querySelectorAll(".cardList")).find(row => row.querySelector("h2") && row.querySelector("h2").textContent.trim() === title).classList.contains("hoa-filtered")));
+      ["Comedy", "Sci-Fi & Fantasy"].forEach(title => assert.ok(page.document.querySelector(`li a[aria-label="${title}"]`).closest("li").classList.contains("hoa-filtered"), `${title} rail entry follows its hidden row`));
+    });
+    check("filters: Xumo promo title comes from href and row promo gets no actions", () => {
+      const promos = page.document.querySelectorAll("li.promoCard");
+      assert.equal(promos[0].querySelector(".hoa-actions").hoaData.title, "Wyatt Earp 2");
+      assert.equal(promos[1].querySelector(".hoa-actions"), null);
+      assert.ok(promos[1].classList.contains("hoa-filtered"), "row promo follows the filtered row on the first pass");
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/xumo-rows.html", url: "https://play.xumo.com/free-movies/",
+      siteRules: { "play.xumo.com": { enabled: true, hideKinds: ["special"], hideKeywords: ["Wyatt"], featuredCarousels: false } }, testSeam: true });
+    const normal = page.document.createElement("li");
+    normal.className = "card titleCard";
+    normal.innerHTML = '<a aria-label="Wyatt ordinary" href="/free-movies/wyatt-ordinary/X-test">Wyatt ordinary</a>';
+    page.document.getElementById("582924").querySelector("ul").appendChild(normal);
+    page.test.apply();
+    check("Xumo excluded featured promos stay visible while ordinary keyword matches hide", () => {
+      const promos = page.document.querySelectorAll("li.promoCard");
+      assert.ok(!promos[0].classList.contains("hoa-filtered"), "video promo is kept when featured carousels are excluded");
+      assert.ok(!promos[1].classList.contains("hoa-filtered"), "row promo is kept when its target row is hidden but Featured is excluded");
+      assert.ok(normal.classList.contains("hoa-filtered"), "ordinary Wyatt card still matches the keyword");
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/xumo-tv-rows.html", url: "https://play.xumo.com/tv-shows/",
+      siteRules: { "play.xumo.com": { enabled: true, hideKinds: ["special"], hideSections: ["Crime TV"] } } });
+    check("filters: Xumo TV classifies special and named rows", () => {
+      assert.ok(page.document.getElementById("556825").classList.contains("hoa-filtered"));
+      assert.ok(page.document.getElementById("33108").classList.contains("hoa-filtered"));
+      assert.ok(!page.document.getElementById("539123").classList.contains("hoa-filtered"));
+    });
+    const status = await page.status();
+    check("Xumo status reports rail rows in order with fixed and lazy genre kinds", () => {
+      assert.deepEqual(status.rows.slice(0, 4), [
+        { title: "Season of Scares", kind: "special" }, { title: "Editor's Picks", kind: "editors" },
+        { title: "Westerns", kind: "genre" }, { title: "Crime TV", kind: "genre" }
+      ]);
+    });
+    page.window.close();
+  }
+  {
+    const html = '<section id="both"><h2>Recommended International</h2><div data-test-id="web-ui-grid-container"></div></section>';
+    const page = await load({ html, url: "https://tubitv.com/", siteRules: { "tubitv.com": { enabled: true, hideKinds: ["foreign"] } } });
+    check("a row matching multiple shelf categories hides when only its non-first category is selected", () => {
+      assert.ok(page.document.getElementById("both").classList.contains("hoa-filtered"));
+    });
+    page.window.close();
+  }
+  {
+    const html = '<div class="buttonList railNav"><ul class="buttonRow"><li><a aria-label="Something New">Something New</a></li><li><a aria-label="Editor’s Picks">Editor’s Picks</a></li><li><a aria-label="Comedy">Comedy</a></li></ul></div>'
+      + '<div class="cardList cardListType-promo"><div class="listHeader"><h2>Featured</h2></div><ul><li class="card promoCard"><a href="/free-movies/featured/X1">Featured</a></li></ul></div>'
+      + '<div class="cardList" id="temporary"><div class="listHeader"><h2>Something New</h2></div><ul><li class="card titleCard"><a href="/free-movies/new/X2">New</a></li></ul></div>'
+      + '<div class="cardList" id="editors"><div class="listHeader"><h2>Editor’s Picks</h2></div><ul><li class="card titleCard"><a href="/free-movies/editor/X3">Editor</a></li></ul></div>'
+      + '<div class="cardList" id="genre"><div class="listHeader"><h2>Comedy</h2></div><ul><li class="card titleCard"><a href="/free-movies/comedy/X4">Comedy</a></li></ul></div>';
+    const page = await load({ html, url: "https://play.xumo.com/free-movies/", siteRules: { "play.xumo.com": { enabled: true, hideKinds: ["special"] } } });
+    check("Xumo positional special applies only above Editor's Picks", () => {
+      assert.ok(page.document.getElementById("temporary").classList.contains("hoa-filtered"));
+      assert.ok(!page.document.getElementById("genre").classList.contains("hoa-filtered"));
+    });
     page.window.close();
   }
   {

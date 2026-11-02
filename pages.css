@@ -360,6 +360,28 @@ button.filter-tool { display: grid; width: 30px; min-width: 30px; min-height: 30
 button.filter-tool svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 button.filter-tool[aria-pressed="false"] { color: var(--muted); }
 button.filter-tool:disabled { opacity: .4; cursor: default; }
+.genres-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; width: 100%; min-height: 38px; padding: 0; color: var(--text); background: transparent; border: 0; border-radius: 0; font: inherit; text-align: left; cursor: pointer; }
+.genres-row:hover { background: transparent; }
+.hide-filters-body button.genres-row { padding: 0; margin: 0; }
+.genres-switch { position: relative; width: 38px; height: 22px; margin-right: -4px; background: var(--border); border-radius: 999px; transform: scale(.88); transform-origin: left center; }
+.genres-switch::after { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; content: ""; background: var(--surface); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.18); transition: left .15s ease; }
+.genres-row[aria-checked="true"] .genres-switch, .genres-row[aria-checked="mixed"] .genres-switch { background: var(--accent); }
+.genres-row[aria-checked="true"] .genres-switch::after { left: 19px; }
+.genres-row[aria-checked="mixed"] .genres-switch::after { left: 11px; }
+.genres-row small { color: var(--muted); }
+.genres-row .filter-chevron { transition: transform .2s ease; }
+.genres-row[aria-expanded="true"] .filter-chevron { transform: rotate(90deg); }
+.genres-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 200ms ease; }
+.genres-panel.is-open { grid-template-rows: 1fr; }
+.genres-panel > * { min-height: 0; overflow: hidden; }
+.genres-panel-header { display: flex; align-items: center; gap: 5px; padding: 6px 0; }
+.genres-panel-header > span { margin-right: auto; font-size: 12px; }
+.genres-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; padding-bottom: 8px; }
+.genres-list .filter-note { grid-column: 1 / -1; }
+.genre-check { display: flex; gap: 6px; align-items: center; min-width: 0; min-height: 24px; font-size: 12px; line-height: 1.35; cursor: pointer; }
+.genre-check input { flex: 0 0 auto; margin: 0; }
+.genre-check span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+@media (prefers-reduced-motion: reduce) { .genres-panel { transition: none; } }
 .popup .popup-footer .footer-icon-button { width: 30px; min-width: 30px; padding: 3px; }
 .popup .button-controls.popup-position-room { padding-bottom: var(--popup-position-room, 14px); }
 

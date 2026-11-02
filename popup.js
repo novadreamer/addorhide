@@ -114,7 +114,7 @@ function openPopover(triggerButton, titleText, buildBody) {
   const tools = document.createElement("div"); tools.className = "filter-popover-tools"; header.appendChild(tools);
   const close = button("×", closePanel); close.className = "filter-close"; close.setAttribute("aria-label", `Close ${titleText}`); tools.appendChild(close); panel.appendChild(header);
   const body = document.createElement("div"); body.className = "hide-filters-body"; panel.appendChild(body);
-  const closeOnKey = event => { if (event.key === "Escape") closePanel(); };
+  const closeOnKey = event => { if (event.key === "Escape") { if (panel.hoaCloseInner && panel.hoaCloseInner()) return; closePanel(); } };
   let closing = false;
   function closePanel() { if (closing) return; closing = true; document.removeEventListener("keydown", closeOnKey); if (panel.hoaRefresh) clearInterval(panel.hoaRefresh); panel.classList.add("is-closing"); backdrop.classList.add("is-closing"); setTimeout(() => { panel.remove(); backdrop.remove(); triggerButton.focus(); }, 290); }
   backdrop.addEventListener("click", closePanel); document.addEventListener("keydown", closeOnKey);
@@ -243,29 +243,34 @@ function addLearnedControl(host, catalog, rule, container) {
 
 function appendFilterControls(container, catalogRule) {
   const categories = catalogRule && Array.isArray(catalogRule.categories) ? catalogRule.categories : [];
+  const typeCategories = categories.filter(category => category.id !== "genres");
+  const genreCategory = categories.find(category => category.id === "genres");
   let kinds = HOA.normalizeHideKinds(siteRule(activeHost).hideKinds, categories.map(category => category.id));
   let keywords = HOA.normalizeKeywords(siteRule(activeHost).hideKeywords);
+  let hideSections = HOA.normalizeSectionTitles(siteRule(activeHost).hideSections);
   let featuredCarousels = siteRule(activeHost).featuredCarousels !== false;
   let duplicateMessage = "";
+  let genresOpen = false;
+  let genreTitles = [];
   let refreshCount = () => {};   // set while the popover is open
   const launch = button("Hide on this site", openPanel);
   launch.className = "secondary-button filter-launch";
   launch.innerHTML = '<span class="filter-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7v5l-4 2v-7z"/></svg></span><span>Hide on this site</span><span class="filter-badge" hidden></span><span class="filter-chevron">›</span>';
-  const updateSummary = () => { const labels = categories.filter(c => kinds.includes(c.id)).map(c => c.label); const count = labels.length + keywords.length; const what = [...labels, keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", "); const summary = count ? `Hiding: ${what}` : "Nothing is hidden by type or word on this site"; launch.title = `${summary}${featuredCarousels ? "" : " · not in featured carousels"}`; const badge = launch.querySelector(".filter-badge"); badge.hidden = !count; badge.textContent = count; launch.classList.toggle("is-active", Boolean(count)); };
+  const updateSummary = () => { const labels = typeCategories.filter(c => kinds.includes(c.id)).map(c => c.label); const count = labels.length + keywords.length + (hideSections.length ? 1 : 0); const what = [...labels, hideSections.length ? `${hideSections.length} genre${hideSections.length === 1 ? "" : "s"}` : "", keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", "); const summary = count ? `Hiding: ${what}` : "Nothing is hidden by type or word on this site"; launch.title = `${summary}${featuredCarousels ? "" : " · not in featured carousels"}`; const badge = launch.querySelector(".filter-badge"); badge.hidden = !count; badge.textContent = count; launch.classList.toggle("is-active", Boolean(count)); };
   updateSummary();
   container.append(launch);
   function save() {
     const hadWatched = HOA.normalizeHideKinds(siteRule(activeHost).hideKinds, categories.map(c => c.id)).includes("watched");
     const hasWatched = kinds.includes("watched");
     saveSiteRules({ ...siteRules, [activeHost]: { ...siteRule(activeHost), enabled: siteRule(activeHost).enabled !== false,
-      hideKinds: HOA.normalizeHideKinds(kinds, categories.map(c => c.id)), hideKeywords: HOA.normalizeKeywords(keywords), featuredCarousels } }, "Filter settings saved.");
+      hideKinds: HOA.normalizeHideKinds(kinds, categories.map(c => c.id)), hideKeywords: HOA.normalizeKeywords(keywords), hideSections: HOA.normalizeSectionTitles(hideSections), featuredCarousels } }, "Filter settings saved.");
     updateSummary();
     if (hadWatched && !hasWatched) HOA.clearAutoWatched(activeHost);
     window.setTimeout(() => refreshCount(), 400);
   }
   function openPanel() {
     openPopover(launch, `Hide on ${HOA.siteDisplayName(activeHost)}`, (body, panel, tools) => {
-      const allIds = categories.map(c => c.id);
+      const allIds = typeCategories.map(c => c.id);
       const eye = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
       const eyeOff = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
       const featuredIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="14" height="10" rx="1"/><path d="M2 12h3M19 12h3M3 10l-2 2 2 2M21 10l2 2-2 2"/></svg>';
@@ -273,12 +278,12 @@ function appendFilterControls(container, catalogRule) {
       const allOn = () => allIds.every(id => kinds.includes(id));
       const toggleAll = button("", () => { kinds = allOn() ? [] : [...allIds]; save(); redraw(); });
       toggleAll.className = "filter-tool";
-      const paintToggleAll = () => { if (categories.length < 2) return; const on = allOn(); const label = on ? "Unhide all types on this site" : "Hide all types on this site";
+      const paintToggleAll = () => { if (typeCategories.length < 2) return; const on = allOn(); const label = on ? "Unhide all types" : "Hide all types";
         toggleAll.innerHTML = on ? eye : eyeOff; toggleAll.title = label; toggleAll.setAttribute("aria-label", label); toggleAll.setAttribute("aria-pressed", String(on)); };
       // Neither tool means anything without types (keyword-only and taught sites), and the carousel switch only
       // on sites that have big rotating featured rows.
-      if (categories.length > 1) tools.prepend(toggleAll);
-      if (categories.length && catalogRule && (catalogRule.carousels || catalogRule.featuredSelector)) {
+      if (typeCategories.length > 1) tools.prepend(toggleAll);
+      if (typeCategories.length && catalogRule && (catalogRule.carousels || catalogRule.featuredSelector)) {
         const toggleFeatured = button("", () => { featuredCarousels = !featuredCarousels; save(); paintFeatured(); });
         toggleFeatured.className = "filter-tool";
         const paintFeatured = () => { const label = featuredCarousels ? "Featured carousels are included — click to leave them alone" : "Featured carousels are left alone — click to include them";
@@ -291,9 +296,46 @@ function appendFilterControls(container, catalogRule) {
         if (panel.hoaRefresh) { window.clearInterval(panel.hoaRefresh); panel.hoaRefresh = 0; }
         paintToggleAll();
         body.replaceChildren();
-        categories.forEach(category => { const label = document.createElement("label"); label.className = "switch-row"; label.title = category.hint;
+        typeCategories.forEach(category => { const label = document.createElement("label"); label.className = "switch-row"; label.title = category.hint;
           const toggle = document.createElement("input"); toggle.type = "checkbox"; toggle.setAttribute("role", "switch"); toggle.checked = kinds.includes(category.id);
           toggle.addEventListener("change", () => { kinds = toggle.checked ? [...kinds, category.id] : kinds.filter(id => id !== category.id); save(); }); label.append(toggle, document.createTextNode(` ${category.label}`)); body.appendChild(label); });
+        if (genreCategory) {
+          const genreRow = button("", () => toggleGenres()); genreRow.className = "genres-row"; genreRow.title = genreCategory.hint;
+          genreRow.setAttribute("aria-expanded", "false"); genreRow.setAttribute("role", "checkbox");
+          const paintGenreRow = titles => { const total = titles.length; const count = titles.filter(title => hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0)).length; const state = total && count >= total ? "true" : count ? "mixed" : "false";
+            genreRow.setAttribute("aria-checked", state); genreRow.innerHTML = `<span class="genres-switch" aria-hidden="true"></span><span>${genreCategory.label}</span><small>${count}${total ? ` of ${total}` : ""}</small><span class="filter-chevron">›</span>`; };
+          const genreWrap = document.createElement("div"); genreWrap.className = "genres-panel";
+          genreWrap.classList.toggle("is-open", genresOpen);
+          genreRow.setAttribute("aria-expanded", String(genresOpen));
+          const list = document.createElement("div"); list.className = "genres-list";
+          const normalize = values => HOA.normalizeSectionTitles(values);
+          const setTitles = values => { genreTitles = normalize(values); paintGenreRow(genreTitles); };
+          const drawGenreList = () => {
+            list.replaceChildren();
+            if (!genreTitles.length) { list.appendChild(Object.assign(document.createElement("p"), { className: "filter-note muted", textContent: "Scroll the page once so AddOrHide can list its rows." })); return; }
+            genreTitles.forEach(title => { const label = document.createElement("label"); label.className = "genre-check"; const input = document.createElement("input"); input.type = "checkbox";
+              input.checked = hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0);
+              input.addEventListener("change", () => { hideSections = input.checked ? normalize([...hideSections, title]) : hideSections.filter(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) !== 0); save(); paintGenreRow(genreTitles); });
+              const text = document.createElement("span"); text.textContent = title; label.title = title; label.append(input, text); list.appendChild(label); });
+          };
+          const header = document.createElement("div"); header.className = "genres-panel-header"; header.appendChild(Object.assign(document.createElement("span"), { className: "muted", textContent: "Tick a genre to hide its row" }));
+          const allGenres = button("", () => { const all = genreTitles.length && genreTitles.every(title => hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0)); hideSections = all ? hideSections.filter(value => !genreTitles.some(title => title.localeCompare(value, undefined, { sensitivity: "accent" }) === 0)) : normalize([...hideSections, ...genreTitles]); save(); drawGenreList(); paintGenreRow(genreTitles); paintAll(); }); allGenres.className = "filter-tool";
+          const closeGenres = button("×", () => closeGenresPanel()); closeGenres.className = "filter-close"; closeGenres.title = "Close Genres"; header.append(allGenres, closeGenres); genreWrap.append(Object.assign(document.createElement("div"), { className: "genres-panel-inner" })); genreWrap.firstChild.append(header, list);
+          const paintAll = () => { const all = genreTitles.length && genreTitles.every(title => hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0)); const label = all ? "Unhide all genres" : "Hide all genres"; allGenres.innerHTML = all ? eye : eyeOff; allGenres.title = label; allGenres.setAttribute("aria-label", label); };
+          const closeGenresPanel = () => { genresOpen = false; genreWrap.classList.remove("is-open"); genreRow.setAttribute("aria-expanded", "false"); panel.hoaCloseInner = null; };
+          const loadGenres = () => chrome.storage.local.get({ [HOA.SEEN_ROWS_KEY]: {} }, saved => {
+            const seen = saved[HOA.SEEN_ROWS_KEY] && saved[HOA.SEEN_ROWS_KEY][activeHost] || [];
+            const finish = pageRows => { const pageTitles = normalize((pageRows || []).filter(row => row && row.kind === "genre").map(row => row.title)); const remembered = normalize([...seen, ...pageTitles]).slice(-150);
+              setTitles([...pageTitles, ...seen, ...hideSections]); drawGenreList(); paintAll();
+              if (pageTitles.some(title => !normalize(seen).some(old => old.localeCompare(title, undefined, { sensitivity: "accent" }) === 0))) chrome.storage.local.set({ [HOA.SEEN_ROWS_KEY]: { ...(saved[HOA.SEEN_ROWS_KEY] || {}), [activeHost]: remembered } }); };
+            if (activeTab && Number.isInteger(activeTab.id)) chrome.tabs.sendMessage(activeTab.id, { type: "hoa-status" }, reply => finish(reply && reply.rows)); else finish([]);
+          });
+          const toggleGenres = () => { const open = !genresOpen; if (open) { genresOpen = true; genreWrap.classList.add("is-open"); genreRow.setAttribute("aria-expanded", "true"); panel.hoaCloseInner = () => { closeGenresPanel(); return true; }; window.setTimeout(() => { if (genresOpen && genreRow.scrollIntoView) genreRow.scrollIntoView({ block: "start", behavior: "smooth" }); }, 220); } else closeGenresPanel(); };
+          paintGenreRow(genreTitles); body.append(genreRow, genreWrap);
+          if (genresOpen) panel.hoaCloseInner = () => { closeGenresPanel(); return true; };
+          // Fetch on the first popover draw so its count and tri-state are already known before opening the panel.
+          loadGenres();
+        }
         const words = document.createElement("div"); words.className = "filter-words"; const input = document.createElement("input"); input.type = "text"; input.setAttribute("aria-label", "Hide videos with these words, comma-separated");
         input.disabled = keywords.length >= 10; input.placeholder = input.disabled ? "10 of 10 words — remove one to add another" : "Hide videos with these words";
         const note = document.createElement("p"); note.className = "filter-note muted"; note.textContent = duplicateMessage;
