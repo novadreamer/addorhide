@@ -68,7 +68,7 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
     url: "https://play.xumo.com/free-movies/",
     siteRules: { "play.xumo.com": { enabled: true, hideSections: ["Comedy"] } },
     seenRows: { "play.xumo.com": ["Westerns"] },
-    statusRows: [{ title: "Most Popular", kind: "popular" }, { title: "Comedy", kind: "genre" }, { title: "Drama", kind: "genre" }]
+    statusRows: [{ title: "Most Popular", kind: "popular", listed: false }, { title: "Comedy", kind: "genre", listed: true }, { title: "Drama", kind: "genre", listed: true }]
   });
   const genreLaunch = genres.document.querySelector(".filter-launch");
   genreLaunch.click();
@@ -86,23 +86,35 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   drama.checked = true; drama.dispatchEvent(new genres.window.Event("change", { bubbles: true }));
   await wait(12);
   assert.deepEqual(genres.store.siteRules["play.xumo.com"].hideSections, ["Comedy", "Drama"]);
+  assert.match(inner.querySelector(".genres-panel-header .filter-tool").title, /Unhide all genres/, "a selected row repaints the Genres bulk control");
   assert.equal(genres.document.querySelector(".genres-panel"), inner, "checking a row does not re-render the open Genres panel");
   const genreAll = inner.querySelector(".genres-panel-header .filter-tool");
   genreAll.click();
   await wait(12);
-  assert.deepEqual(genres.store.siteRules["play.xumo.com"].hideSections, ["Comedy", "Drama", "Westerns"], "Hide all genres keeps the panel list order");
+  assert.deepEqual(genres.store.siteRules["play.xumo.com"].hideSections, [], "Unhide all genres clears every listed row when one or more are selected");
   genreAll.click();
   await wait(12);
-  assert.deepEqual(genres.store.siteRules["play.xumo.com"].hideSections, [], "Unhide all genres clears every listed row");
-  const typeAll = Array.from(genrePanel.querySelectorAll(".filter-popover-tools .filter-tool")).find(node => /all types/.test(node.title));
+  assert.deepEqual(genres.store.siteRules["play.xumo.com"].hideSections, ["Comedy", "Drama", "Westerns"], "Hide all genres selects every listed row when none are selected");
+  let typeAll = Array.from(genrePanel.querySelectorAll(".filter-popover-tools .filter-tool")).find(node => /all types/.test(node.title));
   typeAll.click();
   await wait(12);
-  assert.deepEqual(genres.store.siteRules["play.xumo.com"].hideSections, [], "type toggle does not touch named rows");
+  typeAll = Array.from(genrePanel.querySelectorAll(".filter-popover-tools .filter-tool")).find(node => /all types/.test(node.title));
+  assert.deepEqual(genres.store.siteRules["play.xumo.com"].hideSections, ["Comedy", "Drama", "Westerns"], "type toggle does not touch named rows");
+  assert.ok(genres.store.siteRules["play.xumo.com"].hideKinds.length, "type toggle selects every type from zero");
+  assert.match(typeAll.title, /Unhide all types/);
+  typeAll.click();
+  await wait(12);
+  typeAll = Array.from(genrePanel.querySelectorAll(".filter-popover-tools .filter-tool")).find(node => /all types/.test(node.title));
+  assert.deepEqual(genres.store.siteRules["play.xumo.com"].hideKinds, [], "type toggle clears every type when one or more are selected");
+  const firstType = genrePanel.querySelector('.switch-row input[role="switch"]');
+  firstType.checked = true; firstType.dispatchEvent(new genres.window.Event("change", { bubbles: true }));
+  await wait(12);
+  assert.match(typeAll.title, /Unhide all types/, "an individual type selection repaints the bulk control");
   const activeInner = genrePanel.querySelector(".genres-panel");
   assert.ok(activeInner.classList.contains("is-open"), "redraw preserves the open Genres panel");
   genres.document.dispatchEvent(new genres.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   assert.ok(!activeInner.classList.contains("is-open"), "Escape closes the inner Genres panel first");
   assert.equal(genres.document.querySelector(".filter-popover"), genrePanel, "Escape leaves the outer popover open after closing Genres");
   genres.window.close();
-  console.log("popup.test.js: 16 passed, 0 failed");
+  console.log("popup.test.js: 22 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

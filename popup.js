@@ -274,11 +274,11 @@ function appendFilterControls(container, catalogRule) {
       const eye = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
       const eyeOff = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
       const featuredIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="14" height="10" rx="1"/><path d="M2 12h3M19 12h3M3 10l-2 2 2 2M21 10l2 2-2 2"/></svg>';
-      // One toggle: while every type is on it unhides them all, otherwise it hides them all.
-      const allOn = () => allIds.every(id => kinds.includes(id));
-      const toggleAll = button("", () => { kinds = allOn() ? [] : [...allIds]; save(); redraw(); });
+      // One toggle: clear any active types, or select all when none are active.
+      const anyOn = () => allIds.some(id => kinds.includes(id));
+      const toggleAll = button("", () => { kinds = anyOn() ? [] : [...allIds]; save(); redraw(); });
       toggleAll.className = "filter-tool";
-      const paintToggleAll = () => { if (typeCategories.length < 2) return; const on = allOn(); const label = on ? "Unhide all types" : "Hide all types";
+      const paintToggleAll = () => { if (typeCategories.length < 2) return; const on = anyOn(); const label = on ? "Unhide all types" : "Hide all types";
         toggleAll.innerHTML = on ? eye : eyeOff; toggleAll.title = label; toggleAll.setAttribute("aria-label", label); toggleAll.setAttribute("aria-pressed", String(on)); };
       // Neither tool means anything without types (keyword-only and taught sites), and the carousel switch only
       // on sites that have big rotating featured rows.
@@ -298,7 +298,7 @@ function appendFilterControls(container, catalogRule) {
         body.replaceChildren();
         typeCategories.forEach(category => { const label = document.createElement("label"); label.className = "switch-row"; label.title = category.hint;
           const toggle = document.createElement("input"); toggle.type = "checkbox"; toggle.setAttribute("role", "switch"); toggle.checked = kinds.includes(category.id);
-          toggle.addEventListener("change", () => { kinds = toggle.checked ? [...kinds, category.id] : kinds.filter(id => id !== category.id); save(); }); label.append(toggle, document.createTextNode(` ${category.label}`)); body.appendChild(label); });
+          toggle.addEventListener("change", () => { kinds = toggle.checked ? [...kinds, category.id] : kinds.filter(id => id !== category.id); save(); paintToggleAll(); }); label.append(toggle, document.createTextNode(` ${category.label}`)); body.appendChild(label); });
         if (genreCategory) {
           const genreRow = button("", () => toggleGenres()); genreRow.className = "genres-row"; genreRow.title = genreCategory.hint;
           genreRow.setAttribute("aria-expanded", "false"); genreRow.setAttribute("role", "checkbox");
@@ -315,17 +315,17 @@ function appendFilterControls(container, catalogRule) {
             if (!genreTitles.length) { list.appendChild(Object.assign(document.createElement("p"), { className: "filter-note muted", textContent: "Scroll the page once so AddOrHide can list its rows." })); return; }
             genreTitles.forEach(title => { const label = document.createElement("label"); label.className = "genre-check"; const input = document.createElement("input"); input.type = "checkbox";
               input.checked = hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0);
-              input.addEventListener("change", () => { hideSections = input.checked ? normalize([...hideSections, title]) : hideSections.filter(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) !== 0); save(); paintGenreRow(genreTitles); });
+              input.addEventListener("change", () => { hideSections = input.checked ? normalize([...hideSections, title]) : hideSections.filter(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) !== 0); save(); paintGenreRow(genreTitles); paintAll(); });
               const text = document.createElement("span"); text.textContent = title; label.title = title; label.append(input, text); list.appendChild(label); });
           };
           const header = document.createElement("div"); header.className = "genres-panel-header"; header.appendChild(Object.assign(document.createElement("span"), { className: "muted", textContent: "Tick a genre to hide its row" }));
-          const allGenres = button("", () => { const all = genreTitles.length && genreTitles.every(title => hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0)); hideSections = all ? hideSections.filter(value => !genreTitles.some(title => title.localeCompare(value, undefined, { sensitivity: "accent" }) === 0)) : normalize([...hideSections, ...genreTitles]); save(); drawGenreList(); paintGenreRow(genreTitles); paintAll(); }); allGenres.className = "filter-tool";
+          const allGenres = button("", () => { const any = genreTitles.some(title => hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0)); hideSections = any ? hideSections.filter(value => !genreTitles.some(title => title.localeCompare(value, undefined, { sensitivity: "accent" }) === 0)) : normalize([...hideSections, ...genreTitles]); save(); drawGenreList(); paintGenreRow(genreTitles); paintAll(); }); allGenres.className = "filter-tool";
           const closeGenres = button("×", () => closeGenresPanel()); closeGenres.className = "filter-close"; closeGenres.title = "Close Genres"; header.append(allGenres, closeGenres); genreWrap.append(Object.assign(document.createElement("div"), { className: "genres-panel-inner" })); genreWrap.firstChild.append(header, list);
-          const paintAll = () => { const all = genreTitles.length && genreTitles.every(title => hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0)); const label = all ? "Unhide all genres" : "Hide all genres"; allGenres.innerHTML = all ? eye : eyeOff; allGenres.title = label; allGenres.setAttribute("aria-label", label); };
+          const paintAll = () => { const any = genreTitles.some(title => hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0)); const label = any ? "Unhide all genres" : "Hide all genres"; allGenres.innerHTML = any ? eye : eyeOff; allGenres.title = label; allGenres.setAttribute("aria-label", label); };
           const closeGenresPanel = () => { genresOpen = false; genreWrap.classList.remove("is-open"); genreRow.setAttribute("aria-expanded", "false"); panel.hoaCloseInner = null; };
           const loadGenres = () => chrome.storage.local.get({ [HOA.SEEN_ROWS_KEY]: {} }, saved => {
             const seen = saved[HOA.SEEN_ROWS_KEY] && saved[HOA.SEEN_ROWS_KEY][activeHost] || [];
-            const finish = pageRows => { const pageTitles = normalize((pageRows || []).filter(row => row && row.kind === "genre").map(row => row.title)); const remembered = normalize([...seen, ...pageTitles]).slice(-150);
+            const finish = pageRows => { const pageTitles = normalize((pageRows || []).filter(row => row && row.listed).map(row => row.title)); const remembered = normalize([...seen, ...pageTitles]).slice(-150);
               setTitles([...pageTitles, ...seen, ...hideSections]); drawGenreList(); paintAll();
               if (pageTitles.some(title => !normalize(seen).some(old => old.localeCompare(title, undefined, { sensitivity: "accent" }) === 0))) chrome.storage.local.set({ [HOA.SEEN_ROWS_KEY]: { ...(saved[HOA.SEEN_ROWS_KEY] || {}), [activeHost]: remembered } }); };
             if (activeTab && Number.isInteger(activeTab.id)) chrome.tabs.sendMessage(activeTab.id, { type: "hoa-status" }, reply => finish(reply && reply.rows)); else finish([]);

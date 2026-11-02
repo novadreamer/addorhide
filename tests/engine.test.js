@@ -465,8 +465,8 @@ const CASES = [
   }
   {
     const page = await load({ fixture: "sites/tubi-foreign.html", url: "https://tubitv.com/",
-      siteRules: { "tubitv.com": { hideKinds: ["foreign", "not-english"] } } });
-    check("filters: Tubi Foreign/International tiles match Foreign and Not in English", () => assert.ok(
+      siteRules: { "tubitv.com": { hideKinds: ["not-english"] } } });
+    check("filters: Tubi Foreign/International tiles match Not in English", () => assert.ok(
       page.document.querySelectorAll('[data-test-id="web-ui-grid-item"].hoa-filtered').length >= 3));
     page.window.close();
   }
@@ -496,7 +496,7 @@ const CASES = [
   }
   {
     const page = await load({ fixture: "sites/tubi-featured.html", url: "https://tubitv.com/",
-      siteRules: { "tubitv.com": { hideKinds: ["foreign", "not-english", "dubbed"] } } });
+      siteRules: { "tubitv.com": { hideKinds: ["not-english", "dubbed"] } } });
     check("filters: plain English Tubi drama stays visible to language filters", () => assert.equal(
       page.document.querySelectorAll(".hoa-filtered").length, 0));
     page.window.close();
@@ -691,19 +691,52 @@ const CASES = [
       assert.ok(!page.document.getElementById("539123").classList.contains("hoa-filtered"));
     });
     const status = await page.status();
-    check("Xumo status reports rail rows in order with fixed and lazy genre kinds", () => {
+    check("Xumo status keeps fixed rows outside Genres while listing lazy genre rows", () => {
       assert.deepEqual(status.rows.slice(0, 4), [
-        { title: "Season of Scares", kind: "special" }, { title: "Editor's Picks", kind: "editors" },
-        { title: "Westerns", kind: "genre" }, { title: "Crime TV", kind: "genre" }
+        { title: "Season of Scares", kind: "special", listed: false }, { title: "Editor's Picks", kind: "editors", listed: false },
+        { title: "Westerns", kind: "genre", listed: true }, { title: "Crime TV", kind: "genre", listed: true }
       ]);
     });
     page.window.close();
   }
   {
-    const html = '<section id="both"><h2>Recommended International</h2><div data-test-id="web-ui-grid-container"></div></section>';
-    const page = await load({ html, url: "https://tubitv.com/", siteRules: { "tubitv.com": { enabled: true, hideKinds: ["foreign"] } } });
-    check("a row matching multiple shelf categories hides when only its non-first category is selected", () => {
-      assert.ok(page.document.getElementById("both").classList.contains("hoa-filtered"));
+    const html = '<section id="international"><h2>International Films</h2><div data-test-id="web-ui-grid-container"></div></section><section id="recommended"><h2>Recommended</h2><div data-test-id="web-ui-grid-container"></div></section>';
+    const page = await load({ html, url: "https://tubitv.com/", siteRules: { "tubitv.com": { enabled: true, hideKinds: ["recommended"], hideSections: ["International Films", "Recommended"] } } });
+    check("Tubi named rows include International Films and typed Recommended rows", () => {
+      assert.ok(page.document.getElementById("international").classList.contains("hoa-filtered"));
+      assert.ok(page.document.getElementById("recommended").classList.contains("hoa-filtered"));
+    });
+    const status = await page.status();
+    check("Tubi status lists named rows while retaining their type", () => assert.deepEqual(status.rows, [
+      { title: "International Films", kind: "foreign", listed: true }, { title: "Recommended", kind: "recommended", listed: true }
+    ]));
+    page.window.close();
+  }
+  {
+    const rows = [
+      ["sites/fandango-sections.synthetic.html", "https://athome.fandango.com/", "drama"],
+      ["sites/crunchyroll-sections.synthetic.html", "https://www.crunchyroll.com/browse", "action"],
+      ["sites/vix-sections.synthetic.html", "https://vix.com/", "drama"]
+    ];
+    for (const [fixture, url, id] of rows) {
+      const host = new URL(url).hostname;
+      const page = await load({ fixture, url, siteRules: { [host]: { enabled: true, hideSections: [id === "action" ? "Action" : "Drama"] } } });
+      const status = await page.status();
+      check(`filters: ${fixture} has clean listed row titles and hides its named row`, () => {
+        assert.ok(page.document.getElementById(id).classList.contains("hoa-filtered"));
+        assert.ok(status.rows.some(row => row.title === (id === "action" ? "Action" : "Drama") && row.listed));
+      });
+      page.window.close();
+    }
+    const page = await load({ fixture: "sites/shout-sections.synthetic.html", url: "https://shout-tv.com/",
+      siteRules: { "shout-tv.com": { enabled: true, hideSections: ["Featured", "Recommended"] } } });
+    const status = await page.status();
+    check("filters: Shout hero is featured and outside Rows by name", () => {
+      assert.ok(!page.document.getElementById("hero").classList.contains("hoa-filtered"));
+      assert.ok(page.document.getElementById("recommended").classList.contains("hoa-filtered"));
+      assert.deepEqual(status.rows, [
+        { title: "Featured", kind: "featured", listed: false }, { title: "Recommended", kind: "recommended", listed: true }
+      ]);
     });
     page.window.close();
   }

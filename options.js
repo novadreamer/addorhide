@@ -291,7 +291,8 @@ function renderFilterSites() {
     details.appendChild(summary);
     const body = document.createElement("div");
     body.className = "hide-filters-body";
-    categories.filter(category => category.id !== "genres").forEach(category => {
+    const typeCategories = categories.filter(category => category.id !== "genres");
+    typeCategories.forEach(category => {
       const label = document.createElement("label");
       label.className = "switch-row";
       label.title = category.hint;

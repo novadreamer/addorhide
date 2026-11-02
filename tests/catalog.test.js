@@ -98,5 +98,16 @@ check("TMDB retains Movies and TV categories", () => assert.deepEqual(
   catalog.byId("tmdb").categories.map(category => category.id), ["movies", "tv"]));
 check("new ready-made site ids are present", () => ["xumo", "pluto", "roku", "fandango", "crunchyroll", "odysee", "kick", "rumble", "pbs", "vix", "shout", "justwatch", "rottentomatoes", "letterboxd"]
   .forEach(id => assert.ok(catalog.byId(id), id)));
+check("row-based catalog rules expose a Rows by name picker", () => ["tubi", "xumo", "pluto", "roku", "fandango", "crunchyroll", "vix", "shout"].forEach(id => {
+  const picker = catalog.byId(id).categories.find(category => category.id === "genres");
+  assert.ok(picker, id);
+  if (id === "xumo") assert.equal(picker.typedRows, false);
+}));
+check("Foreign is kept as an anywhere-on-the-page type and says so", () => ["tubi", "pluto", "roku", "fandango", "crunchyroll", "vix", "shout"].forEach(id => {
+  const foreign = catalog.byId(id).categories.find(category => category.id === "foreign");
+  assert.ok(foreign, id);
+  assert.equal(foreign.label, "Foreign titles, anywhere");
+  assert.match(foreign.hint, /wherever they appear/);
+}));
 
 console.log(`catalog.test.js: ${passed} passed, 0 failed`);

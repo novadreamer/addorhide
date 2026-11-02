@@ -20,8 +20,8 @@ var HOA_CATALOG = Object.freeze((() => {
     ".yt-lockup-metadata-view-model-wiz__title", "h3 a[title]", "a[title]"
   ]);
   const RECOMMENDED_SHELF_TITLE = "^(Recommended|For You|Top Picks|Picked for You|Because You Watched|Suggested|You Might Like|You May Also Like|More Like This)";
-  const FOREIGN_TEXT = "Foreign|International|Anime|Bollywood|K-Drama|Korean Drama|Telenovela|En Español|Español|Spanish|Latino|Subtitled|Subtitulado|Subbed|Doblad[oa]";
   const FOREIGN_SHELF_TITLE = "Foreign|International|En Español|Español|Spanish|Latino|Anime|K-Drama|Bollywood|Telenovela";
+  const FOREIGN_TEXT = "Foreign|International|Anime|Bollywood|K-Drama|Korean Drama|Telenovela|En Español|Español|Spanish|Latino|Subtitled|Subtitulado|Subbed|Doblad[oa]";
   const ENGLISH_DUB_TEXT = "\\(Dubbed\\)|English Dub(bed)?|\\bDub\\b";
   const DUBBED_TEXT = "\\(Dubbed\\)|English Dub(bed)?|\\(Español\\)|Doblad[oa]|\\bDub(bed)?\\b";
   const rules = Object.freeze([
@@ -112,7 +112,7 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "spanish", label: "En español", hint: "Spanish-language rows and tiles", card: { text: "Español|Spanish" }, shelfTitle: "Español|Spanish" },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", card: { text: "For You In" }, shelfTitle: RECOMMENDED_SHELF_TITLE },
         { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
-        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
         { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
@@ -233,7 +233,7 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "recent", label: "Recently added", hint: "The Recently added row", shelfTitle: "^Recently Added\\s*$" },
         { id: "recommended", label: "Recommended for you", hint: "The Recommended For You row", shelfTitle: RECOMMENDED_SHELF_TITLE },
         { id: "editors", label: "Editor's Picks", hint: "The Editor's Picks row", shelfTitle: "^Editor.?s Picks\\s*$" },
-        { id: "genres", label: "Genres", hint: "Hide rows by their heading" }
+        { id: "genres", label: "Genres", hint: "Hide rows by their heading", typedRows: false }
       ])
     }),
     Object.freeze({
@@ -249,7 +249,7 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
         { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
-        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
       ])
@@ -265,7 +265,7 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
         { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
-        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
       ])
@@ -273,11 +273,13 @@ var HOA_CATALOG = Object.freeze((() => {
     Object.freeze({
       id: "fandango", carousels: true, name: "Fandango at Home", builtIn: false, hosts: Object.freeze(["athome.fandango.com", "fandangoathome.com", "vudu.com"]), subdomains: true,
       cardSelector: '[class*="carousel-default-styles__item"]', removeClosest: '[class*="carousel-default-styles__item"]', linkSelector: 'a[href*="/content/browse/details/"]', titleCandidates: Object.freeze(["img[alt]", "a[aria-label]"]),
+      sections: Object.freeze([{ container: '[class*="sectionContainer__sectionContainer"]', title: '[class*="sectionContainer__sectionTitle"] h2' }]),
       categories: Object.freeze([
         { id: "free", label: "Free with ads", hint: "Free or Free to Watch titles", card: { text: "Free to Watch|\\bFree\\b" } },
         { id: "paid", label: "Rent or buy", hint: "Titles that are not marked free", fallback: true },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
+        { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
       ])
@@ -285,11 +287,13 @@ var HOA_CATALOG = Object.freeze((() => {
     Object.freeze({
       id: "crunchyroll", carousels: true, name: "Crunchyroll", builtIn: false, hosts: Object.freeze(["crunchyroll.com"]), subdomains: true,
       cardSelector: '[class*="browse-card--"]:not([class*="hover"])', removeClosest: '[class*="browse-card--"]:not([class*="hover"])', linkSelector: 'a[href^="/series/"], a[href^="/watch/"]', titleCandidates: Object.freeze(['[class*="browse-card-hover"] [class*="title"]', "img[alt]", "a[aria-label]"]),
+      sections: Object.freeze([{ container: "div.erc-browse-collection", title: "h2.browse-collection-title" }]),
       categories: Object.freeze([
         { id: "series", label: "Series", hint: "Series cards", card: { href: "/series/" } },
         { id: "movies", label: "Movies", hint: "Movies and movie labels", card: { href: "/watch/", text: "\\bMovie\\b" } },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { has: "a[href]" }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
+        { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { has: "a[href]" }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { has: "a[href]", withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
         { id: "subbed", label: "Subtitled only", hint: "Cards marked Sub or Subtitled, without a dub", card: { text: "\\bSub(titled)?\\b", withoutText: "\\bDub(bed)?\\b" } }
@@ -330,9 +334,12 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "vix", carousels: true, name: "ViX", builtIn: false, hosts: Object.freeze(["vix.com"]), subdomains: true,
-      cardSelector: '[data-testid="content-card"]', removeClosest: '[data-testid="content-card"]', linkSelector: 'a[href^="/detail/"]', titleCandidates: Object.freeze(["img[alt]", "h3"]), categories: Object.freeze([
+      cardSelector: '[data-testid="content-card"]', removeClosest: '[data-testid="content-card"]', linkSelector: 'a[href^="/detail/"]', titleCandidates: Object.freeze(["img[alt]", "h3"]),
+      sections: Object.freeze([{ container: "section[data-uimodule]", title: 'h2[data-test-id^="carousel-title"]' }]),
+      categories: Object.freeze([
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { has: "a[href]" }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
+        { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { has: "a[href]" }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { has: "a[href]", withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
       ])
@@ -340,12 +347,14 @@ var HOA_CATALOG = Object.freeze((() => {
     Object.freeze({
       id: "shout", carousels: true, name: "Shout! TV", builtIn: false, hosts: Object.freeze(["shout-tv.com"]), subdomains: true,
       cardSelector: "div.content-pager__item", removeClosest: "div.content-pager__item", linkSelector: "a[data-content-type]", titleCandidates: Object.freeze(["a[aria-label]", "img[alt]", ".card-title__title"]),
+      sections: Object.freeze([{ container: "div.carousel-container", title: "h3.simple-carousel__title" }]), featuredSelector: "div.carousel-container--hero",
       categories: Object.freeze([
         { id: "live", label: "Live", hint: "Live channels", card: { has: '[data-card-type="LIVE"]' } },
         { id: "vod", label: "Movies & episodes", hint: "On-demand titles", card: { has: '[data-card-type="VOD"]' } },
         { id: "signin", label: "Needs sign-up", hint: "Titles that require sign-in", card: { has: '[data-access-level="GRANTED_ON_SIGN_IN"]' } },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "foreign", label: "Foreign movies & TV", hint: "Foreign-language titles, including Spanish, anime and subtitled films", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
+        { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
       ])

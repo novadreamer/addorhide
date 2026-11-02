@@ -662,6 +662,7 @@ window.__hoaLoaded = true;
   }
 
   function sectionHasFeaturedCarousel(section, rule) {
+    if (matchesOptionalSelector(section, rule.featuredSelector)) return true;
     const selectors = [rule.cardSelector, ...(rule.variants || []).map(variant => variant.cardSelector)].filter(Boolean).join(", ");
     if (!selectors) return false;
     try { return Array.from(section.querySelectorAll(selectors)).some(card => isFeaturedCarousel(card, rule)); }
@@ -696,6 +697,7 @@ window.__hoaLoaded = true;
       try { navTitles = Array.from(document.querySelectorAll(rule.sectionNav)).map(rowLabel).filter(Boolean); } catch (error) { navTitles = []; }
     }
     const order = navTitles.length ? navTitles : rows.map(row => row.title);
+    const picker = (rule.categories || []).find(category => category.id === "genres");
     const categories = (rule.categories || []).filter(category => category.id !== "genres" && (category.shelfTitle || category.rowsAbove));
     const anchorIndex = category => category.rowsAbove ? order.findIndex(title => safePattern(category.rowsAbove, title)) : -1;
     const orderIndex = new Map();
@@ -705,7 +707,8 @@ window.__hoaLoaded = true;
       // A positional category is the fallback for rows with no title category at all; it never overrides a match.
       const positional = direct.length || featured ? [] : categories.filter(category => category.rowsAbove && index >= 0 && index < anchorIndex(category));
       const kinds = [...direct, ...positional].map(category => category.id);
-      return { kinds, kind: kinds[0] || (featured ? "featured" : "genre") };
+      return { kinds, kind: kinds[0] || (featured ? "featured" : "genre"),
+        listed: !featured && Boolean(picker) && (picker.typedRows !== false || !kinds.length) };
     };
     rows.forEach((row, index) => {
       const position = navTitles.length ? orderIndex.get(rowKey(row.title)) : index;
@@ -753,7 +756,7 @@ window.__hoaLoaded = true;
     const hiddenNames = new Set(HOA.normalizeSectionTitles(rule.hideSections).map(rowKey).filter(Boolean));
     info.rows.forEach(row => {
       const byType = row.kinds.some(id => selectedIds.has(id));
-      const byName = row.kind === "genre" && hiddenNames.has(rowKey(row.title));
+      const byName = row.listed && hiddenNames.has(rowKey(row.title));
       if ((byType || byName) && (rule.featuredCarousels !== false || !row.featured)) { filtered.add(row.section); nodes.add(row.section); }
     });
     hideSectionNav(rule, info.rows, filtered, nodes);
@@ -2012,7 +2015,7 @@ window.__hoaLoaded = true;
           rows = titles.slice(0, 120).map((title, index) => {
             const rendered = renderedByKey.get(rowKey(title));
             const classified = info.classify(title, index, Boolean(rendered && rendered.featured));
-            return { title, kind: classified.kind };
+            return { title, kind: classified.kind, listed: classified.listed };
           });
         }
         sendResponse({
