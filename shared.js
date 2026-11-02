@@ -889,6 +889,8 @@ var HOA = Object.freeze((() => {
       if (typeof value !== "string") return;
       const title = value.trim().replace(/\s+/g, " ").slice(0, 80);
       const key = title.toLocaleLowerCase();
+      // A sentence ("Step inside for big names, …") is a row's tagline, not its name; older versions remembered some.
+      if (/[.!]$/.test(title) && title.split(" ").length >= 5) return;
       if (!title || seen.has(key) || result.length >= 100) return;
       seen.add(key);
       result.push(title);

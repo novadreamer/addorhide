@@ -327,6 +327,10 @@ body.popup main { overflow: visible; scrollbar-width: auto; }
 .detail-row strong { text-align: right; font-variant-numeric: tabular-nums; }
 .footer-icon-button { display: inline-grid; width: 28px; min-height: 28px; padding: 3px; place-items: center; color: var(--text); }
 .footer-icon-button svg { width: 21px; height: 21px; }
+/* Options gear: turns a little and lifts on hover (and keyboard focus). */
+#open-options-button svg { transition: transform .45s cubic-bezier(.34, 1.56, .64, 1), color .2s ease; }
+#open-options-button:hover svg, #open-options-button:focus-visible svg { transform: rotate(90deg) scale(1.12); color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { #open-options-button svg { transition: color .2s ease; } #open-options-button:hover svg, #open-options-button:focus-visible svg { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .filter-launch, .filter-launch:hover:not(:disabled), .filter-launch:active:not(:disabled) { transform: none; transition: none; } }
 @media (prefers-reduced-motion: reduce) { .filter-popover { transform: translate(-50%,-50%); transition: opacity 160ms ease; } .filter-popover.is-open, .filter-popover.is-closing { transform: translate(-50%,-50%); } .filter-backdrop { transition-duration: 160ms; } }
 button.filter-chip { min-height: 23px; padding: 2px 7px; color: var(--text); background: var(--surface-2); border-color: var(--border); font-size: 11px; font-weight: 500; }
@@ -386,7 +390,8 @@ button.filter-tool:disabled { opacity: .4; cursor: default; }
 .popup .button-controls.popup-position-room { padding-bottom: var(--popup-position-room, 14px); }
 
 /* Round 9. Centred tooltips (tooltip.js). */
-.hoa-tip { position: fixed; z-index: 2147483000; max-width: 260px; padding: 5px 9px; color: var(--surface, #fff); background: var(--text, #222);
+.hoa-tip { position: fixed; z-index: 2147483000; max-width: 260px; padding: 5px 9px; color: var(--surface, #fff); background: color-mix(in srgb, var(--text, #222) 68%, transparent);
+  -webkit-backdrop-filter: blur(6px) saturate(1.3); backdrop-filter: blur(6px) saturate(1.3); text-shadow: 0 0 6px color-mix(in srgb, var(--text, #222) 70%, transparent);
   border-radius: 7px; font-size: 12px; line-height: 1.35; text-align: center; pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
 /* Site links on one line (taught sites have three), and the status line as a toast that takes no room. */
 .popup .site-links { flex-wrap: nowrap; justify-content: center; gap: 12px; white-space: nowrap; }

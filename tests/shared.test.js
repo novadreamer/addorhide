@@ -432,6 +432,8 @@ check("normalize hide kinds keeps allowed unique ids", () => assert.deepEqual(
   HOA.normalizeHideKinds(["shorts", " shorts ", "bad", 4], ["shorts", "live"]), ["shorts"]));
 check("normalize section titles collapses space and deduplicates case-insensitively", () => assert.deepEqual(
   HOA.normalizeSectionTitles(["  Sci-Fi   & Fantasy ", "sci-fi & fantasy", 4, "Comedy"]), ["Sci-Fi & Fantasy", "Comedy"]));
+check("normalize section titles drops remembered taglines", () => assert.deepEqual(
+  HOA.normalizeSectionTitles(["Step inside for big names, breakout stars, and fresh finds.", "Creatorverse", "Dr. Who"]), ["Creatorverse", "Dr. Who"]));
 check("normalize keywords trims, folds spaces and deduplicates case-insensitively", () => assert.deepEqual(
   HOA.normalizeKeywords(["  Space   Robot ", "space robot", "", 4]), ["Space Robot"]));
 check("normalize keywords keeps at most ten words", () => assert.equal(

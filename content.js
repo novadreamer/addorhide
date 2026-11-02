@@ -600,6 +600,12 @@ window.__hoaLoaded = true;
     if (title) return (title.textContent || "").replace(/\s+/g, " ").trim();
     const cardSelectors = [rule.cardSelector, ...(rule.variants || []).map(variant => variant.cardSelector)]
       .filter(Boolean).join(", ");
+    // A row headed by a logo (Tubi's Creatorverse) is named by the image's alt text; the text beside it is a tagline.
+    let logo = null;
+    try { logo = section.querySelector('[class*="row-header"] img[alt]:not([alt=""])'); } catch (error) { logo = null; }
+    let logoInCard = false;
+    try { logoInCard = Boolean(logo && cardSelectors && logo.closest(cardSelectors)); } catch (error) { logoInCard = false; }
+    if (logo && !logoInCard) return logo.getAttribute("alt").replace(/\s+/g, " ").trim();
     const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {

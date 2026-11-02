@@ -700,6 +700,15 @@ const CASES = [
     page.window.close();
   }
   {
+    // Live Tubi markup (home, 2026-11-02): the Creatorverse row is headed by a logo image plus a tagline.
+    const html = '<section id="creators"><div class="CiW8z"></div><div data-test-id="web-ui-grid-container" class="web-grid-container"><a class="web-row-header web-row-header--link" href="/category/creators"><div class="web-row-header__title"><div class="YCElA"><img src="https://mcdn.tubitv.com/image/creatorverse/creatorverse-logo-large.png" alt="Creatorverse"><div class="Nnp1e">Step inside for big names, breakout stars, and fresh finds.</div></div></div></a></div><div data-test-id="web-ui-grid-container"></div></section>';
+    const page = await load({ html, url: "https://tubitv.com/", siteRules: { "tubitv.com": { enabled: true, hideSections: ["Creatorverse"] } } });
+    check("Tubi logo-headed row is named by its logo, not its tagline", () => assert.ok(page.document.getElementById("creators").classList.contains("hoa-filtered")));
+    const status = await page.status();
+    check("Tubi status lists Creatorverse", () => assert.equal(status.rows[0].title, "Creatorverse"));
+    page.window.close();
+  }
+  {
     const html = '<section id="international"><h2>International Films</h2><div data-test-id="web-ui-grid-container"></div></section><section id="recommended"><h2>Recommended</h2><div data-test-id="web-ui-grid-container"></div></section>';
     const page = await load({ html, url: "https://tubitv.com/", siteRules: { "tubitv.com": { enabled: true, hideKinds: ["recommended"], hideSections: ["International Films", "Recommended"] } } });
     check("Tubi named rows include International Films and typed Recommended rows", () => {
