@@ -75,6 +75,8 @@ async function load({ fixture, html: suppliedHtml, url, siteRules, noBody = fals
     let answered = false;
     messageListeners.forEach(listener => listener({ type: "hoa-status" }, {}, reply => { if (!answered) { answered = true; resolve(reply); } }));
     if (!messageListeners.length) resolve(null);
+    // A script that stopped answering must fail its checks, not leave Node with nothing to wait for (a silent exit 0).
+    setTimeout(() => { if (!answered) { answered = true; resolve(null); } }, 1000);
   });
   return { window, document: window.document, store, status, test: window.__hoaTest };
 }
@@ -441,7 +443,7 @@ const CASES = [
     page.window.close();
   }
   {
-    const page = await load({ html: '<div class="cardList" id="recommended"><div class="listHeader">Recommended For You</div></div><div class="cardList" id="popular"><div class="listHeader">Most Popular</div></div>',
+    const page = await load({ html: '<div class="cardList" id="recommended"><div class="listHeader"><h2>Recommended For You</h2></div></div><div class="cardList" id="popular"><div class="listHeader"><h2>Most Popular</h2></div></div>',
       url: "https://play.xumo.com/", siteRules: { "play.xumo.com": { enabled: true, hideKinds: ["recommended"] } } });
     check("filters: Recommended hides Xumo's Recommended For You row only", () => {
       assert.ok(page.document.getElementById("recommended").classList.contains("hoa-filtered"));
@@ -740,11 +742,11 @@ const CASES = [
     const page = await load({ fixture: "sites/shout-sections.synthetic.html", url: "https://shout-tv.com/",
       siteRules: { "shout-tv.com": { enabled: true, hideSections: ["Featured", "Recommended"] } } });
     const status = await page.status();
-    check("filters: Shout hero is featured and outside Rows by name", () => {
-      assert.ok(!page.document.getElementById("hero").classList.contains("hoa-filtered"));
+    check("filters: Shout featured hero is listed and hides by name", () => {
+      assert.ok(page.document.getElementById("hero").classList.contains("hoa-filtered"));
       assert.ok(page.document.getElementById("recommended").classList.contains("hoa-filtered"));
       assert.deepEqual(status.rows, [
-        { title: "Featured", kind: "featured", listed: false }, { title: "Recommended", kind: "recommended", listed: true }
+        { title: "Featured", kind: "featured", listed: true }, { title: "Recommended", kind: "recommended", listed: true }
       ]);
     });
     page.window.close();
@@ -760,6 +762,14 @@ const CASES = [
       assert.ok(page.document.getElementById("temporary").classList.contains("hoa-filtered"));
       assert.ok(!page.document.getElementById("genre").classList.contains("hoa-filtered"));
     });
+    page.window.close();
+  }
+  {
+    const html = '<li class="movie" id="tv-y7-fv"><a itemprop="url" href="/movie/kid">Kids show</a><span>TV-Y7-FV</span></li>';
+    const page = await load({ html, url: "https://therokuchannel.roku.com/",
+      siteRules: { "therokuchannel.roku.com": { enabled: true, hideKinds: ["kids"] } } });
+    check("filters: Roku kids ratings normalise TV-Y7-FV", () => assert.ok(
+      page.document.getElementById("tv-y7-fv").classList.contains("hoa-filtered")));
     page.window.close();
   }
   {
@@ -867,14 +877,14 @@ const CASES = [
     page.window.close();
   }
   {
-    const html = '<div id="viewport" style="overflow:hidden"><div id="row" style="display:flex;flex-wrap:nowrap;transform:translateX(-1px)"><div id="slot"><div data-test-id="web-ui-content-tile"><a class="web-content-tile__poster-link" href="/series/1/large"></a><a class="web-content-tile__title">Large series</a></div></div></div></div>';
+    const html = '<div id="viewport" style="overflow:hidden"><div id="row" style="display:flex;flex-wrap:nowrap;transform:translateX(-1px)"><div id="slot"><div data-test-id="web-ui-content-tile"><a class="web-content-tile__poster-link" href="/series/1/large"></a><a class="web-content-tile__title">Large series</a></div></div><div id="other-slot"></div></div></div>';
     const page = await load({ html, url: "https://tubitv.com/", testSeam: true,
       siteRules: { "tubitv.com": { hideKinds: ["series"], featuredCarousels: false } } });
     const rect = width => () => ({ left: 0, right: width, width, height: 80, top: 0, bottom: 80 });
     page.document.getElementById("viewport").getBoundingClientRect = rect(100);
     page.document.getElementById("slot").getBoundingClientRect = rect(45);
     page.test.apply();
-    check("filters: a large flex carousel slot is featured without a site selector", () => assert.ok(
+    check("filters: a large flex carousel slot with one card is featured without a site selector", () => assert.ok(
       !page.document.getElementById("slot").classList.contains("hoa-filtered")));
     page.window.close();
   }
@@ -928,6 +938,97 @@ const CASES = [
     check("Odysee Hide channel filters that creator while keeping others", () => {
       assert.ok(first.classList.contains("hoa-filtered"));
       assert.ok(page.document.querySelectorAll("li.claim-preview__wrapper:not(.hoa-filtered)").length >= 1);
+    });
+    page.window.close();
+  }
+  {
+    // PBS's app rewrites <html>'s attributes after load, wiping AddOrHide's marker; the script must keep running.
+    const page = await load({ fixture: "sites/pbs-rows.html", url: "https://www.pbs.org/", siteRules: { "www.pbs.org": { enabled: true, hideSections: ["Texascentric"] } } });
+    ["hoaInstance", "hoaExtension", "hoaVersion"].forEach(key => delete page.document.documentElement.dataset[key]);
+    page.document.body.appendChild(page.document.createElement("div"));
+    await wait(120);
+    const status = await page.status();
+    check("a wiped page marker is claimed back instead of retiring (PBS)", () => {
+      assert.ok(page.document.documentElement.dataset.hoaInstance);
+      assert.ok(status && status.active && status.rows.some(row => row.title === "Texascentric"));
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/rumble-rows.html", url: "https://rumble.com/", siteRules: { "rumble.com": { enabled: true } } });
+    const status = await page.status();
+    check("Rumble rows without a heading are not named from scripts or View All", () => {
+      assert.ok(status.rows.length > 0);
+      assert.ok(status.rows.every(row => row.title !== "View All" && !/window\.|function/.test(row.title)), JSON.stringify(status.rows.map(row => row.title)));
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/pluto-rows.html", url: "https://pluto.tv/us/movies",
+      siteRules: { "pluto.tv": { enabled: true, hideSections: ["Featured Movies"] } } });
+    const status = await page.status();
+    check("Pluto rows are named, listed and not mistaken for featured slides", () => {
+      // Pluto draws every row twice (small and medium layouts); the list names each once.
+      assert.equal(status.rows.length, 5);
+      assert.ok(["Most Popular Movies", "Featured Movies"].every(title => status.rows.some(row => row.title === title && row.listed)));
+      assert.ok(status.rows.every(row => row.kind !== "featured"));
+      assert.ok(Array.from(page.document.querySelectorAll("div.vds-carousel")).find(row => {
+        const heading = row.querySelector(".vds-carousel__title-medium");
+        return heading && heading.textContent.trim() === "Featured Movies";
+      }).classList.contains("hoa-filtered"));
+    });
+    page.window.close();
+    const movies = await load({ fixture: "sites/pluto-rows.html", url: "https://pluto.tv/us/movies",
+      siteRules: { "pluto.tv": { enabled: true, hideKinds: ["movies"] } } });
+    check("Pluto movie type filtering still applies to ordinary rows", () => assert.ok(movies.document.querySelectorAll(".hoa-filtered").length > 0));
+    movies.window.close();
+  }
+  {
+    const html = '<div id="row" class="roku-collection-row" data-row-title="Recently Added TV"><ul><li class="featured"><a itemprop="url" href="/series/example">Featured series</a></li></ul></div>';
+    const page = await load({ html, url: "https://therokuchannel.roku.com/", siteRules: { "therokuchannel.roku.com": {
+      enabled: true, featuredCarousels: false, hideSections: ["Recently Added TV"] } } });
+    const status = await page.status();
+    check("Roku featured rows are listed and hide by name when featured filtering is off", () => {
+      assert.ok(page.document.getElementById("row").classList.contains("hoa-filtered"));
+      assert.deepEqual(status.rows, [{ title: "Recently Added TV", kind: "featured", listed: true }]);
+    });
+    page.window.close();
+  }
+  {
+    const cases = [
+      ["rumble", "https://rumble.com/", "section.homepage-section", 'rum-text[variant="h3"]', "Sports", "Live"],
+      ["twitch", "https://twitch.tv/", "div.find-me", "h2.tw-title", "Live on Twitch", "Just Chatting & IRL"],
+      ["kick", "https://kick.com/", "section:has(> div > h2)", "h2", "Featured Creators", "Games"],
+      ["odysee", "https://odysee.com/", "div.claim-grid__wrapper", ".claim-grid__title, h1.home__meme", "Featured", "Tech"],
+      ["pbs", "https://pbs.org/", 'div[class*="_show_row"]', 'h2[class*="content_row_title"]', "Featured Shows", "Texascentric"]
+    ];
+    for (const [site, url, rowSelector, titleSelector, title, secondTitle] of cases) {
+      const host = new URL(url).hostname;
+      const page = await load({ fixture: `sites/${site}-rows.html`, url, siteRules: { [host]: { enabled: true, hideSections: [title] } } });
+      const status = await page.status();
+      const row = Array.from(page.document.querySelectorAll(rowSelector)).find(node => {
+        const heading = node.querySelector(titleSelector);
+        return heading && heading.textContent.replace(/\s+/g, " ").trim() === title;
+      });
+      check(`${site} Rows by name lists clean headings and removes the named row wrapper`, () => {
+        assert.ok(status.rows.some(entry => entry.title === title && entry.listed));
+        assert.ok(status.rows.some(entry => entry.title === secondTitle && entry.listed));
+        assert.ok(row && (row.classList.contains("hoa-filtered") || row.closest(".hoa-filtered")));
+      });
+      page.window.close();
+    }
+  }
+  {
+    const page = await load({ fixture: "sites/rumble-rows.html", url: "https://rumble.com/",
+      siteRules: { "rumble.com": { enabled: true, hideKinds: ["live"] } } });
+    const live = page.document.getElementById("top_live_videos").closest("section.homepage-section");
+    check("Rumble Live collapses its empty section without collapsing other rows", () => {
+      assert.ok(live.classList.contains("hoa-empty") || live.closest(".hoa-empty"));
+      const leaderboard = Array.from(page.document.querySelectorAll("section.homepage-section")).find(section => {
+        const heading = section.querySelector('rum-text[variant="h3"]');
+        return heading && heading.textContent.trim() === "Leaderboard";
+      });
+      assert.ok(!leaderboard.classList.contains("hoa-empty"));
     });
     page.window.close();
   }

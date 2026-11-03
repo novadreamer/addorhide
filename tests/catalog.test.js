@@ -64,7 +64,7 @@ catalog.rules.forEach(rule => {
       .forEach(source => assert.doesNotThrow(() => new RegExp(source, "iu")));
     [category.containers, category.card && category.card.has, category.card && category.card.is].filter(Boolean)
       .forEach(selector => assert.equal(typeof selector, "string"));
-    if (category.card && category.card.ratings) category.card.ratings.forEach(rating => assert.match(rating, /^(TVY7?|TVG|TVPG|TV14|TVMA|G|PG|PG13|R|NC17|X|7\+|12\+|16\+|18\+|NR)$/));
+    if (category.card && category.card.ratings) category.card.ratings.forEach(rating => assert.match(rating, /^(TVY(?:7(?:FV)?)?|TVG|TVPG|TV14|TVMA|G|PG|PG13|R|NC17|X|7\+|12\+|16\+|18\+|NR)$/));
   }));
 });
 
@@ -98,11 +98,19 @@ check("TMDB retains Movies and TV categories", () => assert.deepEqual(
   catalog.byId("tmdb").categories.map(category => category.id), ["movies", "tv"]));
 check("new ready-made site ids are present", () => ["xumo", "pluto", "roku", "fandango", "crunchyroll", "odysee", "kick", "rumble", "pbs", "vix", "shout", "justwatch", "rottentomatoes", "letterboxd"]
   .forEach(id => assert.ok(catalog.byId(id), id)));
-check("row-based catalog rules expose a Rows by name picker", () => ["tubi", "xumo", "pluto", "roku", "fandango", "crunchyroll", "vix", "shout"].forEach(id => {
+check("row-based catalog rules expose a Rows by name picker", () => ["tubi", "xumo", "pluto", "roku", "fandango", "crunchyroll", "twitch", "rumble", "kick", "odysee", "pbs", "vix", "shout"].forEach(id => {
   const picker = catalog.byId(id).categories.find(category => category.id === "genres");
   assert.ok(picker, id);
   if (id === "xumo") assert.equal(picker.typedRows, false);
 }));
+check("every section rule keeps Rows by name as its last picker category", () => catalog.rules.filter(rule => rule.sections)
+  .forEach(rule => assert.equal(rule.categories.at(-1).id, "genres", rule.id)));
+check("Roku adds kids and mature ratings while Pluto adds mature", () => {
+  const roku = catalog.byId("roku").categories.map(category => category.id);
+  assert.ok(roku.includes("kids") && roku.includes("mature"));
+  assert.ok(catalog.byId("roku").categories.find(category => category.id === "kids").card.ratings.includes("TVY7FV"));
+  assert.ok(catalog.byId("pluto").categories.some(category => category.id === "mature"));
+});
 check("Foreign is kept as an anywhere-on-the-page type and says so", () => ["tubi", "pluto", "roku", "fandango", "crunchyroll", "vix", "shout"].forEach(id => {
   const foreign = catalog.byId(id).categories.find(category => category.id === "foreign");
   assert.ok(foreign, id);

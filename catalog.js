@@ -109,14 +109,14 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "series", label: "TV shows", hint: "Series tiles", card: { href: "^/series/", text: "\\b\\d+\\s+Seasons?\\b" } },
         { id: "live", label: "Live TV", hint: "Live channels", card: { href: "^/live/", text: "\\bLive\\b" } },
         { id: "kids", label: "Kids & family", hint: "Kids, family and animation", card: { text: "Kids|Family|Animation" }, shelfTitle: "Kids|Family|Animation" },
-        { id: "spanish", label: "En español", hint: "Spanish-language rows and tiles", card: { text: "Español|Spanish" }, shelfTitle: "Español|Spanish" },
+        { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
+        { id: "mature", label: "Mature only", hint: "Rated R, NC-17, TV-MA, X, or 18+", card: { ratings: ["R", "NC17", "TVMA", "X", "18+"] } },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", card: { text: "For You In" }, shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
+        { id: "spanish", label: "En español", hint: "Spanish-language rows and tiles", card: { text: "Español|Spanish" }, shelfTitle: "Español|Spanish" },
         { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
-        { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
-        { id: "mature", label: "Mature only", hint: "Rated R, NC-17, TV-MA, X, or 18+", card: { ratings: ["R", "NC17", "TVMA", "X", "18+"] } }
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
       ]),
       removeClosest: '[data-test-id="web-ui-grid-item"]',
       gridSelector: "",
@@ -214,10 +214,12 @@ var HOA_CATALOG = Object.freeze((() => {
       meta: Object.freeze({ texts: Object.freeze(["*"]), genres: 'a[data-a-target="preview-card-game-link"]' }),
       channelLinkSelector: 'a[data-a-target="preview-card-channel-link"]',
       channelCandidates: Object.freeze(["h4", "h3", 'a[data-a-target="preview-card-channel-link"]']),
+      sections: Object.freeze([{ container: "div.find-me", title: "h2.tw-title" }]),
       categories: Object.freeze([
         { id: "live", label: "Live channels", hint: "Channels currently streaming", card: { has: 'a[data-a-target="preview-card-image-link"]', text: "\\bLIVE\\b" } },
         { id: "videos", label: "Past broadcasts & videos", hint: "Recorded Twitch videos", card: { href: "/videos/" } },
-        { id: "clips", label: "Clips", hint: "Short Twitch clips", card: { href: "/clip/" } }
+        { id: "clips", label: "Clips", hint: "Short Twitch clips", card: { href: "/clip/" } },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
       ])
     }),
     Object.freeze({
@@ -240,34 +242,37 @@ var HOA_CATALOG = Object.freeze((() => {
       id: "pluto", carousels: true, name: "Pluto TV", builtIn: false, hosts: Object.freeze(["pluto.tv"]), subdomains: true,
       cardSelector: 'div.swiper-slide:has(a[data-testid="region-link"]), a[data-testid="region-link"]:not(div.swiper-slide a[data-testid="region-link"])', removeClosest: 'div.swiper-slide, a[data-testid="region-link"]', linkSelector: 'a[data-testid="region-link"]', titleCandidates: Object.freeze(["a[aria-label]", "img[alt]"]),
       pageData: Object.freeze({ script: "script#__NEXT_DATA__", idFromHref: "(?:movies|shows|series)/([0-9a-f]{24})", idKeys: Object.freeze(["id", "contentId", "movieId"]), fields: Object.freeze({ cast: "castNames", genres: "genre", description: "description", rating: "regionalRating.rating", kids: "isKidsContent" }) }),
-      sections: Object.freeze([{ container: "div.vds-carousel", title: ".vds-carousel__title-medium" }]),
+      sections: Object.freeze([{ container: "div.vds-carousel", title: ".vds-carousel__title-medium", titleClosest: ".vds-screen" }]),
       categories: Object.freeze([
         { id: "movies", label: "Movies", hint: "Movie tiles", card: { href: "/movies/" } },
         { id: "tv", label: "TV shows", hint: "Series tiles", card: { href: "/shows/|/series/" } },
         { id: "live", label: "Live TV", hint: "Live TV tiles", card: { href: "/live-tv/" } },
         { id: "kids", label: "Kids & family", hint: "Tiles marked as kids content", card: { kids: true } },
         { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
+        { id: "mature", label: "Mature only", hint: "Rated R, NC-17, TV-MA, X, or 18+", card: { ratings: ["R", "NC17", "TVMA", "X", "18+"] } },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
         { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
-        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
       ])
     }),
     Object.freeze({
       id: "roku", carousels: true, name: "The Roku Channel", builtIn: false, hosts: Object.freeze(["therokuchannel.roku.com"]), subdomains: false,
       cardSelector: "li.movie, li.series, li.featured, li[data-row][data-col]", removeClosest: "li.movie, li.series, li.featured, li[data-row][data-col]", featuredSelector: "li.featured", linkSelector: 'a[itemprop="url"]', titleCandidates: Object.freeze(["[aria-label]", 'meta[itemprop="name"]']),
       meta: Object.freeze({ texts: Object.freeze([".title-label", '[data-test-id="content-indicator-container"]']) }),
-      sections: Object.freeze([{ container: "div.roku-collection-row", title: ".roku-collection-row__title" }]),
+      sections: Object.freeze([{ container: "div.roku-collection-row", title: ".roku-collection-row__title", titleAttribute: "data-row-title" }]),
       categories: Object.freeze([
         { id: "movies", label: "Movies", hint: "Movie tiles", card: { is: "li.movie" } },
         { id: "tv", label: "TV shows", hint: "Series tiles", card: { is: "li.series" } },
+        { id: "kids", label: "Kids & family", hint: "Rated TV-Y, TV-Y7, TV-Y7-FV, TV-G or G", card: { ratings: ["TVY", "TVY7", "TVY7FV", "TVG", "G"] } },
         { id: "unsafe-kids", label: "Unsafe for children", hint: "Rated PG-13, TV-14, R, NC-17, TV-MA, 16+/18+, or unrated", card: { ratings: ["PG13", "TV14", "R", "NC17", "TVMA", "X", "16+", "18+", "NR"] } },
+        { id: "mature", label: "Mature only", hint: "Rated R, NC-17, TV-MA, X, or 18+", card: { ratings: ["R", "NC17", "TVMA", "X", "18+"] } },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
         { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
-        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
       ])
     }),
     Object.freeze({
@@ -278,10 +283,10 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "free", label: "Free with ads", hint: "Free or Free to Watch titles", card: { text: "Free to Watch|\\bFree\\b" } },
         { id: "paid", label: "Rent or buy", hint: "Titles that are not marked free", fallback: true },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
         { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
-        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
       ])
     }),
     Object.freeze({
@@ -292,45 +297,53 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "series", label: "Series", hint: "Series cards", card: { href: "/series/" } },
         { id: "movies", label: "Movies", hint: "Movies and movie labels", card: { href: "/watch/", text: "\\bMovie\\b" } },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
         { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { has: "a[href]" }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { has: "a[href]", withoutText: ENGLISH_DUB_TEXT } },
         { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
-        { id: "subbed", label: "Subtitled only", hint: "Cards marked Sub or Subtitled, without a dub", card: { text: "\\bSub(titled)?\\b", withoutText: "\\bDub(bed)?\\b" } }
+        { id: "subbed", label: "Subtitled only", hint: "Cards marked Sub or Subtitled, without a dub", card: { text: "\\bSub(titled)?\\b", withoutText: "\\bDub(bed)?\\b" } },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
       ])
     }),
     Object.freeze({
       id: "odysee", name: "Odysee", builtIn: false, hosts: Object.freeze(["odysee.com"]), subdomains: true,
       cardSelector: "li.claim-preview__wrapper", removeClosest: "li.claim-preview__wrapper", linkSelector: 'a[href^="/@"]:has(.claim-preview__title), .claim-tile__header a[href^="/@"]', titleCandidates: Object.freeze([".claim-preview__title", "a[aria-label]"]),
       channelLinkSelector: 'a[href^="/@"]:not(:has(.claim-preview__title))', channelCandidates: Object.freeze([".channel-name"]), meta: Object.freeze({ duration: ".claim-preview__overlay-properties span" }),
+      sections: Object.freeze([{ container: "div.claim-grid__wrapper", title: ".claim-grid__title, h1.home__meme" }]),
       categories: Object.freeze([
         { id: "live", label: "Live", hint: "Live streams", card: { text: "\\bLIVE\\b" } },
-        { id: "shorts", label: "Shorts", hint: "Videos one minute or shorter", card: { maxSeconds: 60 } }
+        { id: "shorts", label: "Shorts", hint: "Videos one minute or shorter", card: { maxSeconds: 60 } },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
       ])
     }),
     Object.freeze({
       id: "kick", name: "Kick", builtIn: false, hosts: Object.freeze(["kick.com"]), subdomains: true,
       cardSelector: 'div:has(> a[data-testid="media-card-thumbnail"])', removeClosest: 'div:has(> a[data-testid="media-card-thumbnail"])', linkSelector: 'a[data-testid="media-card-thumbnail"]', titleCandidates: Object.freeze(["a[data-card-link]", "a[title]"]),
       channelLinkSelector: 'a[data-card-link]', channelCandidates: Object.freeze(['a[href^="/"]:not([data-testid="media-card-thumbnail"])']),
+      sections: Object.freeze([{ container: "section:has(> div h2)", title: "h2" }]),
       categories: Object.freeze([
         { id: "gambling", label: "Gambling", hint: "Casino, betting and gambling streams", card: { text: "Slots & Casino|\\bCasino\\b|\\bSlots\\b|\\bPoker\\b|Blackjack|Roulette|Gambling|Plinko|Sports betting" } },
         { id: "chatting", label: "Just Chatting / IRL", hint: "Chatting and IRL streams", card: { text: "Just Chatting|\\bIRL\\b" } },
-        { id: "gaming", label: "Gaming", hint: "Streams not marked gambling or chatting", fallback: true }
+        { id: "gaming", label: "Gaming", hint: "Streams not marked gambling or chatting", fallback: true },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
       ])
     }),
     Object.freeze({
       id: "rumble", name: "Rumble", builtIn: false, hosts: Object.freeze(["rumble.com"]), subdomains: true,
       cardSelector: "rum-video-thumbnail", removeClosest: "rum-video-thumbnail", linkSelector: 'a[href*=".html"], a[href*="/shorts/"]', linkAttribute: "url", stripQuery: true, titleCandidates: Object.freeze(["[video-title]"]),
       channelHrefAttribute: "creator-url", channelNameAttribute: "name",
+      sections: Object.freeze([{ container: "section.homepage-section", title: 'rum-text[variant="h3"]' }]),
       categories: Object.freeze([
         { id: "live", label: "Live", hint: "Live streams", card: { text: "\\bLIVE\\b" } },
         { id: "shorts", label: "Shorts", hint: "Rumble Shorts", card: { href: "/shorts/" } },
-        { id: "videos", label: "Videos", hint: "Videos that are not live or Shorts", fallback: true }
+        { id: "videos", label: "Videos", hint: "Videos that are not live or Shorts", fallback: true },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
       ])
     }),
     Object.freeze({
       id: "pbs", name: "PBS", builtIn: false, hosts: Object.freeze(["pbs.org"]), subdomains: true,
-      cardSelector: 'a[class*="show_poster__link"]', removeClosest: 'a[class*="show_poster__link"]', linkSelector: 'a[class*="show_poster__link"]', titleCandidates: Object.freeze(["img[alt]"]), categories: Object.freeze([])
+      cardSelector: 'a[class*="show_poster__link"]', removeClosest: 'a[class*="show_poster__link"]', linkSelector: 'a[class*="show_poster__link"]', titleCandidates: Object.freeze(["img[alt]"]),
+      sections: Object.freeze([{ container: 'div[class*="_show_row"]', title: 'h2[class*="content_row_title"]' }]),
+      categories: Object.freeze([{ id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }])
     }),
     Object.freeze({
       id: "vix", carousels: true, name: "ViX", builtIn: false, hosts: Object.freeze(["vix.com"]), subdomains: true,
@@ -338,10 +351,10 @@ var HOA_CATALOG = Object.freeze((() => {
       sections: Object.freeze([{ container: "section[data-uimodule]", title: 'h2[data-test-id^="carousel-title"]' }]),
       categories: Object.freeze([
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
         { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { has: "a[href]" }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { has: "a[href]", withoutText: ENGLISH_DUB_TEXT } },
-        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
       ])
     }),
     Object.freeze({
@@ -353,10 +366,10 @@ var HOA_CATALOG = Object.freeze((() => {
         { id: "vod", label: "Movies & episodes", hint: "On-demand titles", card: { has: '[data-card-type="VOD"]' } },
         { id: "signin", label: "Needs sign-up", hint: "Titles that require sign-in", card: { has: '[data-access-level="GRANTED_ON_SIGN_IN"]' } },
         { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
-        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" },
         { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
         { id: "not-english", label: "Not in English", hint: "Foreign-language titles, anime and subtitled films; English-dubbed versions stay", card: { text: FOREIGN_TEXT, withoutText: ENGLISH_DUB_TEXT } },
-        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } }
+        { id: "dubbed", label: "Dubbed", hint: "Versions dubbed into another language than the original", card: { text: DUBBED_TEXT } },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
       ])
     }),
     Object.freeze({

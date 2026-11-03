@@ -89,6 +89,13 @@ window.__hoaLoaded = true;
   }
 
   function ownContext() {
+    // Some sites rewrite <html>'s attributes after load (PBS's app does), wiping the marker without another copy
+    // taking over: claim it back instead of retiring. A different instance id still means a newer copy owns the page.
+    if (!rootElement.dataset.hoaInstance && !otherCopyFirst) {
+      rootElement.dataset.hoaInstance = ownInstance;
+      rootElement.dataset.hoaExtension = ownExtension;
+      rootElement.dataset.hoaVersion = ownVersion;
+    }
     return rootElement.dataset.hoaInstance === ownInstance;
   }
 
@@ -288,7 +295,7 @@ window.__hoaLoaded = true;
     const text = String(value || "").trim().toUpperCase();
     if (/^(?:NOT\s*RATED|UNRATED|NR|UR)$/.test(text)) return "NR";
     const normalized = text.replace(/[\s-]/g, "");
-    return /^(?:TVY7?|TVG|TVPG|TV14|TVMA|G|PG|PG13|R|NC17|X|12\+|16\+|18\+|7\+)$/.test(normalized) ? normalized : "";
+    return /^(?:TVY7(?:FV)?|TVY|TVG|TVPG|TV14|TVMA|G|PG|PG13|R|NC17|X|12\+|16\+|18\+|7\+)$/.test(normalized) ? normalized : "";
   }
 
   function cardRatings(card, rule, data) {
@@ -301,7 +308,7 @@ window.__hoaLoaded = true;
     });
     if (data && data.pageData && data.pageData.rating) add(data.pageData.rating);
     const text = cardText(card);
-    const multi = /\b(?:TV-?Y7?|TV-?G|TV-?PG|TV-?14|TV-?MA|PG-?13|NC-?17|NR|Not\s+Rated|Unrated|1[2368]\+|7\+)\b/giu;
+    const multi = /\b(?:TV-?Y7(?:-?FV)?|TV-?G|TV-?PG|TV-?14|TV-?MA|PG-?13|NC-?17|NR|Not\s+Rated|Unrated|1[2368]\+|7\+)\b/giu;
     let match;
     while ((match = multi.exec(text))) add(match[0]);
     const standalone = /(?:^|[•·|])\s*(G|R|X)\s*(?=$|[•·|])/giu;
@@ -597,7 +604,20 @@ window.__hoaLoaded = true;
     if (config.title) {
       try { title = section.querySelector(config.title); } catch (error) { title = null; }
     }
+    if (!title && config.titleClosest && config.title) {
+      try {
+        const owner = section.closest(config.titleClosest);
+        title = owner && owner.querySelector(config.title);
+      } catch (error) { title = null; }
+    }
     if (title) return (title.textContent || "").replace(/\s+/g, " ").trim();
+    if (config.titleAttribute) {
+      const value = section.getAttribute(config.titleAttribute);
+      if (value) return value.replace(/\s+/g, " ").trim();
+    }
+    // A rule that names its heading element means "no heading, no title": guessing from the row's text picks up
+    // scripts and "View All" links (Rumble's untitled Shorts and featured blocks).
+    if (config.title) return "";
     const cardSelectors = [rule.cardSelector, ...(rule.variants || []).map(variant => variant.cardSelector)]
       .filter(Boolean).join(", ");
     // A row headed by a logo (Tubi's Creatorverse) is named by the image's alt text; the text beside it is a tagline.
@@ -653,11 +673,21 @@ window.__hoaLoaded = true;
     const cached = passFeaturedCarousel.get(card);
     if (cached !== undefined) return cached;
     let featured = matchesOptionalSelector(card, rule.featuredSelector);
+    const cardSelectors = [rule.cardSelector, ...(rule.variants || []).map(variant => variant.cardSelector)]
+      .filter(Boolean).join(", ");
     for (let row = card.parentElement, level = 0; !featured && row && level < 6; row = row.parentElement, level += 1) {
       let slot = card;
       while (slot.parentElement && slot.parentElement !== row) slot = slot.parentElement;
       if (matchesOptionalSelector(slot, rule.featuredSelector)) { featured = true; break; }
-      if (!featuredRow(row)) continue;
+      if (!featuredRow(row) || row.children.length < 2) continue;
+      let slotCards = [];
+      try {
+        slotCards = [
+          ...(matchesOptionalSelector(slot, cardSelectors) ? [slot] : []),
+          ...slot.querySelectorAll(cardSelectors)
+        ];
+      } catch (error) { continue; }
+      if (slotCards.length !== 1 || slotCards[0] !== card) continue;
       const viewport = featuredViewport(row);
       const slotBox = slot.getBoundingClientRect();
       const viewportBox = viewport && viewport.getBoundingClientRect();
@@ -714,7 +744,7 @@ window.__hoaLoaded = true;
       const positional = direct.length || featured ? [] : categories.filter(category => category.rowsAbove && index >= 0 && index < anchorIndex(category));
       const kinds = [...direct, ...positional].map(category => category.id);
       return { kinds, kind: kinds[0] || (featured ? "featured" : "genre"),
-        listed: !featured && Boolean(picker) && (picker.typedRows !== false || !kinds.length) };
+        listed: Boolean(picker) && (picker.typedRows !== false || (!featured && !kinds.length)) };
     };
     rows.forEach((row, index) => {
       const position = navTitles.length ? orderIndex.get(rowKey(row.title)) : index;
@@ -763,7 +793,13 @@ window.__hoaLoaded = true;
     info.rows.forEach(row => {
       const byType = row.kinds.some(id => selectedIds.has(id));
       const byName = row.listed && hiddenNames.has(rowKey(row.title));
-      if ((byType || byName) && (rule.featuredCarousels !== false || !row.featured)) { filtered.add(row.section); nodes.add(row.section); }
+      if (byName || (byType && (rule.featuredCarousels !== false || !row.featured))) {
+        const node = outermostSingleChildWrapper(row.section);
+        filtered.add(row.section);
+        nodes.add(row.section);
+        filtered.add(node);
+        nodes.add(node);
+      }
     });
     hideSectionNav(rule, info.rows, filtered, nodes);
     containerFilterCache = { key: cacheKey, nodes };
@@ -1674,17 +1710,40 @@ window.__hoaLoaded = true;
     return true;
   }
 
+  const EMPTY_SECTION_EXCLUDED = "html, body, main, [role=main], #root, #__next, #app, ytd-app, ytd-page-manager, ytd-browse, ytd-rich-grid-renderer, ytd-two-column-browse-results-renderer";
+
+  function outermostSingleChildWrapper(node) {
+    let outer = node;
+    for (let parent = node && node.parentElement; parent && !parent.matches(EMPTY_SECTION_EXCLUDED); parent = parent.parentElement) {
+      if (parent.children.length !== 1) break;
+      outer = parent;
+    }
+    return outer;
+  }
+
+  function hasVisibleSiblingContent(parent, section, selector) {
+    return Array.from(parent.children).some(child => {
+      if (child === section || child.hidden || child.classList.contains(ACTIVE_CLASS) || child.classList.contains(FILTER_CLASS)
+        || Array.from(child.classList).some(name => name.startsWith("hoa-"))) return false;
+      const rect = child.getBoundingClientRect();
+      if (!rect.width && !rect.height) return false;
+      try {
+        if (child.matches(selector) || child.querySelector(selector) || child.querySelector("img")) return true;
+      } catch (error) { /* stale optional selector */ }
+      return true;
+    });
+  }
+
   function collapseEmptySections(rule, variants, filtered, matchedCards = null) {
     document.querySelectorAll(".hoa-empty").forEach(node => node.classList.remove("hoa-empty"));
     const selector = variants.map(variant => variant.cardSelector).filter(Boolean).join(", ");
     if (!selector) return;
-    const excluded = "html, body, main, [role=main], #root, #__next, #app, ytd-app, ytd-page-manager, ytd-browse, ytd-rich-grid-renderer, ytd-two-column-browse-results-renderer";
     const candidates = new Set();
     filtered.forEach(target => {
       let parent = target;
       for (let level = 0; level < 6 && parent; level += 1) {
         parent = parent.parentElement;
-        if (!parent || parent.matches(excluded)) break;
+        if (!parent || parent.matches(EMPTY_SECTION_EXCLUDED)) break;
         const rect = parent.getBoundingClientRect();
         if (rect.height && window.innerHeight && rect.height > window.innerHeight * 1.5) break;
         candidates.add(parent);
@@ -1704,7 +1763,16 @@ window.__hoaLoaded = true;
     });
     const empty = new Set(Array.from(candidates).filter(section => !occupied.has(section)));
     Array.from(empty).filter(section => !Array.from(empty).some(other => other !== section && other.contains(section)))
-      .forEach(section => section.classList.add("hoa-empty"));
+      .forEach(section => {
+        let outer = section;
+        for (let parent = outer.parentElement; parent && !parent.matches(EMPTY_SECTION_EXCLUDED); parent = parent.parentElement) {
+          const rect = parent.getBoundingClientRect();
+          if (rect.height && window.innerHeight && rect.height > window.innerHeight * 1.5) break;
+          if (hasVisibleSiblingContent(parent, outer, selector)) break;
+          outer = parent;
+        }
+        outer.classList.add("hoa-empty");
+      });
   }
 
   function apply() {
@@ -2018,7 +2086,10 @@ window.__hoaLoaded = true;
           const info = sectionRows(rule);
           const titles = info.navTitles.length ? info.navTitles : info.rows.map(row => row.title);
           const renderedByKey = new Map(info.rows.map(row => [rowKey(row.title), row]));
-          rows = titles.slice(0, 120).map((title, index) => {
+          // Some sites render each row twice for different screen sizes (Pluto): list a title once.
+          const seenTitles = new Set();
+          rows = titles.filter(title => { const key = rowKey(title); if (!key || seenTitles.has(key)) return false; seenTitles.add(key); return true; })
+            .slice(0, 120).map((title, index) => {
             const rendered = renderedByKey.get(rowKey(title));
             const classified = info.classify(title, index, Boolean(rendered && rendered.featured));
             return { title, kind: classified.kind, listed: classified.listed };
