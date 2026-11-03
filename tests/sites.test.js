@@ -64,6 +64,28 @@ check("requested patterns are covered by the manifest's optional_host_permission
   });
 });
 check("script id", () => assert.equal(SITES.scriptId("example.com"), "hoa-site-example.com"));
+check("PBS requests and registers its player host separately", () => assert.deepEqual(SITES.playerHosts("www.pbs.org"), ["player.pbs.org"]));
+check("Dailymotion requests and registers its player host separately", () => assert.deepEqual(SITES.playerHosts("www.dailymotion.com"), ["geo.dailymotion.com"]));
+check("ordinary sites have no separate player host", () => assert.deepEqual(SITES.playerHosts("www.imdb.com"), []));
+{
+  const requested = []; const registered = []; const removed = [];
+  const previousChrome = global.chrome;
+  global.chrome = {
+    runtime: { lastError: null },
+    storage: { local: { get(_defaults, callback) { callback({ siteRules: {} }); }, set(_value, callback) { if (callback) callback(); } } },
+    permissions: { request(details, callback) { requested.push(details.origins); callback(true); }, remove(details, callback) { removed.push(details.origins); callback(); } },
+    scripting: {
+      unregisterContentScripts(_details, callback) { callback(); }, registerContentScripts(details, callback) { registered.push(details); callback(); },
+      executeScript(_details, callback) { callback(); }, insertCSS(_details, callback) { callback(); }
+    }
+  };
+  SITES.enableSite("www.pbs.org", 1, {}, result => assert.equal(result.ok, true));
+  SITES.disableSite("www.pbs.org", result => assert.equal(result.ok, true));
+  check("PBS enable requests page and player origins from catalog metadata", () => assert.deepEqual(requested[0], ["https://www.pbs.org/*", "https://player.pbs.org/*"]));
+  check("PBS registers a distinct player content script", () => assert.deepEqual(registered[0].map(script => script.matches[0]), ["https://www.pbs.org/*", "https://player.pbs.org/*"]));
+  check("PBS disable removes page and player origins", () => assert.deepEqual(removed, [["https://www.pbs.org/*", "https://player.pbs.org/*"], ["http://www.pbs.org/*", "http://player.pbs.org/*"]]));
+  global.chrome = previousChrome;
+}
 check("host from pattern", () => assert.equal(SITES.hostFromPattern("*://example.com/*"), "example.com"));
 check("host from https pattern", () => assert.equal(SITES.hostFromPattern("https://www.imdb.com/*"), "www.imdb.com"));
 check("host from http pattern", () => assert.equal(SITES.hostFromPattern("http://example.com/*"), "example.com"));

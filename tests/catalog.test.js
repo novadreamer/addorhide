@@ -94,8 +94,8 @@ check("YouTube gaming category has title terms", () => {
   const gaming = catalog.byId("youtube").categories.find(category => category.id === "gaming");
   assert.ok(Array.isArray(gaming.titleTerms) && gaming.titleTerms.includes("minecraft"));
 });
-check("TMDB retains Movies and TV categories", () => assert.deepEqual(
-  catalog.byId("tmdb").categories.map(category => category.id), ["movies", "tv"]));
+check("TMDB retains Movies and TV categories plus Watched", () => assert.deepEqual(
+  catalog.byId("tmdb").categories.map(category => category.id), ["movies", "tv", "watched"]));
 check("new ready-made site ids are present", () => ["xumo", "pluto", "roku", "fandango", "crunchyroll", "odysee", "kick", "rumble", "pbs", "vix", "shout", "justwatch", "rottentomatoes", "letterboxd"]
   .forEach(id => assert.ok(catalog.byId(id), id)));
 check("row-based catalog rules expose a Rows by name picker", () => ["tubi", "xumo", "pluto", "roku", "fandango", "crunchyroll", "twitch", "rumble", "kick", "odysee", "pbs", "vix", "shout"].forEach(id => {

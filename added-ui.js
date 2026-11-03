@@ -61,6 +61,7 @@ const HOA_ADDED = (() => {
     }
 
     let added = {};
+    let watchProgress = {};
     let prefs = {};
     let editingKey = "";
     let pendingRefresh = false;
@@ -566,6 +567,40 @@ const HOA_ADDED = (() => {
       return section;
     }
 
+    function renderContinueWatching(entries) {
+      if (!entries.length) return null;
+      const prefKey = "continueWatching"; const current = prefs[prefKey] || {};
+      const section = element("section", "site-group continue-watching"); section.dataset.site = prefKey;
+      const heading = element("div", "site-heading");
+      const collapse = element("button", "collapse-button", current.collapsed ? "▸" : "▾"); collapse.type = "button";
+      collapse.setAttribute("aria-expanded", String(!current.collapsed)); collapse.setAttribute("aria-label", `${current.collapsed ? "Expand" : "Collapse"} Continue Watching`);
+      collapse.addEventListener("click", () => { setPrefs(prefKey, { collapsed: !current.collapsed }); render(); });
+      const identity = element("div", "site-identity"); identity.append(element("h2", "site-name-toggle", "Continue Watching"), element("span", "count-badge", String(entries.length)));
+      heading.append(collapse, identity);
+      const controls = element("div", "site-controls"); const clear = element("button", `site-delete-all${siteDeleteConfirmations.has(prefKey) ? " armed" : ""}`); clear.type = "button";
+      clear.innerHTML = siteDeleteConfirmations.has(prefKey) ? OPEN_BIN_ICON : BIN_ICON;
+      clear.title = siteDeleteConfirmations.has(prefKey) ? "Click again to remove every Continue Watching video" : "Remove all Continue Watching videos";
+      clear.setAttribute("aria-label", clear.title);
+      clear.addEventListener("click", () => {
+        if (siteDeleteConfirmations.has(prefKey)) { clearTimeout(siteDeleteConfirmations.get(prefKey)); siteDeleteConfirmations.delete(prefKey); HOA.readLists(lists => { const next = { ...lists.watchProgress }; entries.forEach(([key]) => { if (next[key]) delete next[key].cw; }); HOA.writeLists({ watchProgress: next }, refresh); }); return; }
+        siteDeleteConfirmations.set(prefKey, window.setTimeout(() => { siteDeleteConfirmations.delete(prefKey); render(); }, 4000)); render();
+      });
+      controls.appendChild(clear); heading.appendChild(controls); section.appendChild(heading);
+      if (current.collapsed) return section;
+      const grid = element("div", "added-card-grid landscape-grid"); entries.forEach(([key, entry]) => {
+        const card = element("article", "added-card continue-card");
+        let href = HOA.safeHref(key) || key;
+        try { const url = new URL(href); if (HOA.siteOf(key) === "youtube.com") url.searchParams.set("t", `${Math.max(0, Math.floor(entry.position - 5))}s`); href = url.href; } catch (error) { /* keep the stored URL */ }
+        const media = element("a", "card-media card-external"); media.href = href; media.target = "_blank"; media.rel = "noopener noreferrer"; media.setAttribute("aria-label", `Resume ${entry.title}`);
+        if (entry.thumbnail || HOA.youtubeThumb(key)) { const image = document.createElement("img"); image.src = HOA.safeHref(entry.thumbnail) || HOA.youtubeThumb(key); image.alt = ""; image.loading = "lazy"; media.appendChild(image); } else media.appendChild(element("div", "hoa-placeholder"));
+        const bar = element("span", "continue-progress"); bar.style.setProperty("--hoa-progress", `${Math.min(100, entry.position / entry.duration * 100)}%`); media.appendChild(bar); card.appendChild(media);
+        const body = element("div", "added-card-body"); const title = element("h3"); const titleLink = element("a", "added-title", entry.title); titleLink.href = href; title.appendChild(titleLink); body.appendChild(title);
+        body.appendChild(element("p", "added-meta", `${HOA.formatDuration(Math.max(0, Math.floor(entry.duration - entry.position)))} left · ${HOA.siteDisplayName(entry.site)}`));
+        const actions = element("div", "video-actions"); const remove = element("button", "icon-btn remove-button"); remove.type = "button"; remove.innerHTML = REMOVE_ICON; remove.title = "Remove from Continue Watching"; remove.setAttribute("aria-label", remove.title);
+        remove.addEventListener("click", () => { HOA.readLists(lists => { const next = { ...lists.watchProgress }; if (next[key]) { next[key] = { ...next[key] }; delete next[key].cw; } HOA.writeLists({ watchProgress: next }, refresh); }); }); actions.appendChild(remove); body.appendChild(actions); card.appendChild(body); grid.appendChild(card);
+      }); section.appendChild(grid); return section;
+    }
+
     // Every change rebuilds the list. Keep the reader where they were: the website section they were working
     // in stays at the same height on screen (otherwise the page jumped to the top), and focus returns to
     // the same control.
@@ -581,14 +616,16 @@ const HOA_ADDED = (() => {
         groupsRoot.firstChild.remove();
       }
       const groups = HOA.groupBySite(added);
+      const continuing = Object.entries(watchProgress).filter(([, entry]) => entry && entry.cw && !entry.watched).sort((a, b) => b[1].updated - a[1].updated);
       const videoCount = groups.reduce((count, group) => count + group.entries.length, 0);
-      introSummary.textContent = HOA.addedSummaryText(videoCount, groups.length);
-      empty.hidden = groups.length !== 0;
+      introSummary.textContent = videoCount || !continuing.length ? `${HOA.addedSummaryText(videoCount, groups.length)}${continuing.length ? ` · ${continuing.length} to continue` : ""}`
+        : `${continuing.length} to continue watching.`;
+      empty.hidden = groups.length !== 0 || continuing.length !== 0;
       // aria-disabled (not disabled) so the tooltip still shows on hover in every browser.
       clearButton.setAttribute("aria-disabled", String(videoCount === 0));
       clearButton.title = videoCount === 0 ? "Nothing to clear: no videos have been added yet"
         : "Clear page: delete every added video (asks first)";
-      groups.forEach(group => groupsRoot.appendChild(renderSite(group)));
+      const continueSection = renderContinueWatching(continuing); if (continueSection) groupsRoot.appendChild(continueSection); groups.forEach(group => groupsRoot.appendChild(renderSite(group)));
       groupsRoot.style.minHeight = "";
       const nextAnchor = anchorSite
         ? Array.from(groupsRoot.querySelectorAll(".site-group")).find(section => section.dataset.site === anchorSite)
@@ -607,6 +644,7 @@ const HOA_ADDED = (() => {
     function refresh() {
       HOA.readLists(lists => {
         added = lists.added;
+        watchProgress = lists.watchProgress;
         HOA.readPrefs(nextPrefs => {
           prefs = nextPrefs;
           render();
@@ -627,7 +665,7 @@ const HOA_ADDED = (() => {
 
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
       chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName !== "local" || (!changes[HOA.ADDED_KEY] && !changes[HOA.PREFS_KEY])) {
+        if (areaName !== "local" || (!changes[HOA.ADDED_KEY] && !changes[HOA.PREFS_KEY] && !changes[HOA.PROGRESS_KEY])) {
           return;
         }
         if (editingKey) {

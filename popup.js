@@ -15,10 +15,12 @@ const popupMain = document.querySelector("body.popup main");
 let hidden = {};
 let added = {};
 let channels = {};
+let watchProgress = {};
 let activeTab = null;
 let activeHost = "";
 let siteRulesWrittenHere = false;
 let positionRoomFrame = 0;
+let rowsRefresh = 0;
 
 function fitPositionBreathingRoom() {
   positionRoomFrame = 0;
@@ -83,6 +85,18 @@ function appendPageStatus(container) {
       line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"}, but none got buttons. Reload the page; if it stays like this, send the details below.`;
     } else {
       line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"} on this page. Move your mouse over one to see Add and Hide.`;
+    }
+    if (reply.nowPlaying && reply.nowPlaying.key) {
+      chrome.storage.local.get({ [HOA.WATCH_SETTINGS_KEY]: {} }, saved => {
+      if (HOA.normalizeWatchSettings(saved[HOA.WATCH_SETTINGS_KEY]).continueWatching === "off") return;
+      const listed = reply.nowPlaying.cw;
+      const continueButton = button(listed ? "In Continue Watching" : "Add to Continue Watching", () => {
+        if (listed) return;
+        const entry = watchProgress[reply.nowPlaying.key] || { ...reply.nowPlaying, url: reply.nowPlaying.key, site: HOA.siteOf(reply.nowPlaying.key), thumbnail: "", buckets: HOA.bitmapBuckets(""), watched: false, ts: Date.now(), updated: Date.now() };
+        HOA.writeProgress(reply.nowPlaying.key, { ...entry, cw: "manual", updated: Date.now() }, () => { continueButton.textContent = "In Continue Watching"; continueButton.disabled = true; });
+      });
+      continueButton.className = "secondary-button continue-popup-button"; continueButton.disabled = Boolean(listed); line.appendChild(continueButton);
+      });
     }
     schedulePositionBreathingRoom();
   });
@@ -310,31 +324,34 @@ function appendFilterControls(container, catalogRule) {
           const list = document.createElement("div"); list.className = "genres-list";
           const normalize = values => HOA.normalizeSectionTitles(values);
           const setTitles = values => { genreTitles = normalize(values); paintGenreRow(genreTitles); };
-          const drawGenreList = () => {
-            list.replaceChildren();
-            if (!genreTitles.length) { list.appendChild(Object.assign(document.createElement("p"), { className: "filter-note muted", textContent: "Scroll the page once so AddOrHide can list its rows." })); return; }
-            genreTitles.forEach(title => { const label = document.createElement("label"); label.className = "genre-check"; const input = document.createElement("input"); input.type = "checkbox";
+          let rowsComplete = false; let rowsScanned = false; let rowNote; let findRows;
+          const drawGenreList = (append = false) => {
+            if (!append) list.replaceChildren();
+            if (!genreTitles.length) { if (!list.firstChild) list.appendChild(Object.assign(document.createElement("p"), { className: "filter-note muted", textContent: "Rows appear here as the page loads them." })); return; }
+            list.querySelectorAll(".filter-note").forEach(node => node.remove()); const present = new Set(Array.from(list.querySelectorAll(".genre-check span")).map(node => node.textContent.toLocaleLowerCase()));
+            genreTitles.filter(title => !present.has(title.toLocaleLowerCase())).forEach(title => { const label = document.createElement("label"); label.className = "genre-check"; const input = document.createElement("input"); input.type = "checkbox";
               input.checked = hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0);
               input.addEventListener("change", () => { hideSections = input.checked ? normalize([...hideSections, title]) : hideSections.filter(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) !== 0); save(); paintGenreRow(genreTitles); paintAll(); });
               const text = document.createElement("span"); text.textContent = title; label.title = title; label.append(input, text); list.appendChild(label); });
           };
           const header = document.createElement("div"); header.className = "genres-panel-header"; header.appendChild(Object.assign(document.createElement("span"), { className: "muted", textContent: "Tick a genre to hide its row" }));
           const allGenres = button("", () => { const any = genreTitles.some(title => hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0)); hideSections = any ? hideSections.filter(value => !genreTitles.some(title => title.localeCompare(value, undefined, { sensitivity: "accent" }) === 0)) : normalize([...hideSections, ...genreTitles]); save(); drawGenreList(); paintGenreRow(genreTitles); paintAll(); }); allGenres.className = "filter-tool";
-          const closeGenres = button("×", () => closeGenresPanel()); closeGenres.className = "filter-close"; closeGenres.title = "Close Genres"; header.append(allGenres, closeGenres); genreWrap.append(Object.assign(document.createElement("div"), { className: "genres-panel-inner" })); genreWrap.firstChild.append(header, list);
+          const closeGenres = button("×", () => closeGenresPanel()); closeGenres.className = "filter-close"; closeGenres.title = "Close Genres"; header.append(allGenres, closeGenres); genreWrap.append(Object.assign(document.createElement("div"), { className: "genres-panel-inner" })); rowNote = Object.assign(document.createElement("p"), { className: "filter-note muted genres-live-note" }); findRows = button("Find all rows", () => { if (!activeTab || !Number.isInteger(activeTab.id)) return; findRows.disabled = true; findRows.textContent = "Finding rows…"; chrome.tabs.sendMessage(activeTab.id, { type: "hoa-load-rows" }, () => { rowsScanned = true; paintRowNote(); findRows.disabled = false; findRows.textContent = "Find all rows"; }); }); findRows.className = "genres-find"; genreWrap.firstChild.append(header, rowNote, findRows, list);
           const paintAll = () => { const any = genreTitles.some(title => hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0)); const label = any ? "Unhide all genres" : "Hide all genres"; allGenres.innerHTML = any ? eye : eyeOff; allGenres.title = label; allGenres.setAttribute("aria-label", label); };
-          const closeGenresPanel = () => { genresOpen = false; genreWrap.classList.remove("is-open"); genreRow.setAttribute("aria-expanded", "false"); panel.hoaCloseInner = null; };
+          const paintRowNote = () => { rowNote.textContent = rowsComplete ? "" : rowsScanned ? `${genreTitles.length} rows · from your last visit too` : `Rows load as you scroll — ${genreTitles.length} listed so far.`; rowNote.hidden = rowsComplete; findRows.hidden = rowsComplete || rowsScanned; };
+          const closeGenresPanel = () => { genresOpen = false; genreWrap.classList.remove("is-open"); genreRow.setAttribute("aria-expanded", "false"); panel.hoaCloseInner = null; if (rowsRefresh) { window.clearInterval(rowsRefresh); rowsRefresh = 0; } };
           const loadGenres = () => chrome.storage.local.get({ [HOA.SEEN_ROWS_KEY]: {} }, saved => {
             const seen = saved[HOA.SEEN_ROWS_KEY] && saved[HOA.SEEN_ROWS_KEY][activeHost] || [];
-            const finish = pageRows => { const pageTitles = normalize((pageRows || []).filter(row => row && row.listed).map(row => row.title)); const remembered = normalize([...seen, ...pageTitles]).slice(-150);
-              setTitles([...pageTitles, ...seen, ...hideSections]); drawGenreList(); paintAll();
+            const finish = (pageRows, reply) => { const pageTitles = normalize((pageRows || []).filter(row => row && row.listed).map(row => row.title)); const remembered = normalize([...seen, ...pageTitles]).slice(-150); const before = genreTitles.length;
+              setTitles([...genreTitles, ...pageTitles, ...seen, ...hideSections]); drawGenreList(before > 0); paintAll(); rowsComplete = Boolean(reply && reply.rowsComplete); paintRowNote();
               if (pageTitles.some(title => !normalize(seen).some(old => old.localeCompare(title, undefined, { sensitivity: "accent" }) === 0))) chrome.storage.local.set({ [HOA.SEEN_ROWS_KEY]: { ...(saved[HOA.SEEN_ROWS_KEY] || {}), [activeHost]: remembered } }); };
-            if (activeTab && Number.isInteger(activeTab.id)) chrome.tabs.sendMessage(activeTab.id, { type: "hoa-status" }, reply => finish(reply && reply.rows)); else finish([]);
+            if (activeTab && Number.isInteger(activeTab.id)) chrome.tabs.sendMessage(activeTab.id, { type: "hoa-status" }, reply => finish(reply && reply.rows, reply)); else finish([]);
           });
-          const toggleGenres = () => { const open = !genresOpen; if (open) { genresOpen = true; genreWrap.classList.add("is-open"); genreRow.setAttribute("aria-expanded", "true"); panel.hoaCloseInner = () => { closeGenresPanel(); return true; }; window.setTimeout(() => { if (genresOpen && genreRow.scrollIntoView) genreRow.scrollIntoView({ block: "start", behavior: "smooth" }); }, 220); } else closeGenresPanel(); };
+          const toggleGenres = () => { const open = !genresOpen; if (open) { if (rowsRefresh) window.clearInterval(rowsRefresh); genresOpen = true; genreWrap.classList.add("is-open"); genreRow.setAttribute("aria-expanded", "true"); panel.hoaCloseInner = () => { closeGenresPanel(); return true; }; loadGenres(); rowsRefresh = window.setInterval(() => { if (genresOpen && panel.isConnected) loadGenres(); }, 1000); window.setTimeout(() => { if (genresOpen && genreRow.scrollIntoView) genreRow.scrollIntoView({ block: "start", behavior: "smooth" }); }, 220); } else closeGenresPanel(); };
           paintGenreRow(genreTitles); body.append(genreRow, genreWrap);
           if (genresOpen) panel.hoaCloseInner = () => { closeGenresPanel(); return true; };
           // Fetch on the first popover draw so its count and tri-state are already known before opening the panel.
-          loadGenres();
+          loadGenres(); if (genresOpen) { if (rowsRefresh) window.clearInterval(rowsRefresh); rowsRefresh = window.setInterval(() => { if (genresOpen && panel.isConnected) loadGenres(); }, 1000); }
         }
         const words = document.createElement("div"); words.className = "filter-words"; const input = document.createElement("input"); input.type = "text"; input.setAttribute("aria-label", "Hide videos with these words, comma-separated");
         input.disabled = keywords.length >= 10; input.placeholder = input.disabled ? "10 of 10 words — remove one to add another" : "Hide videos with these words";
@@ -393,7 +410,7 @@ function renderSite() {
     schedulePositionBreathingRoom();
     return;
   }
-  const renderEnabled = granted => {
+  const renderEnabled = (granted, playerGranted = true) => {
   if (generation !== renderGeneration) return;
   clearNode(siteContent);
   if (!granted || rule.enabled !== true) {
@@ -401,6 +418,12 @@ function renderSite() {
       const supported = document.createElement("p");
       supported.textContent = `${catalogRule.name} is supported`;
       siteContent.appendChild(supported);
+    }
+    if (HOA_SITES.playerHosts(activeHost).length) {
+      const playerNote = document.createElement("p");
+      playerNote.className = "muted";
+      playerNote.textContent = "To track what you watch here, allow its video player";
+      siteContent.appendChild(playerNote);
     }
     siteContent.appendChild(siteButton("Enable on this site", () => {
       HOA_SITES.enableSite(activeHost, activeTab.id, siteRules, result => {
@@ -439,6 +462,18 @@ function renderSite() {
     : (isCatalog ? "Supported" : "Pick the cards to finish setup");
   siteContent.appendChild(status);
   appendPageStatus(siteContent);
+  if (!playerGranted) {
+    const playerNote = document.createElement("p");
+    playerNote.className = "muted";
+    playerNote.textContent = "To track what you watch here, allow its video player ";
+    const allowPlayer = siteButton("Allow player", () => HOA_SITES.enablePlayers(activeHost, activeTab.id, result => {
+      if (!result.ok) { setSiteStatus(result.error, "error"); return; }
+      renderSite();
+    }, activeScheme()), true);
+    allowPlayer.classList.add("player-permission-button");
+    playerNote.appendChild(allowPlayer);
+    siteContent.appendChild(playerNote);
+  }
   const actions = document.createElement("div");
   actions.className = "page-actions";
   const teachLabel = learnedCount ? "Teach more cards" : (isCatalog ? "Teach cards" : "Pick cards");
@@ -490,7 +525,11 @@ function renderSite() {
   siteContent.appendChild(links);
   schedulePositionBreathingRoom();
   };
-  chrome.permissions.contains({ origins: [HOA_SITES.matchPattern(activeHost, activeScheme())] }, renderEnabled);
+  chrome.permissions.contains({ origins: [HOA_SITES.matchPattern(activeHost, activeScheme())] }, granted => {
+    const players = HOA_SITES.playerHosts(activeHost);
+    if (!granted || !players.length) { renderEnabled(granted); return; }
+    chrome.permissions.contains({ origins: players.map(host => HOA_SITES.matchPattern(host, activeScheme())) }, playerGranted => renderEnabled(granted, playerGranted));
+  });
 }
 
 function loadSite() {
@@ -509,6 +548,7 @@ function loadSite() {
 }
 
 function render() {
+  if (rowsRefresh) { window.clearInterval(rowsRefresh); rowsRefresh = 0; }
   const listed = HOA.listedHidden(hidden);
   const count = listed.length;
   openHiddenButton.disabled = count === 0 && Object.keys(channels).length === 0;
@@ -526,8 +566,10 @@ function render() {
   } else if (channelSummary) channelSummary.remove();
   // Added Videos works the same way: off while nothing is added, with the count underneath.
   const addedCount = Object.keys(added || {}).length;
-  openAddedButton.disabled = addedCount === 0;
-  addedSummary.textContent = HOA.addedCountText(addedCount, HOA.groupBySite(added).length);
+  const continuing = Object.values(watchProgress).filter(entry => entry && entry.cw && !entry.watched).length;
+  openAddedButton.disabled = addedCount === 0 && continuing === 0;
+  addedSummary.textContent = addedCount || !continuing ? `${HOA.addedCountText(addedCount, HOA.groupBySite(added).length)}${continuing ? ` · ${continuing} to continue` : ""}`
+    : `${continuing} to continue watching.`;
   schedulePositionBreathingRoom();
 }
 
@@ -591,8 +633,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === "local" && changes[HOA.THEME_KEY]) {
     refreshThemeToggle();
   }
-  if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.ADDED_KEY] || changes[HOA.CHANNELS_KEY])) {
-    HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; channels = lists.channels; render(); });
+  if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.ADDED_KEY] || changes[HOA.CHANNELS_KEY] || changes[HOA.PROGRESS_KEY])) {
+    HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; channels = lists.channels; watchProgress = lists.watchProgress; render(); });
   }
   if (areaName === "local" && changes[HOA.SITES_KEY]) {
     siteRules = changes[HOA.SITES_KEY].newValue && typeof changes[HOA.SITES_KEY].newValue === "object"
@@ -601,5 +643,5 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     renderSite();
   }
 });
-HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; channels = lists.channels; render(); });
+HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; channels = lists.channels; watchProgress = lists.watchProgress; render(); });
 loadSite();

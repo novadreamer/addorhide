@@ -19,11 +19,14 @@ const importDataButton = document.getElementById("import-data-button");
 const importDataInput = document.getElementById("import-data-input");
 const dataStatus = document.getElementById("data-status");
 const filterSites = document.getElementById("filter-sites");
+const tagWatchedInput = document.getElementById("tag-watched");
+const continueInputs = Array.from(document.querySelectorAll('input[name="continue-watching"]'));
 
 let hidden = {};
 let added = {};
 let siteRules = {};
 let seenRows = {};
+let watchSettings = HOA.normalizeWatchSettings({});
 let siteRulesWrittenHere = false;
 const filterDuplicateNotes = {};
 
@@ -153,6 +156,17 @@ function loadRules() {
     renderFilterSites();
   });
 }
+
+function loadWatchSettings() {
+  chrome.storage.local.get({ [HOA.WATCH_SETTINGS_KEY]: {} }, result => {
+    watchSettings = HOA.normalizeWatchSettings(result[HOA.WATCH_SETTINGS_KEY]);
+    tagWatchedInput.checked = watchSettings.tagWatched;
+    continueInputs.forEach(input => { input.checked = input.value === watchSettings.continueWatching; });
+  });
+}
+function saveWatchSettings() { chrome.storage.local.set({ [HOA.WATCH_SETTINGS_KEY]: watchSettings }); }
+tagWatchedInput.addEventListener("change", () => { watchSettings = { ...watchSettings, tagWatched: tagWatchedInput.checked }; saveWatchSettings(); });
+continueInputs.forEach(input => input.addEventListener("change", () => { if (input.checked) { watchSettings = { ...watchSettings, continueWatching: input.value }; saveWatchSettings(); } }));
 
 function bindBulkHide(input, host) {
   input.addEventListener("change", () => {
@@ -377,6 +391,7 @@ function storageSnapshot(callback) {
     [HOA.ADDED_KEY]: {},
     [HOA.CHANNELS_KEY]: {},
     [HOA.WATCHED_SHOWN_KEY]: {},
+    [HOA.PROGRESS_KEY]: {},
     [HOA.SITES_KEY]: {},
     [HOA.PREFS_KEY]: {}
   }, callback);
@@ -390,6 +405,7 @@ function exportData() {
       added: result[HOA.ADDED_KEY],
       channels: result[HOA.CHANNELS_KEY],
       watchedShown: result[HOA.WATCHED_SHOWN_KEY],
+      watchProgress: result[HOA.PROGRESS_KEY],
       siteRules: result[HOA.SITES_KEY],
       prefs: result[HOA.PREFS_KEY]
     }, manifest.version || "", Date.now());
@@ -450,6 +466,7 @@ function importDataFile(file) {
         added: current[HOA.ADDED_KEY],
         channels: current[HOA.CHANNELS_KEY],
         watchedShown: current[HOA.WATCHED_SHOWN_KEY],
+        watchProgress: current[HOA.PROGRESS_KEY],
         siteRules: current[HOA.SITES_KEY],
         prefs: current[HOA.PREFS_KEY]
       }, parsed.backup);
@@ -462,6 +479,7 @@ function importDataFile(file) {
         [HOA.ADDED_KEY]: merged.added,
         [HOA.CHANNELS_KEY]: merged.channels,
         [HOA.WATCHED_SHOWN_KEY]: merged.watchedShown,
+        [HOA.PROGRESS_KEY]: merged.watchProgress,
         [HOA.SITES_KEY]: merged.siteRules,
         [HOA.PREFS_KEY]: merged.prefs
       }, () => {
@@ -508,3 +526,4 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 HOA.purgeLegacy();
 HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; renderHidden(); });
 loadRules();
+loadWatchSettings();

@@ -288,4 +288,22 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     showButtonsState();
   }
 });
+
+const progressFrames = new Map();
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || !sender.tab) return undefined;
+  if (message.type === "hoa-frame-progress" && Number.isInteger(sender.frameId) && sender.frameId !== 0) {
+    progressFrames.set(sender.tab.id, sender.frameId);
+    chrome.tabs.sendMessage(sender.tab.id, message, { frameId: 0 }, response => {
+      if (chrome.runtime.lastError) { sendResponse({}); return; }
+      sendResponse(response || {});
+    });
+    return true;
+  }
+  if (message.type === "hoa-frame-seek" && sender.frameId === 0 && Number.isFinite(message.seekTo)) {
+    const frameId = progressFrames.get(sender.tab.id);
+    if (Number.isInteger(frameId)) chrome.tabs.sendMessage(sender.tab.id, { type: "hoa-frame-seek", seekTo: message.seekTo }, { frameId }, () => void chrome.runtime.lastError);
+  }
+  return undefined;
+});
 showButtonsState();

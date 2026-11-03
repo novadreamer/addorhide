@@ -16,13 +16,16 @@ const root = path.join(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, statusRows } = {}) {
+async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, statusRows, nowPlaying, watchSettings, playerGranted = true } = {}) {
   const dom = new JSDOM(read("popup.html"), { url: "https://extension.test/popup.html", runScripts: "outside-only", pretendToBeVisual: true });
   const { window } = dom;
   const host = new URL(url).hostname;
   const store = { siteRules: siteRules || { [host]: { enabled: true } } };
   if (seenRows) store.seenRows = seenRows;
+  if (watchSettings) store.watchSettings = watchSettings;
   const listeners = [];
+  const requestedOrigins = [];
+  const registeredScripts = [];
   const clone = value => JSON.parse(JSON.stringify(value));
   window.matchMedia = () => ({ matches: false, addEventListener() {} });
   window.chrome = {
@@ -39,13 +42,14 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
         setTimeout(() => { listeners.forEach(listener => listener(changes, "local")); if (callback) callback(); }, 0);
       }
     }, onChanged: { addListener: listener => listeners.push(listener) } },
-    tabs: { query(_query, callback) { callback([{ id: 1, url }]); }, sendMessage(_id, _message, callback) { if (callback) callback({ active: true, cards: 1, overlays: 1, rows: statusRows || [] }); }, create() {}, reload() {} },
-    permissions: { contains(_details, callback) { callback(true); }, request(_details, callback) { callback(true); } },
+    tabs: { query(_query, callback) { callback([{ id: 1, url }]); }, sendMessage(_id, _message, callback) { if (callback) callback({ active: true, cards: 1, overlays: 1, rows: statusRows || [], nowPlaying }); }, create() {}, reload() {} },
+    permissions: { contains(details, callback) { callback(details.origins.some(origin => /player\.(pbs|dailymotion)\.org/.test(origin)) ? playerGranted : true); }, request(details, callback) { requestedOrigins.push(details.origins); callback(true); } },
+    scripting: { unregisterContentScripts(_details, callback) { callback(); }, registerContentScripts(details, callback) { registeredScripts.push(...details); callback(); }, updateContentScripts(_details, callback) { callback(); }, executeScript(_details, callback) { callback(); }, insertCSS(_details, callback) { callback(); } },
     windows: { getCurrent(callback) { callback({ id: 1, incognito: false }); } }
   };
   window.eval(["theme.js", "shared.js", "edge-choice.js", "catalog.js", "sites.js", "popup.js"].map(read).join("\n;\n"));
   await wait(40);
-  return { window, document: window.document, store };
+  return { window, document: window.document, store, requestedOrigins, registeredScripts };
 }
 
 (async () => {
@@ -82,6 +86,8 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   const inner = genrePanel.querySelector(".genres-panel");
   assert.ok(inner.classList.contains("is-open"));
   assert.equal(genreRow.getAttribute("aria-expanded"), "true");
+  assert.match(inner.querySelector(".genres-live-note").textContent, /Rows load as you scroll/, "incomplete rows explain live loading");
+  assert.equal(inner.querySelector(".genres-find").textContent, "Find all rows", "incomplete rows offer a full scan");
   const drama = Array.from(inner.querySelectorAll(".genre-check")).find(label => /Drama/.test(label.textContent)).querySelector("input");
   drama.checked = true; drama.dispatchEvent(new genres.window.Event("change", { bubbles: true }));
   await wait(12);
@@ -116,5 +122,26 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   assert.ok(!activeInner.classList.contains("is-open"), "Escape closes the inner Genres panel first");
   assert.equal(genres.document.querySelector(".filter-popover"), genrePanel, "Escape leaves the outer popover open after closing Genres");
   genres.window.close();
-  console.log("popup.test.js: 22 passed, 0 failed");
+  const playing = await loadPopup({ nowPlaying: { key: "https://tubitv.com/movies/1", title: "One", duration: 100, position: 30 } });
+  const continueButton = playing.document.querySelector(".continue-popup-button");
+  assert.ok(continueButton, "unlisted playing video offers Continue Watching");
+  continueButton.click(); await wait(45);
+  assert.equal(continueButton.disabled, true, "saving changes the popup action to its listed state");
+  playing.window.close();
+  const off = await loadPopup({ nowPlaying: { key: "https://tubitv.com/movies/1", title: "One", duration: 100, position: 30 }, watchSettings: { continueWatching: "off" } });
+  assert.equal(off.document.querySelector(".continue-popup-button"), null, "Continue Watching action hides when disabled globally");
+  off.window.close();
+  const pbs = await loadPopup({ url: "https://www.pbs.org/", siteRules: { "www.pbs.org": { enabled: false } } });
+  assert.ok(Array.from(pbs.document.querySelectorAll(".muted")).some(node => node.textContent === "To track what you watch here, allow its video player"), "PBS explains its player-origin permission before the click");
+  pbs.document.querySelector(".primary-button").click(); await wait(10);
+  assert.deepEqual(pbs.requestedOrigins[0], ["https://www.pbs.org/*", "https://player.pbs.org/*"], "PBS enable click makes the small player request in the user gesture");
+  pbs.window.close();
+  const pbsMissingPlayer = await loadPopup({ url: "https://www.pbs.org/", siteRules: { "www.pbs.org": { enabled: true } }, playerGranted: false });
+  const allowPlayer = pbsMissingPlayer.document.querySelector(".player-permission-button");
+  assert.ok(allowPlayer, "enabled PBS explains a missing player-origin permission");
+  allowPlayer.click(); await wait(10);
+  assert.deepEqual(pbsMissingPlayer.requestedOrigins[0], ["https://player.pbs.org/*"], "player permission button requests only the player origin");
+  assert.deepEqual(pbsMissingPlayer.registeredScripts.map(script => script.matches[0]), ["https://player.pbs.org/*"], "player permission registers the player-frame script");
+  pbsMissingPlayer.window.close();
+  console.log("popup.test.js: 27 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

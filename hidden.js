@@ -6,6 +6,7 @@
   let hidden = {};
   let channels = {};
   let watchedShown = {};
+  let watchProgress = {};
   let prefs = {};
   let pageStatusText = "";
   let removeAllTimer = 0;
@@ -330,8 +331,11 @@
       const rowTile = element("div", "hidden-thumbnail-placeholder watched-logo"); rowTile.innerHTML = PERSON_ICON; row.appendChild(rowTile);
       const info = element("div", "hidden-info");
       const href = HOA.safeHref(entry.url);
-      const fallbackName = (() => { const handle = key.match(/\|\/(?:@)([^/]+)/); const named = key.match(/name:(.+)$/); return handle ? `@${handle[1]}` : named ? named[1] : "Hidden channel"; })();
-      const title = element(href ? "a" : "span", "hidden-title", entry.name || fallbackName);
+      const fallbackName = (() => { const handle = key.match(/\|\/([^/]+)/); const named = key.match(/name:(.+)$/); return handle ? (handle[1].startsWith("@") ? handle[1] : handle[1]) : named ? named[1] : "Hidden channel"; })();
+      const knownTitles = new Set([...Object.values(hidden), ...Object.values(added)].filter(item => item && item.site === entry.site).map(item => String(item.title || "").trim().toLocaleLowerCase()));
+      const storedName = String(entry.name || "").trim();
+      const displayName = !storedName || storedName.length > 60 || knownTitles.has(storedName.toLocaleLowerCase()) ? fallbackName : storedName;
+      const title = element(href ? "a" : "span", "hidden-title", displayName);
       if (href) { title.href = href; title.addEventListener("click", event => { event.preventDefault(); openLink(href); }); }
       info.appendChild(title);
       info.appendChild(element("span", "hidden-kind hidden-channel", "Channel"));
@@ -359,6 +363,8 @@
     }
     const entries = HOA.listedHidden(hidden);
     const watchedEntries = entries.filter(([, entry]) => entry.reason === "watched" || entry.watched === true);
+    const watchedKeys = new Set(watchedEntries.map(([key]) => key));
+    Object.entries(watchProgress).filter(([key, entry]) => entry && entry.watched && !entry.untagged && !watchedKeys.has(key)).forEach(([key, entry]) => watchedEntries.push([key, { title: entry.title, thumb: entry.thumbnail || "", site: entry.site, kind: HOA.kindOf(key), ts: entry.updated, listed: false, watched: true, reason: "watched" }]));
     const groups = groupsFor(entries.filter(([, entry]) => entry.reason !== "watched" && entry.watched !== true));
     const channelEntries = Object.entries(channels);
     const header = element("header", "hidden-header");
@@ -435,6 +441,7 @@
       hidden = lists.hidden;
       channels = lists.channels;
       watchedShown = lists.watchedShown;
+      watchProgress = lists.watchProgress;
       chrome.storage.local.get({ [HIDDEN_PREFS_KEY]: {} }, result => {
         prefs = normalizePrefs(result[HIDDEN_PREFS_KEY]);
         render();
@@ -443,7 +450,7 @@
   }
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.CHANNELS_KEY] || changes[HOA.WATCHED_SHOWN_KEY] || changes[HIDDEN_PREFS_KEY])) {
+    if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.CHANNELS_KEY] || changes[HOA.WATCHED_SHOWN_KEY] || changes[HOA.PROGRESS_KEY] || changes[HIDDEN_PREFS_KEY])) {
       if (ignoreOwnStorageChange) { ignoreOwnStorageChange = false; return; }
       refresh();
     }

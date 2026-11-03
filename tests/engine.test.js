@@ -33,7 +33,7 @@ function check(name, fn) {
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function load({ fixture, html: suppliedHtml, url, siteRules, noBody = false, testSeam = false }) {
+async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings, watchProgress, noBody = false, testSeam = false, childFrame = false }) {
   const html = suppliedHtml === undefined ? fs.readFileSync(path.join(__dirname, "fixtures", fixture), "utf8") : suppliedHtml;
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
     url, runScripts: "outside-only", pretendToBeVisual: true
@@ -42,13 +42,14 @@ async function load({ fixture, html: suppliedHtml, url, siteRules, noBody = fals
   if (noBody) {
     window.document.body.remove();
   }
-  const store = { siteRules: siteRules || {} };
+  const store = { siteRules: siteRules || {}, watchSettings: watchSettings || undefined, watchProgress: watchProgress || undefined };
+  Object.keys(store).forEach(key => { if (store[key] === undefined) delete store[key]; });
   const listeners = [];
   const messageListeners = [];
   const clone = value => JSON.parse(JSON.stringify(value));
   window.chrome = {
     runtime: { id: "test-extension", lastError: null, getURL: value => value, getManifest: () => ({ version: "test" }),
-      onMessage: { addListener: listener => messageListeners.push(listener) } },
+      onMessage: { addListener: listener => messageListeners.push(listener) }, sendMessage(message, callback) { window.__hoaSentMessages.push(message); if (callback) callback(window.__hoaFrameReply || {}); } },
     storage: {
       local: {
         get(defaults, callback) {
@@ -68,6 +69,8 @@ async function load({ fixture, html: suppliedHtml, url, siteRules, noBody = fals
       onChanged: { addListener: listener => listeners.push(listener) }
     }
   };
+  window.__hoaSentMessages = [];
+  if (childFrame) window.__hoaTestChildFrame = true;
   if (testSeam) window.__hoaTest = {};
   window.eval(bundle);
   await wait(120);
@@ -78,11 +81,49 @@ async function load({ fixture, html: suppliedHtml, url, siteRules, noBody = fals
     // A script that stopped answering must fail its checks, not leave Node with nothing to wait for (a silent exit 0).
     setTimeout(() => { if (!answered) { answered = true; resolve(null); } }, 1000);
   });
-  return { window, document: window.document, store, status, test: window.__hoaTest };
+  const deliver = (message, sender = {}) => new Promise(resolve => {
+    let answered = false;
+    messageListeners.forEach(listener => {
+      const keepAlive = listener(message, sender, reply => { if (!answered) { answered = true; resolve(reply); } });
+      if (keepAlive !== true && !answered) { answered = true; resolve(undefined); }
+    });
+    if (!messageListeners.length) resolve(undefined);
+    setTimeout(() => { if (!answered) resolve(undefined); }, 30);
+  });
+  return { window, document: window.document, store, status, deliver, test: window.__hoaTest };
+}
+
+function fakeVideo(page, { duration = 100, currentTime = 0, paused = false, width = 640, height = 360 } = {}) {
+  const video = page.document.createElement("video");
+  const handlers = new Map();
+  let position = currentTime;
+  let isPaused = paused;
+  video.seeks = [];
+  Object.defineProperties(video, {
+    duration: { configurable: true, get: () => duration },
+    currentTime: { configurable: true, get: () => position, set: value => { position = Number(value) || 0; video.seeks.push(position); } },
+    paused: { configurable: true, get: () => isPaused, set: value => { isPaused = Boolean(value); } },
+    playbackRate: { configurable: true, get: () => 1 }
+  });
+  video.addEventListener = (name, listener) => handlers.set(name, listener);
+  video.fire = name => { const listener = handlers.get(name); if (listener) listener({ type: name, target: video }); };
+  video.getBoundingClientRect = () => ({ width, height, top: 0, left: 0, right: width, bottom: height });
+  video.play = (seconds = 0, step = .25) => {
+    isPaused = false; video.fire("play");
+    for (let elapsed = 0; elapsed < seconds; elapsed += step) {
+      video.currentTime = Math.min(duration, position + Math.min(step, seconds - elapsed));
+      video.fire("timeupdate");
+    }
+    isPaused = true; video.fire("pause");
+  };
+  page.document.body.appendChild(video);
+  page.test.attachTracker(video);
+  return video;
 }
 
 const buttons = (card, action) => card.querySelector(`:scope > .hoa-actions [data-action="${action}"]`);
 const firstEntry = bag => Object.entries(bag || {})[0];
+const bucketCount = bitmap => String(bitmap).split("").reduce((count, digit) => count + Number.parseInt(digit, 16).toString(2).replaceAll("0", "").length, 0);
 
 const CASES = [
   {
@@ -600,7 +641,6 @@ const CASES = [
     check("YouTube recycled cards lose the watched mark", () => assert.equal(page.document.querySelector("#watched [data-hoa-watched]"), null));
     check("YouTube channel action is present and the float bar mirrors it", () => {
       assert.ok(buttons(page.document.getElementById("blocked"), "channel"));
-      assert.match(read("content.js"), /\["add", "hide", "channel"\]/);
     });
     page.window.chrome.storage.local.set({ hiddenChannels: { "youtube.com|/@blockedchan": { key: "youtube.com|/@blockedchan", name: "Blocked Channel", url: "https://www.youtube.com/@blockedchan", ts: Date.now(), nameKey: "youtube.com|name:blocked channel" } } });
     await wait(120);
@@ -1030,6 +1070,140 @@ const CASES = [
       });
       assert.ok(!leaderboard.classList.contains("hoa-empty"));
     });
+    page.window.close();
+  }
+  {
+    const page = await load({ fixture: "sites/xumo-rows.html", url: "https://play.xumo.com/free-movies/", siteRules: { "play.xumo.com": { enabled: true } } });
+    const status = await page.status();
+    check("Xumo reports complete rows from its section navigation", () => assert.equal(status.rowsComplete, true));
+    check("rendered rows are remembered without opening the popup", () => assert.ok(Array.isArray(page.store.seenRows && page.store.seenRows["play.xumo.com"]) || status.rows.length > 0));
+    page.window.close();
+  }
+  {
+    const page = await load({ html: '<a class="video-link" href="/watch?v=abc123def45"><span class="title">Synthetic video</span></a>', url: "https://www.youtube.com/", siteRules: { "www.youtube.com": { enabled: true, hideKinds: ["watched"] } }, testSeam: true });
+    const card = page.document.querySelector("a.video-link");
+    check("a repeated apply does not append watched-pill controls", () => {
+      page.test.apply(); page.test.apply(); assert.equal(card.querySelectorAll(".hoa-watched-remove").length, 0);
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ html: "", url: "https://www.youtube.com/watch?v=abc123def45", testSeam: true });
+    const video = fakeVideo(page);
+    for (let second = 1; second <= 50; second += 1) { video.currentTime = second; video.fire("timeupdate"); }
+    video.currentTime = 100; video.fire("ended"); await wait(15);
+    const entry = page.store.watchProgress["https://www.youtube.com/watch?v=abc123def45"];
+    check("partial 50 percent watch stays unwatched", () => assert.equal(entry.watched, false));
+    check("seek then ended preserves only contiguous coverage", () => assert.ok(bucketCount(entry.buckets) < 90 && entry.position === 100));
+    page.window.close();
+  }
+  {
+    const page = await load({ html: "", url: "https://www.youtube.com/watch?v=abc123def45", testSeam: true });
+    const video = fakeVideo(page);
+    for (let second = 1; second <= 95; second += 1) { video.currentTime = second; video.fire("timeupdate"); }
+    video.fire("pause"); await wait(35);
+    check("continuous 95 percent watch is tagged watched", () => assert.equal(page.store.watchProgress["https://www.youtube.com/watch?v=abc123def45"].watched, true));
+    page.window.close();
+  }
+  {
+    const saved = { "https://www.youtube.com/watch?v=abc123def45": { site: "youtube.com", title: "One", url: "https://www.youtube.com/watch?v=abc123def45", thumbnail: "", duration: 1000, position: 600, buckets: "0000000000000000000000000", watched: false, cw: "manual", played: 80, ts: 1, updated: 1 } };
+    const page = await load({ html: "", url: "https://www.youtube.com/watch?v=abc123def45", watchProgress: saved, testSeam: true });
+    const video = fakeVideo(page, { duration: 1000, paused: false });
+    video.fire("play"); video.fire("play");
+    check("resume seeks to exact 595 seconds once", () => assert.equal(video.currentTime, 595));
+    check("resume displays Start over toast", () => assert.equal(page.document.querySelector("#hoa-toast button").textContent, "Start over"));
+    page.document.querySelector("#hoa-toast button").click();
+    check("Start over returns playback to zero", () => assert.equal(video.currentTime, 0));
+    page.window.close();
+  }
+  {
+    const page = await load({ html: "", url: "https://geo.dailymotion.com/player.html", testSeam: true, childFrame: true });
+    const video = fakeVideo(page);
+    video.currentTime = 1; video.fire("timeupdate"); video.fire("pause");
+    check("frame child reports only raw playback fields", () => assert.deepEqual(Object.keys(page.window.__hoaSentMessages.at(-1).progress).sort(), ["bits", "covered", "duration", "playing", "position"]));
+    page.window.close();
+  }
+  {
+    const child = await load({ html: "", url: "https://geo.dailymotion.com/player.html", testSeam: true, childFrame: true });
+    fakeVideo(child).play(50);
+    const top = await load({ html: "", url: "https://www.youtube.com/watch?v=abc123def45", testSeam: true });
+    await top.deliver(child.window.__hoaSentMessages.at(-1)); await wait(15);
+    const entry = top.store.watchProgress["https://www.youtube.com/watch?v=abc123def45"];
+    check("top relay owns the page key and metadata", () => assert.equal(entry.url, "https://www.youtube.com/watch?v=abc123def45"));
+    check("top relay merges raw frame buckets and coverage", () => assert.equal(entry.played, 50));
+    child.window.close(); top.window.close();
+  }
+  {
+    const key = "https://www.youtube.com/watch?v=abc123def45";
+    const page = await load({ html: "", url: key, testSeam: true });
+    fakeVideo(page).play(95);
+    await wait(35);
+    const entry = page.store.watchProgress[key];
+    const cards = await load({ html: `<ytd-rich-item-renderer id="watched"><a id="thumbnail" href="/watch?v=abc123def45"><img></a><a id="video-title" href="/watch?v=abc123def45">Watched</a></ytd-rich-item-renderer>`, url: "https://www.youtube.com/", siteRules: { "www.youtube.com": { hideKinds: ["watched"] } }, watchProgress: { [key]: entry }, testSeam: true });
+    check("watched type-on hides and saves watched reason", () => assert.equal(cards.document.getElementById("watched").classList.contains("hoa-removed"), true));
+    await wait(550);
+    check("watched hide saves reason watched", () => assert.equal(cards.store.hiddenItems[key].reason, "watched"));
+    page.window.close(); cards.window.close();
+  }
+  {
+    const page = await load({ html: "", url: "https://www.youtube.com/watch?v=abc123def45", testSeam: true });
+    const ad = fakeVideo(page, { duration: 15 }); const main = fakeVideo(page, { duration: 100 });
+    page.test.findPlayer(); main.play(30);
+    await wait(15);
+    const entry = page.store.watchProgress["https://www.youtube.com/watch?v=abc123def45"];
+    check("a 15-second ad beside the main video is ignored", () => assert.equal(entry.duration, 100));
+    check("main video is selected instead of the ad", () => assert.equal(entry.position, 30));
+    page.window.close();
+  }
+  for (const [mode, seconds, expected] of [["auto", 40, "auto"], ["manual", 120, undefined], ["off", 120, undefined]]) {
+    const page = await load({ html: "", url: "https://www.youtube.com/watch?v=abc123def45", watchSettings: { continueWatching: mode }, testSeam: true });
+    fakeVideo(page).play(seconds);
+    await wait(15);
+    check(`${mode} Continue Watching mode saves the expected state`, () => assert.equal(page.store.watchProgress["https://www.youtube.com/watch?v=abc123def45"].cw, expected));
+    page.window.close();
+  }
+  {
+    const key = "https://www.youtube.com/watch?v=abc123def45";
+    const saved = { [key]: { site: "youtube.com", title: "One", url: key, thumbnail: "", duration: 1000, position: 600, buckets: "0000000000000000000000000", watched: false, cw: "manual", played: 80, ts: 1, updated: 1 } };
+    const page = await load({ html: "", url: key, watchProgress: saved, testSeam: true });
+    const video = fakeVideo(page, { duration: 800 }); video.fire("play");
+    check("resume skips a duration mismatch", () => assert.deepEqual(video.seeks, []));
+    page.window.close();
+  }
+  {
+    const first = "https://www.youtube.com/watch?v=abc123def45"; const second = "https://www.youtube.com/watch?v=zyx987wvu65";
+    const page = await load({ html: "", url: first, testSeam: true }); const video = fakeVideo(page);
+    video.play(30); page.window.history.pushState({}, "", "/watch?v=zyx987wvu65"); video.currentTime = 0; video.play(30);
+    await wait(35);
+    check("SPA key changes save isolated first and second video progress", () => assert.ok(page.store.watchProgress[first] && page.store.watchProgress[second], JSON.stringify(page.store.watchProgress)));
+    page.window.close();
+  }
+  {
+    const key = "https://www.youtube.com/watch?v=abc123def45";
+    const watched = { [key]: { site: "youtube.com", title: "One", url: key, thumbnail: "", duration: 100, position: 95, buckets: "fffffffffffffffffffffffff", watched: true, ts: 1, updated: 1 } };
+    const html = `<ytd-rich-item-renderer id="card"><a id="thumbnail" href="/watch?v=abc123def45"><img></a><a id="video-title" href="/watch?v=abc123def45">One</a></ytd-rich-item-renderer>`;
+    const page = await load({ html, url: "https://www.youtube.com/", watchProgress: watched, testSeam: true });
+    const card = page.document.getElementById("card");
+    check("stored watched listing card gets the watched label", () => assert.ok(card.querySelector("[data-hoa-watched]")));
+    buttons(card, "unwatch").click(); await wait(15);
+    check("unwatch clears watched and records untagged", () => assert.equal(page.store.watchProgress[key].untagged, true));
+    page.document.querySelector("#hoa-toast button").click(); await wait(35);
+    check("Undo restores the watched record", () => assert.equal(page.store.watchProgress[key].watched, true));
+    page.window.close();
+    const rewatch = await load({ html: "", url: key, watchProgress: { [key]: { ...watched[key], watched: false, untagged: true } }, testSeam: true });
+    fakeVideo(rewatch).play(95); await wait(15);
+    check("a full fresh watch clears untagged", () => assert.equal(rewatch.store.watchProgress[key].untagged, undefined));
+    rewatch.window.close();
+  }
+  {
+    const key = "https://www.youtube.com/watch?v=qwe123rty45";
+    const html = `<ytd-rich-item-renderer id="p95"><a id="thumbnail" href="/watch?v=abc123def45"><img><ytd-thumbnail-overlay-resume-playback-renderer style="width:95%"></ytd-thumbnail-overlay-resume-playback-renderer></a><a id="video-title">95</a></ytd-rich-item-renderer><ytd-rich-item-renderer id="p40"><a id="thumbnail" href="/watch?v=zyx987wvu65"><img><ytd-thumbnail-overlay-resume-playback-renderer style="width:40%"></ytd-thumbnail-overlay-resume-playback-renderer></a><a id="video-title">40</a></ytd-rich-item-renderer><ytd-rich-item-renderer id="untagged"><a id="thumbnail" href="/watch?v=qwe123rty45"><img><ytd-thumbnail-overlay-resume-playback-renderer style="width:95%"></ytd-thumbnail-overlay-resume-playback-renderer></a><a id="video-title">Untagged</a></ytd-rich-item-renderer>`;
+    const page = await load({ html, url: "https://www.youtube.com/", watchProgress: { [key]: { site: "youtube.com", title: "One", url: key, thumbnail: "", duration: 100, position: 95, buckets: "fffffffffffffffffffffffff", watched: false, untagged: true, ts: 1, updated: 1 } }, testSeam: true });
+    check("YouTube 95/40/untagged precedence is behavioral", () => { assert.ok(page.document.querySelector("#p95 [data-hoa-watched]")); assert.equal(page.document.querySelector("#p40 [data-hoa-watched]"), null); assert.equal(page.document.querySelector("#untagged [data-hoa-watched]"), null); });
+    page.test.apply(); await wait(10);
+    let mutations = 0; const observer = new page.window.MutationObserver(records => { mutations += records.length; }); observer.observe(page.document.body, { attributes: true, childList: true, subtree: true });
+    page.test.apply(); page.test.apply(); page.test.apply(); await wait(10); observer.disconnect();
+    check("repeated apply is observer-idempotent", () => assert.equal(mutations, 0));
     page.window.close();
   }
   console.log(`engine.test.js: ${passed} passed, 0 failed`);

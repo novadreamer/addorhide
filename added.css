@@ -344,3 +344,8 @@ body.hoa-added-view main {
 /* Clear page while there is nothing to clear: greyed out, not clickable, tooltip explains why. */
 .hoa-added-page button[aria-disabled="true"] { opacity: .4; cursor: not-allowed; }
 .hoa-added-page button[aria-disabled="true"]:hover { color: inherit; background: none; box-shadow: none; transform: none; }
+
+.hoa-added-page .continue-watching { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.hoa-added-page .continue-card .card-link { position: relative; }
+.hoa-added-page .continue-progress { position: absolute; right: 0; bottom: 0; left: 0; height: 4px; background: linear-gradient(90deg, var(--accent) var(--hoa-progress), rgba(255,255,255,.3) var(--hoa-progress)); }
+.hoa-added-page .continue-card .card-remove { float: right; min-width: 28px; min-height: 28px; padding: 0; color: var(--danger); background: transparent; border: 0; font-size: 20px; }

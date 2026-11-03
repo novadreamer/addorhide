@@ -8,6 +8,7 @@ window.__hoaLoaded = true;
 {
   const ownInstance = Math.random().toString(36).slice(2) + Date.now().toString(36);
   const rootElement = document.documentElement;
+  const childFrame = (() => { if (window.__hoaTestChildFrame) return true; try { return window.top !== window; } catch (error) { return true; } })();
   const ownExtension = (() => {
     try {
       return chrome.runtime.id || "";
@@ -53,6 +54,9 @@ window.__hoaLoaded = true;
   let added = {};
   let channels = {};
   let watchedShown = {};
+  let watchProgress = {};
+  let hasWatchProgress = false;
+  let watchSettings = { tagWatched: true, continueWatching: "auto" };
   let watchedWriteTimer = 0;
   let siteRules = {};
   let scheduled = 0;
@@ -79,6 +83,14 @@ window.__hoaLoaded = true;
   let containerFilterCache = null;
   const carouselObservers = new Map();
   let carouselFrame = 0;
+  let seenRowsTimer = 0;
+  let lastSeenRows = [];
+  let lastRowsReadAt = 0;
+  let playerTracker = null;
+  let lastProgressWrite = 0;
+  let frameProgressState = null;
+  let frameResumeSent = false;
+  const healedChannels = new Set();
 
   function contextAlive() {
     try {
@@ -425,7 +437,11 @@ window.__hoaLoaded = true;
       const site = (rule.hosts && rule.hosts[0]) || HOA.siteOf(location.href);
       const url = (rule.channelHrefAttribute && link.getAttribute(rule.channelHrefAttribute)) || link.href || link.getAttribute("href") || "";
       const linkKey = HOA.channelLinkKey(site, url);
-      const name = (rule.channelNameAttribute && card.getAttribute(rule.channelNameAttribute)) || elementText(link) || channelText(card, rule);
+      let named = null;
+      try { named = rule.channelNameSelector && card.querySelector(rule.channelNameSelector); } catch (error) { named = null; }
+      let name = (rule.channelNameAttribute && card.getAttribute(rule.channelNameAttribute)) || (named && (named.getAttribute("title") || elementText(named))) || channelText(card, rule) || elementText(link);
+      const title = cardTitle(card, rule);
+      if (name && title && name.trim().toLocaleLowerCase() === title.trim().toLocaleLowerCase()) name = channelSlug(url);
       const nameKey = HOA.channelNameKey(name, site);
       return linkKey || nameKey ? { key: linkKey || nameKey, linkKey, nameKey, name, url, site } : null;
     }
@@ -444,6 +460,24 @@ window.__hoaLoaded = true;
     const key = HOA.youtubeChannelKey(url);
     const nameKey = HOA.channelNameKey(name);
     return key || nameKey ? { key: key || nameKey, linkKey: key, nameKey, name, url, site: "youtube.com" } : null;
+  }
+
+  function channelSlug(url) {
+    try { const path = new URL(url, location.href).pathname.replace(/\/+$/, ""); const part = path.split("/").filter(Boolean).pop() || ""; return part ? decodeURIComponent(part).replace(/^@/, "@") : ""; } catch (error) { return ""; }
+  }
+
+  function cardTitle(card, rule) {
+    for (const selector of rule.titleCandidates || []) { try { const text = textFrom(card.matches(selector) ? card : card.querySelector(selector)); if (text) return text; } catch (error) { /* stale selector */ } }
+    return "";
+  }
+
+  function healChannelName(identity) {
+    if (!identity || !identity.linkKey || !identity.name || healedChannels.has(identity.linkKey)) return;
+    const old = channels[identity.linkKey] || Object.values(channels).find(entry => entry && entry.linkKey === identity.linkKey);
+    if (!old || old.name === identity.name) return;
+    healedChannels.add(identity.linkKey);
+    channels = { ...channels, [old.key || identity.linkKey]: { ...old, name: identity.name, nameKey: identity.nameKey || old.nameKey, ts: Date.now() } };
+    HOA.writeLists({ channels });
   }
 
   function isOwnChannelPage(identity) {
@@ -470,13 +504,21 @@ window.__hoaLoaded = true;
     let progress = null;
     try { progress = card.querySelector(selector); } catch (error) { progress = null; }
     if (!progress) return null;
-    const width = String(progress.style && progress.style.width || "").replace(/\s/g, "").toLowerCase();
-    return width === "0%" || width === "0px" ? null : progress;
+    const widthNode = progress.style && progress.style.width ? progress : progress.querySelector && progress.querySelector("[style*='width']") || progress;
+    const width = String(widthNode.style && widthNode.style.width || "").replace(/\s/g, "").toLowerCase();
+    const match = width.match(/^([\d.]+)%$/);
+    return match && Number(match[1]) >= 90 ? progress : null;
   }
 
-  function watchedCard(card, rule) {
+  function watchedCard(card, rule, data = null) {
     const watched = (rule.categories || []).find(category => category.id === "watched");
-    return Boolean(watched && watchedProgress(card));
+    if (!watched) return false;
+    const current = data || cardData(card, rule);
+    const progress = current && watchProgress[current.key];
+    // An explicit untag wins over YouTube's own resume bar until a fresh full watch replaces it.
+    if (progress && progress.untagged) return false;
+    if (rule.id === "youtube" && watchedProgress(card)) return true;
+    return Boolean(progress && progress.watched);
   }
 
   function watchedEnabled(categories) {
@@ -506,14 +548,36 @@ window.__hoaLoaded = true;
       if (getComputedStyle(target).position === "static") target.style.position = "relative";
       return target;
     }
-    return null;
+    const generic = card.querySelector("a:has(img), [class*=thumbnail], [class*=Thumbnail], img") || card;
+    const target = generic.tagName === "IMG" ? generic.parentElement || card : generic;
+    if (target && getComputedStyle(target).position === "static") target.style.position = "relative";
+    return target;
   }
 
-  function ensureWatchedLabel(card, rule, visible) {
-    card.querySelectorAll(`[data-hoa-watched="${ownInstance}"]`).forEach(node => node.removeAttribute("data-hoa-watched"));
-    if (!visible || rule.id !== "youtube" || !watchedCard(card, rule)) return;
+  function ensureWatchedLabel(card, rule, visible, data = null) {
+    if (!visible || !watchSettings.tagWatched || !watchedCard(card, rule, data)) {
+      card.querySelectorAll(`[data-hoa-watched="${ownInstance}"]`).forEach(node => node.removeAttribute("data-hoa-watched"));
+      return;
+    }
     const thumbnail = thumbnailForWatchedLabel(card);
-    if (thumbnail) thumbnail.setAttribute("data-hoa-watched", ownInstance);
+    if (thumbnail) {
+      card.querySelectorAll(`[data-hoa-watched="${ownInstance}"]`).forEach(node => { if (node !== thumbnail) node.removeAttribute("data-hoa-watched"); });
+      if (thumbnail.getAttribute("data-hoa-watched") !== ownInstance) thumbnail.setAttribute("data-hoa-watched", ownInstance);
+    }
+  }
+
+  function ensureContinueProgress(card, rule, data) {
+    const current = data && watchProgress[data.key];
+    const show = rule.id !== "youtube" && current && current.cw && !current.watched && current.duration > 0;
+    const thumbnail = thumbnailForWatchedLabel(card);
+    if (!thumbnail) return;
+    if (!show) {
+      if (thumbnail.hasAttribute("data-hoa-continue")) thumbnail.removeAttribute("data-hoa-continue");
+      return;
+    }
+    const progress = `${Math.max(0, Math.min(100, current.position / current.duration * 100))}%`;
+    if (!thumbnail.hasAttribute("data-hoa-continue")) thumbnail.setAttribute("data-hoa-continue", "");
+    if (thumbnail.style.getPropertyValue("--hoa-progress") !== progress) thumbnail.style.setProperty("--hoa-progress", progress);
   }
 
   function filterText(card, rule, data) {
@@ -753,6 +817,24 @@ window.__hoaLoaded = true;
     return { rows, navTitles, categories, anchorIndex, classify };
   }
 
+  function rememberRows(rule) {
+    if (!rule || !rule.sections) return;
+    if (Date.now() - lastRowsReadAt < 2000) return;
+    lastRowsReadAt = Date.now();
+    const titles = HOA.normalizeSectionTitles(sectionRows(rule).rows.map(row => row.title));
+    if (!titles.some(title => !lastSeenRows.some(old => old.localeCompare(title, undefined, { sensitivity: "accent" }) === 0))) return;
+    lastSeenRows = HOA.normalizeSectionTitles([...lastSeenRows, ...titles]).slice(-150);
+    if (seenRowsTimer) return;
+    seenRowsTimer = window.setTimeout(() => {
+      seenRowsTimer = 0; const host = (rule.hosts && rule.hosts[0]) || HOA.siteOf(location.href);
+      chrome.storage.local.get({ [HOA.SEEN_ROWS_KEY]: {} }, saved => {
+        const all = saved[HOA.SEEN_ROWS_KEY] && typeof saved[HOA.SEEN_ROWS_KEY] === "object" ? saved[HOA.SEEN_ROWS_KEY] : {};
+        const next = HOA.normalizeSectionTitles([...(all[host] || []), ...lastSeenRows]).slice(-150);
+        if (next.some(title => !(all[host] || []).some(old => String(old).localeCompare(title, undefined, { sensitivity: "accent" }) === 0))) chrome.storage.local.set({ [HOA.SEEN_ROWS_KEY]: { ...all, [host]: next } });
+      });
+    }, 2000);
+  }
+
   function hideSectionNav(rule, rows, filtered, nodes) {
     if (!rule.sectionNav) return;
     const hiddenTitles = new Set(rows.filter(row => filtered.has(row.section)).map(row => rowKey(row.title)).filter(Boolean));
@@ -763,6 +845,7 @@ window.__hoaLoaded = true;
   }
 
   function filterContainers(rule, categories, filtered) {
+    rememberRows(rule);
     const cacheKey = `${filterVersion}|${location.pathname}`;
     if (containerFilterCache && containerFilterCache.key === cacheKey) {
       containerFilterCache.nodes.forEach(node => { if (node.isConnected) filtered.add(node); });
@@ -917,16 +1000,28 @@ window.__hoaLoaded = true;
     return "";
   }
 
+  function keyForHref(href, rule) {
+    if (rule.stripQuery) {
+      try { const url = new URL(href, location.href); url.search = ""; href = url.href; } catch (error) { /* canonicalUrl rejects malformed links */ }
+    }
+    return HOA.canonicalUrl(href, location.href);
+  }
+
+  function watchKey(rule) {
+    let href = location.href;
+    if (rule && rule.watchKey) {
+      try { const match = location.pathname.match(new RegExp(rule.watchKey.pattern)); if (match) href = rule.watchKey.template.replace(/\$(\d+)/g, (_, index) => match[Number(index)] || ""); } catch (error) { /* optional mapping */ }
+    }
+    return keyForHref(href, rule || {});
+  }
+
   function cardData(card, rule) {
     const link = getLink(card, rule);
     if (!link) {
       return null;
     }
-    let href = (rule.linkAttribute && link.getAttribute(rule.linkAttribute)) || link.href || link.getAttribute("href");
-    if (rule.stripQuery) {
-      try { const url = new URL(href, location.href); url.search = ""; href = url.href; } catch (error) { /* canonicalUrl rejects malformed links */ }
-    }
-    const key = HOA.canonicalUrl(href, location.href);
+    const href = (rule.linkAttribute && link.getAttribute(rule.linkAttribute)) || link.href || link.getAttribute("href");
+    const key = keyForHref(href, rule);
     if (!key) {
       return null;
     }
@@ -1329,8 +1424,8 @@ window.__hoaLoaded = true;
   }
 
   function ensureActions(card, data, rule = lastRule) {
-    let actions = card.querySelector(`:scope > .hoa-actions[data-hoa-owner="${ownInstance}"]`);
-    card.querySelectorAll(":scope > .hoa-actions").forEach(node => {
+    let actions = Array.from(card.children).find(node => node.classList.contains("hoa-actions") && node.dataset.hoaOwner === ownInstance) || null;
+    Array.from(card.children).filter(node => node.classList.contains("hoa-actions")).forEach(node => {
       if (node !== actions) {
         if (node.hoaPlacementObserver) {
           node.hoaPlacementObserver.disconnect();
@@ -1347,9 +1442,34 @@ window.__hoaLoaded = true;
       const add = actionButton("Add", button => toggleAdd({ ...actions.hoaData, ...cardMeta(actions.hoaCard, actions.hoaRule, actions.hoaData.key) }, button));
       add.dataset.action = "add";
       actions.appendChild(add);
-      const hide = actionButton("Hide", () => hideEntry({ ...actions.hoaData, ...cardMeta(actions.hoaCard, actions.hoaRule, actions.hoaData.key) }, watchedCard(actions.hoaCard, actions.hoaRule)));
+      const hide = actionButton("Hide", () => hideEntry({ ...actions.hoaData, ...cardMeta(actions.hoaCard, actions.hoaRule, actions.hoaData.key) }, watchedCard(actions.hoaCard, actions.hoaRule, actions.hoaData)));
       hide.dataset.action = "hide";
       actions.appendChild(hide);
+      const continueButton = actionButton("", button => {
+        const entry = watchProgress[actions.hoaData.key];
+        if (!entry || entry.watched) return;
+        watchProgress = { ...watchProgress, [actions.hoaData.key]: { ...entry, cw: "manual", updated: Date.now() } };
+        HOA.writeProgress(actions.hoaData.key, watchProgress[actions.hoaData.key]); button.disabled = true; button.title = "In Continue Watching";
+      });
+      continueButton.dataset.action = "continue"; continueButton.title = "Continue watching later"; continueButton.setAttribute("aria-label", "Continue watching later");
+      if (card.querySelector("button svg, [role=button] svg")) {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", "M12 4a8 8 0 1 0 7.45 11H17v-2h4.5v4.5h-2v-1.7A10 10 0 1 1 12 2v2zm-1 4h2v5l4 2.4-1 1.7-5-3V8z");
+        svg.appendChild(path); continueButton.appendChild(svg); continueButton.classList.add("hoa-icon-action");
+      } else {
+        continueButton.textContent = "◷"; continueButton.classList.add("hoa-icon-action");
+      }
+      actions.appendChild(continueButton);
+      const unwatch = actionButton("✓", () => {
+        const key = actions.hoaData && actions.hoaData.key; const prior = key && watchProgress[key];
+        if (!prior) return;
+        watchProgress = { ...watchProgress, [key]: { ...prior, watched: false, untagged: true, buckets: HOA.bitmapBuckets("") } };
+        HOA.writeProgress(key, watchProgress[key]); scheduleApply(true);
+        showToast(key, "Watched tag removed", () => { watchProgress = { ...watchProgress, [key]: prior }; HOA.writeProgress(key, prior); scheduleApply(true); });
+      });
+      unwatch.dataset.action = "unwatch"; unwatch.title = "Remove Watched tag"; unwatch.setAttribute("aria-label", "Remove Watched tag"); unwatch.hidden = true; actions.appendChild(unwatch);
       card.appendChild(actions);
     }
     actions.hoaData = data;
@@ -1382,18 +1502,23 @@ window.__hoaLoaded = true;
         }
       });
     }
-    card.classList.add("hoa-host");
+    if (!card.classList.contains("hoa-host")) card.classList.add("hoa-host");
     placeActions(card, actions, actions.hoaRule || {});
     const add = actions.querySelector('[data-action="add"]');
     if (add) {
       const isAdded = Boolean(added[data.key]);
-      add.textContent = isAdded ? "Added" : "Add";
-      add.setAttribute("aria-label", isAdded ? "Added" : "Add");
-      add.setAttribute("aria-pressed", String(isAdded));
+      const label = isAdded ? "Added" : "Add";
+      if (add.textContent !== label) add.textContent = label;
+      if (add.getAttribute("aria-label") !== label) add.setAttribute("aria-label", label);
+      if (add.getAttribute("aria-pressed") !== String(isAdded)) add.setAttribute("aria-pressed", String(isAdded));
     }
+    const continueButton = actions.querySelector('[data-action="continue"]');
+    if (continueButton) { const entry = watchProgress[data.key]; const hidden = watchSettings.continueWatching === "off" || !entry || entry.watched || Boolean(entry.cw); const disabled = Boolean(entry && entry.cw); if (continueButton.hidden !== hidden) continueButton.hidden = hidden; if (continueButton.disabled !== disabled) continueButton.disabled = disabled; }
+    const unwatch = actions.querySelector('[data-action="unwatch"]');
+    if (unwatch) { const hidden = !(watchSettings.tagWatched && watchedCard(card, rule, data)); if (unwatch.hidden !== hidden) unwatch.hidden = hidden; }
   }
 
-  function showToast(key, messageText = "Hidden", undoAction = null) {
+  function showToast(key, messageText = "Hidden", undoAction = null, actionLabel = "Undo") {
     if (toastTimer) {
       clearTimeout(toastTimer);
     }
@@ -1407,7 +1532,7 @@ window.__hoaLoaded = true;
     const message = document.createElement("span");
     message.textContent = messageText;
     toast.appendChild(message);
-    const undo = actionButton("Undo", () => {
+    const undo = actionButton(actionLabel, () => {
       if (undoAction) undoAction();
       else {
         hidden = HOA.restoreKeys(hidden, [key]);
@@ -1648,7 +1773,8 @@ window.__hoaLoaded = true;
       handled.add(card);
       return;
     }
-    const isWatched = watchedCard(card, variant);
+    if (Object.keys(channels).length) healChannelName(channelIdentity(card, variant));
+    const isWatched = watchedCard(card, variant, data);
     const cardCategories = isWatched && watchedShown[data.key]
       ? { ...categories, selected: categories.selected.filter(category => category.id !== "watched") } : categories;
     if (hiddenChannel(card, variant)) {
@@ -1685,9 +1811,10 @@ window.__hoaLoaded = true;
         filtered.add(target);
         card.dataset.hoaWhy = "filter";
       } else {
-        target.classList.remove(ACTIVE_CLASS, FILTER_CLASS);
-        delete card.dataset.hoaWhy;
-        ensureWatchedLabel(card, variant, isWatched);
+        if (target.classList.contains(ACTIVE_CLASS) || target.classList.contains(FILTER_CLASS)) target.classList.remove(ACTIVE_CLASS, FILTER_CLASS);
+        if (card.dataset.hoaWhy !== undefined) delete card.dataset.hoaWhy;
+        ensureWatchedLabel(card, variant, isWatched, data);
+        ensureContinueProgress(card, variant, data);
         ensureActions(card, data, variant);
       }
     }
@@ -1776,6 +1903,7 @@ window.__hoaLoaded = true;
   }
 
   function apply() {
+    if (childFrame) return;
     if (!ensureContext()) {
       return;
     }
@@ -1909,11 +2037,119 @@ window.__hoaLoaded = true;
     collapseEmptySections(rule, variants, allFiltered);
     compensateCarousels();
   }
+
+  function pageTitle() {
+    const og = document.querySelector('meta[property="og:title"]');
+    const raw = (og && og.content) || document.title || "";
+    return HOA.cleanTitle(raw.replace(/\s+[|–—-]\s+[^|–—-]+$/, "")).slice(0, HOA.MAX_TITLE);
+  }
+
+  function setBit(bitmap, index) {
+    const digits = HOA.bitmapBuckets(bitmap).split(""); const at = Math.floor(index / 4); const mask = 1 << (3 - index % 4);
+    digits[at] = (Number.parseInt(digits[at], 16) | mask).toString(16); return digits.join("");
+  }
+
+  function progressEntry(key, values) {
+    if (!key || !Number.isFinite(values.duration) || values.duration < 20) return null;
+    const old = watchProgress[key] || {}; const duration = values.duration;
+    const merged = HOA.mergeProgressEntry(old, { buckets: values.buckets, covered: values.covered });
+    const watched = HOA.bucketCount(merged.buckets) >= 90;
+    const played = Math.max(0, Number(values.played) || 0);
+    const automatic = watchSettings.continueWatching === "auto" && played >= Math.min(60, duration < 240 ? duration * .25 : 60);
+    const entry = { ...merged, site: HOA.siteOf(key), title: old.title || pageTitle() || HOA.siteOf(key), url: key,
+      thumbnail: old.thumbnail || ((document.querySelector('meta[property="og:image"]') || {}).content || ""), duration,
+      position: Math.min(Math.max(0, Number(values.position) || 0), duration), watched, played,
+      ...(watched ? {} : automatic && watchSettings.continueWatching !== "off" ? { cw: old.cw || "auto" } : {}), ts: old.ts || Date.now(), updated: Date.now() };
+    if (watched) { delete entry.cw; delete entry.untagged; }
+    return entry;
+  }
+
+  function trackerEntry(tracker) {
+    return tracker && progressEntry(tracker.key, { duration: tracker.video.duration, position: tracker.video.currentTime,
+      buckets: tracker.bits, covered: tracker.covered, played: tracker.basePlayed + tracker.covered });
+  }
+
+  function frameEntry(progress) {
+    if (!progress || !Number.isFinite(progress.duration) || progress.duration < 20) return null;
+    const key = watchKey(hostnameRule());
+    if (!key) return null;
+    const old = watchProgress[key] || {};
+    if (!frameProgressState || frameProgressState.key !== key || Math.abs(frameProgressState.duration - progress.duration) > progress.duration * .05) {
+      frameProgressState = { key, duration: progress.duration, basePlayed: Number(old.played) || 0 };
+    }
+    return progressEntry(key, { duration: progress.duration, position: progress.position, buckets: progress.bits,
+      covered: progress.covered, played: frameProgressState.basePlayed + Math.max(0, Number(progress.covered) || 0) });
+  }
+
+  function saveTracker(force = false) {
+    const tracker = playerTracker; if (!tracker || !tracker.video || !Number.isFinite(tracker.video.duration)) return;
+    if (!force && Date.now() - lastProgressWrite < 10000) return;
+    lastProgressWrite = Date.now();
+    if (childFrame) {
+      const progress = { duration: tracker.video.duration, position: Math.min(tracker.video.currentTime || 0, tracker.video.duration), bits: tracker.bits, covered: tracker.covered, playing: !tracker.video.paused };
+      chrome.runtime.sendMessage({ type: "hoa-frame-progress", progress }, response => {
+        if (response && Number.isFinite(response.seekTo) && !tracker.resumed && Math.abs(tracker.video.duration - progress.duration) <= progress.duration * .05) {
+          tracker.resumed = true; tracker.video.currentTime = response.seekTo;
+        }
+      });
+      return;
+    }
+    const entry = trackerEntry(tracker); if (!entry) return;
+    if (entry.watched) delete entry.cw;
+    watchProgress = { ...watchProgress, [entry.url]: entry }; HOA.writeProgress(entry.url, entry);
+    if (entry.watched && watchedEnabled(activeCategories(hostnameRule()))) queueWatched({ key: entry.url, title: entry.title, thumb: entry.thumbnail, site: entry.site, kind: HOA.kindOf(entry.url), ts: Date.now() });
+    scheduleApply();
+  }
+
+  function maybeResume(tracker) {
+    const entry = tracker.key && watchProgress[tracker.key];
+    if (watchSettings.continueWatching === "off" || !entry || !entry.cw || entry.position < 30 || entry.position >= entry.duration - 30 || tracker.resumed || Math.abs(entry.duration - tracker.video.duration) > entry.duration * .05 || tracker.video.currentTime >= 10) return;
+    tracker.resumed = true; tracker.video.currentTime = Math.max(0, entry.position - 5);
+    showToast(tracker.key, `Resumed at ${HOA.formatDuration(Math.floor(entry.position))}`, () => { tracker.video.currentTime = 0; }, "Start over");
+  }
+
+  function resetTracker(tracker, key) {
+    const existing = key && watchProgress[key];
+    tracker.key = key; tracker.last = tracker.video.currentTime || 0; tracker.bits = existing && existing.buckets || HOA.bitmapBuckets("");
+    tracker.basePlayed = Number(existing && existing.played) || 0; tracker.covered = 0; tracker.bucketSeconds = Array(100).fill(0); tracker.resumed = false;
+  }
+
+  function syncTrackerKey(tracker) {
+    if (!tracker || !tracker.video) return;
+    if (childFrame) return;
+    const key = watchKey(hostnameRule());
+    if (key && key !== tracker.key) { saveTracker(true); resetTracker(tracker, key); }
+  }
+
+  function attachTracker(video) {
+    if (!video || !Number.isFinite(video.duration) || video.duration < 20 || playerTracker && playerTracker.video === video) return;
+    playerTracker = { video, key: childFrame ? "" : watchKey(hostnameRule()), last: video.currentTime || 0, bits: HOA.bitmapBuckets(""), basePlayed: 0, covered: 0, bucketSeconds: Array(100).fill(0), resumed: false };
+    resetTracker(playerTracker, playerTracker.key);
+    const update = () => { const tracker = playerTracker; if (!tracker || tracker.video !== video) return; syncTrackerKey(tracker); if (video.paused || video.playbackRate > 2) return; const now = video.currentTime || 0; const delta = now - tracker.last; tracker.last = now; if (delta <= 0 || delta > 2.5) return; const index = Math.min(99, Math.floor(now / video.duration * 100)); tracker.bucketSeconds[index] += delta; tracker.covered += delta; if (tracker.bucketSeconds[index] >= video.duration / 100 * .7) tracker.bits = setBit(tracker.bits, index); saveTracker(false); };
+    video.addEventListener("timeupdate", update); video.addEventListener("loadedmetadata", () => syncTrackerKey(playerTracker)); video.addEventListener("pause", () => saveTracker(true)); video.addEventListener("ended", () => saveTracker(true));
+    video.addEventListener("play", () => { playerTracker.last = video.currentTime || 0; maybeResume(playerTracker); });
+  }
+
+  function findPlayer() {
+    const videos = Array.from(document.querySelectorAll("video")).filter(video => Number.isFinite(video.duration) && video.duration >= 20);
+    const visible = videos.filter(video => { const box = video.getBoundingClientRect(); return box.width > 0 && box.height > 0 && getComputedStyle(video).visibility !== "hidden"; });
+    if (visible.length) { videos.length = 0; videos.push(...visible); }
+    videos.sort((a, b) => b.duration - a.duration); if (videos[0]) attachTracker(videos[0]);
+  }
+
+  function startPlaybackTracker() {
+    findPlayer(); document.addEventListener("loadedmetadata", findPlayer, true); document.addEventListener("durationchange", findPlayer, true);
+    addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveTracker(true); }); addEventListener("pagehide", () => saveTracker(true));
+  }
   // Narrow test seam: production pages never create __hoaTest.
-  if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, applyAdded, compensateCarousels, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, activeCategories, keywordMatch: HOA.keywordMatch });
+  if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, applyAdded, compensateCarousels, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, keyForHref, attachTracker, findPlayer, activeCategories, keywordMatch: HOA.keywordMatch, saveTracker, watchedCard, frameEntry });
 
   function isOwnMutation(mutation) {
-    return mutation.target.closest && mutation.target.closest(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner");
+    if (mutation.target.closest && mutation.target.closest(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner")) return true;
+    const nodes = [...(mutation.addedNodes || []), ...(mutation.removedNodes || [])];
+    return nodes.length > 0 && nodes.every(node => node.nodeType === 1
+      && (node.matches(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner")
+        || node.querySelector(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner")));
   }
 
   // A site that rewrites a card's class attribute (Tubi does this as its page finishes loading) wipes our
@@ -1947,9 +2183,13 @@ window.__hoaLoaded = true;
     added = lists.added;
     channels = lists.channels;
     watchedShown = lists.watchedShown;
+    watchProgress = lists.watchProgress;
+    hasWatchProgress = Object.keys(watchProgress).length > 0;
     listsReady = true;
     scheduleApply();
+    startPlaybackTracker();
   });
+  chrome.storage.local.get({ [HOA.WATCH_SETTINGS_KEY]: {} }, result => { watchSettings = HOA.normalizeWatchSettings(result[HOA.WATCH_SETTINGS_KEY]); scheduleApply(); });
   chrome.storage.local.get({ [HOA.SITES_KEY]: {} }, result => {
     siteRules = result[HOA.SITES_KEY] && typeof result[HOA.SITES_KEY] === "object" ? result[HOA.SITES_KEY] : {};
     siteRulesReady = true;
@@ -1971,6 +2211,8 @@ window.__hoaLoaded = true;
     if (changes[HOA.WATCHED_SHOWN_KEY]) {
       watchedShown = HOA.normalizeWatchedShown(changes[HOA.WATCHED_SHOWN_KEY].newValue);
     }
+    if (changes[HOA.PROGRESS_KEY]) { watchProgress = HOA.normalizeProgress(changes[HOA.PROGRESS_KEY].newValue); hasWatchProgress = Object.keys(watchProgress).length > 0; }
+    if (changes[HOA.WATCH_SETTINGS_KEY]) watchSettings = HOA.normalizeWatchSettings(changes[HOA.WATCH_SETTINGS_KEY].newValue);
     if (changes[HOA.SITES_KEY]) {
       siteRules = changes[HOA.SITES_KEY].newValue && typeof changes[HOA.SITES_KEY].newValue === "object"
         ? changes[HOA.SITES_KEY].newValue : {};
@@ -2028,11 +2270,32 @@ window.__hoaLoaded = true;
   // The popup asks this to show how many videos the active rule recognised on the current page.
   if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (childFrame && message && message.type === "hoa-frame-seek" && playerTracker && Number.isFinite(message.seekTo)) {
+        playerTracker.video.currentTime = Math.max(0, message.seekTo); return;
+      }
+      if (childFrame) return;
+      if (message && message.type === "hoa-frame-progress" && !childFrame && !playerTracker && message.progress) {
+        const entry = frameEntry(message.progress);
+        const prior = entry && watchProgress[entry.url];
+        if (entry) { watchProgress = { ...watchProgress, [entry.url]: entry }; HOA.writeProgress(entry.url, entry); }
+        if (!frameResumeSent && prior && watchSettings.continueWatching !== "off" && prior.cw && prior.position >= 30 && prior.position < prior.duration - 30 && Math.abs(prior.duration - entry.duration) <= prior.duration * .05 && entry.position < 10) {
+          const seekTo = Math.max(0, prior.position - 5);
+          frameResumeSent = true;
+          showToast(entry.url, `Resumed at ${HOA.formatDuration(Math.floor(prior.position))}`, () => chrome.runtime.sendMessage({ type: "hoa-frame-seek", seekTo: 0 }), "Start over");
+          sendResponse({ seekTo });
+        }
+        return;
+      }
       // Another installed copy of AddOrHide controls this page: tell this copy's popup.
       if (message && message.type === "hoa-status" && !ownContext() && rootElement.dataset.hoaExtension
         && rootElement.dataset.hoaExtension !== ownExtension) {
         sendResponse({ otherCopy: true, otherVersion: rootElement.dataset.hoaVersion || "" });
         return;
+      }
+      if (message && message.type === "hoa-load-rows" && !retired) {
+        const startX = scrollX; const startY = scrollY; const started = Date.now(); let steady = 0; let height = document.documentElement.scrollHeight;
+        const step = () => { const nextHeight = document.documentElement.scrollHeight; steady = nextHeight <= height ? steady + 1 : 0; height = Math.max(height, nextHeight); if (steady >= 3 || Date.now() - started >= 20000) { scrollTo({ left: startX, top: startY, behavior: "instant" }); const rule = hostnameRule(); const count = rule ? HOA.normalizeSectionTitles(sectionRows(rule).rows.map(row => row.title)).length : 0; const host = rule && rule.hosts && rule.hosts[0]; if (host) chrome.storage.local.get({ seenRowsScanned: {} }, saved => chrome.storage.local.set({ seenRowsScanned: { ...(saved.seenRowsScanned || {}), [host]: Date.now() } })); sendResponse({ done: true, rows: count }); return; } scrollBy(0, Math.max(innerHeight || 600, 200)); window.setTimeout(step, 350); };
+        step(); return true;
       }
       // A replaced (retired) copy of this script stays registered as a listener; only the live one answers.
       if (message && message.type === "hoa-status" && !retired) {
@@ -2107,7 +2370,9 @@ window.__hoaLoaded = true;
           channelVideos: channelVideos.length,
           watchedHere: rule ? matchedCards.filter(card => watchedCard(card, rule)).length : 0,
           watchedLabels: document.querySelectorAll(`[data-hoa-watched="${ownInstance}"]`).length,
-          rows
+          rows,
+          rowsComplete: Boolean(rule && rule.sectionNav),
+          nowPlaying: playerTracker && playerTracker.video ? (() => { const entry = trackerEntry(playerTracker); return entry && { key: entry.url, title: entry.title, position: entry.position, duration: entry.duration, cw: entry.cw }; })() : null
         });
       }
     });

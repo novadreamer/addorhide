@@ -500,4 +500,22 @@ check("turning Watched off drops only that site's auto-hidden entries", () => {
   assert.deepEqual(Object.keys(out.watchedShown), [tubi]);
 });
 
+check("progress normalizer keeps a bitmap, played seconds and Continue Watching", () => {
+  const key = "https://example.com/watch/one";
+  const result = HOA.normalizeProgress({ [key]: { duration: 100, position: 40, played: 65, buckets: "f".repeat(25), watched: false, cw: "auto", updated: 1 } });
+  assert.equal(result[key].played, 65); assert.equal(result[key].cw, "auto"); assert.equal(HOA.bucketCount(result[key].buckets), 100);
+});
+check("progress eviction keeps Continue Watching entries", () => {
+  const entries = {}; for (let index = 0; index < 1502; index += 1) entries[`https://example.com/watch/${index}`] = { duration: 100, position: 1, updated: index, cw: index === 0 ? "manual" : undefined };
+  const result = HOA.normalizeProgress(entries); assert.ok(result["https://example.com/watch/0"]); assert.equal(Object.keys(result).length, 1500);
+});
+check("watch settings normalize safe defaults", () => {
+  assert.deepEqual(HOA.normalizeWatchSettings({}), { tagWatched: true, continueWatching: "auto" });
+  assert.deepEqual(HOA.normalizeWatchSettings({ tagWatched: false, continueWatching: "off" }), { tagWatched: false, continueWatching: "off" });
+});
+check("backup round trip retains watch progress", () => {
+  const key = "https://example.com/watch/backup"; const backup = HOA.buildBackup({ hidden: {}, added: {}, siteRules: {}, prefs: {}, watchProgress: { [key]: { duration: 100, position: 25, updated: 1, buckets: "0".repeat(25) } } }, "1.1.0", now);
+  const result = HOA.parseBackup(JSON.stringify(backup)); assert.equal(result.ok, true); assert.ok(result.backup.watchProgress[key]);
+});
+
 console.log(`shared.test.js: ${passed} passed, 0 failed`);

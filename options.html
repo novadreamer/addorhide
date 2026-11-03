@@ -40,6 +40,11 @@
         </div>
       </div>
     </section>
+    <section class="panel" aria-labelledby="watch-heading">
+      <h2 id="watch-heading">Watching</h2>
+      <label class="switch-row"><input id="tag-watched" type="checkbox" role="switch"> <span>Tag watched videos</span></label>
+      <fieldset class="watch-mode"><legend>Continue Watching</legend><label><input type="radio" name="continue-watching" value="auto"> Add videos I start automatically</label><label><input type="radio" name="continue-watching" value="manual"> Only videos I add myself</label><label><input type="radio" name="continue-watching" value="off"> Off</label></fieldset>
+    </section>
     <section class="panel" aria-labelledby="feed-heading">
       <h2 id="feed-heading">Hide whole feeds</h2>
       <label class="switch-row"><input id="bulk-hide" type="checkbox" role="switch"> <span>Hide every recommendation on YouTube</span></label>
@@ -70,7 +75,7 @@
     </section>
     <section class="panel" aria-labelledby="privacy-heading">
       <h2 id="privacy-heading">Your data</h2>
-      <p>AddOrHide keeps the videos you add or hide, your site settings and your page preferences in this browser only. Nothing is sent to the developer, and there are no accounts, ads or analytics.</p>
+      <p>AddOrHide keeps the videos you add or hide, watch progress, your site settings and your page preferences in this browser only. Nothing is sent to the developer, and there are no accounts, ads or analytics.</p>
       <p class="muted">When you click <strong>Add</strong> or <strong>Hide</strong>, the extension reads that video's link, title, thumbnail link and any duration, view count, date, rating or genre shown on its card, and stores them on this device. It uses this data only to build your Added Videos page and to hide videos, and it never sells or shares it. Thumbnails and site icons are loaded straight from the sites they come from. You can delete it at any time: Remove or Clear page for added videos, Restore or Unhide everything for hidden videos, Forget for a site's settings, or remove the extension.</p>
       <div class="page-actions">
         <button id="export-data-button" class="secondary-button" type="button">Export my data</button>

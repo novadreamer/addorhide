@@ -190,7 +190,7 @@ var HOA_CATALOG = Object.freeze((() => {
       ]),
     }),
     Object.freeze({
-      id: "dailymotion", name: "Dailymotion", builtIn: false, hosts: Object.freeze(["dailymotion.com"]), subdomains: true,
+      id: "dailymotion", name: "Dailymotion", builtIn: false, hosts: Object.freeze(["dailymotion.com"]), subdomains: true, playerHosts: Object.freeze(["geo.dailymotion.com"]),
       cardSelector: 'ul[data-testid="page-layout-grid"] > li', linkSelector: 'a[href^="/video/"]',
       titleCandidates: Object.freeze(['[class*="HomeVideoInfo__titleContent"]', "h2"]),
       variants: Object.freeze([
@@ -212,8 +212,8 @@ var HOA_CATALOG = Object.freeze((() => {
       linkSelector: 'a[data-a-target="preview-card-image-link"]', titleCandidates: Object.freeze(["h4", "h3"]),
       typeFixed: "live", removeClimb: true,
       meta: Object.freeze({ texts: Object.freeze(["*"]), genres: 'a[data-a-target="preview-card-game-link"]' }),
-      channelLinkSelector: 'a[data-a-target="preview-card-channel-link"]',
-      channelCandidates: Object.freeze(["h4", "h3", 'a[data-a-target="preview-card-channel-link"]']),
+      channelLinkSelector: 'a[data-a-target="preview-card-channel-link"]', channelNameSelector: 'a[data-a-target="preview-card-channel-link"] p[title]',
+      channelCandidates: Object.freeze(['a[data-a-target="preview-card-channel-link"] p[title]']),
       sections: Object.freeze([{ container: "div.find-me", title: "h2.tw-title" }]),
       categories: Object.freeze([
         { id: "live", label: "Live channels", hint: "Channels currently streaming", card: { has: 'a[data-a-target="preview-card-image-link"]', text: "\\bLIVE\\b" } },
@@ -318,7 +318,7 @@ var HOA_CATALOG = Object.freeze((() => {
     Object.freeze({
       id: "kick", name: "Kick", builtIn: false, hosts: Object.freeze(["kick.com"]), subdomains: true,
       cardSelector: 'div:has(> a[data-testid="media-card-thumbnail"])', removeClosest: 'div:has(> a[data-testid="media-card-thumbnail"])', linkSelector: 'a[data-testid="media-card-thumbnail"]', titleCandidates: Object.freeze(["a[data-card-link]", "a[title]"]),
-      channelLinkSelector: 'a[data-card-link]', channelCandidates: Object.freeze(['a[href^="/"]:not([data-testid="media-card-thumbnail"])']),
+      channelLinkSelector: 'a[data-card-link]', channelNameSelector: 'a[data-card-link]:not([title])', channelCandidates: Object.freeze(['a[data-card-link]:not([title])']),
       sections: Object.freeze([{ container: "section:has(> div h2)", title: "h2" }]),
       categories: Object.freeze([
         { id: "gambling", label: "Gambling", hint: "Casino, betting and gambling streams", card: { text: "Slots & Casino|\\bCasino\\b|\\bSlots\\b|\\bPoker\\b|Blackjack|Roulette|Gambling|Plinko|Sports betting" } },
@@ -340,7 +340,7 @@ var HOA_CATALOG = Object.freeze((() => {
       ])
     }),
     Object.freeze({
-      id: "pbs", name: "PBS", builtIn: false, hosts: Object.freeze(["pbs.org"]), subdomains: true,
+      id: "pbs", name: "PBS", builtIn: false, hosts: Object.freeze(["pbs.org"]), subdomains: true, playerHosts: Object.freeze(["player.pbs.org"]),
       cardSelector: 'a[class*="show_poster__link"]', removeClosest: 'a[class*="show_poster__link"]', linkSelector: 'a[class*="show_poster__link"]', titleCandidates: Object.freeze(["img[alt]"]),
       sections: Object.freeze([{ container: 'div[class*="_show_row"]', title: 'h2[class*="content_row_title"]' }]),
       categories: Object.freeze([{ id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }])
@@ -396,20 +396,30 @@ var HOA_CATALOG = Object.freeze((() => {
     })
   ]);
 
+  // Playback tracking supplies this filter on every supported site.  Keep it before Rows so the picker remains last.
+  const watchedRules = Object.freeze(rules.map(rule => {
+    if ((rule.categories || []).some(category => category.id === "watched")) return rule;
+    const categories = [...(rule.categories || [])];
+    const watched = Object.freeze({ id: "watched", label: "Watched", hint: "Videos you watched to the end. On: hidden automatically and listed under Hidden Videos > Watched. Off: they stay, tagged Watched." });
+    const at = categories.findIndex(category => category.id === "genres");
+    categories.splice(at < 0 ? categories.length : at, 0, watched);
+    return Object.freeze({ ...rule, categories: Object.freeze(categories) });
+  }));
+
   function find(hostname) {
     if (typeof hostname !== "string") {
       return null;
     }
     const host = hostname.toLowerCase();
-    return rules.find(rule => rule.hosts.some(ruleHost => host === ruleHost
+    return watchedRules.find(rule => rule.hosts.some(ruleHost => host === ruleHost
       || (rule.subdomains === true && host.endsWith(`.${ruleHost}`)))) || null;
   }
 
   function byId(id) {
-    return typeof id === "string" ? rules.find(rule => rule.id === id) || null : null;
+    return typeof id === "string" ? watchedRules.find(rule => rule.id === id) || null : null;
   }
 
-  return { rules, find, byId };
+  return { rules: watchedRules, find, byId };
 })());
 
 if (typeof module !== "undefined") {

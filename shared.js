@@ -9,10 +9,13 @@ var HOA = Object.freeze((() => {
   const ADDED_KEY = "addedItems";
   const SITES_KEY = "siteRules";
   const SEEN_ROWS_KEY = "seenRows";
+  const PROGRESS_KEY = "watchProgress";
+  const WATCH_SETTINGS_KEY = "watchSettings";
   const MAX_HIDDEN = 1000;
   const MAX_CHANNELS = 500;
   const MAX_WATCHED_SHOWN = 1000;
   const MAX_ADDED = 500;
+  const MAX_PROGRESS = 1500;
   const MAX_TITLE = 200;
   const MAX_URL = 2048;
   const HOSTED_ADDED_URL = "https://www.youtube.com/robots.txt#addorhide-added";
@@ -36,6 +39,90 @@ var HOA = Object.freeze((() => {
 
   function themeOf(value) {
     return value === "light" || value === "dark" ? value : "";
+  }
+
+  function normalizeWatchSettings(value) {
+    const raw = isObject(value) ? value : {};
+    return { tagWatched: raw.tagWatched !== false, continueWatching: ["auto", "manual", "off"].includes(raw.continueWatching) ? raw.continueWatching : "auto" };
+  }
+
+  function bitmapBuckets(value) {
+    return typeof value === "string" && /^[0-9a-f]{25}$/i.test(value) ? value.toLowerCase() : "0000000000000000000000000";
+  }
+
+  function bucketCount(bitmap) {
+    return bitmapBuckets(bitmap).split("").reduce((total, digit) => total + Number.parseInt(digit, 16).toString(2).split("1").length - 1, 0);
+  }
+
+  function normalizeProgress(value) {
+    const normalized = {};
+    if (!isObject(value)) return normalized;
+    Object.keys(value).forEach(key => {
+      if (canonicalUrl(key) !== key || !isObject(value[key])) return;
+      const raw = value[key];
+      const duration = Number(raw.duration);
+      const position = Number(raw.position);
+      if (!Number.isFinite(duration) || duration < 20 || duration > 1000000 || !Number.isFinite(position) || position < 0) return;
+      const updated = Number(raw.updated);
+      if (!Number.isFinite(updated)) return;
+      const title = typeof raw.title === "string" ? raw.title.trim().slice(0, MAX_TITLE) : fallbackTitle(key);
+      const thumb = typeof raw.thumbnail === "string" && raw.thumbnail.length <= MAX_URL && (!raw.thumbnail || validHttpUrl(raw.thumbnail)) ? raw.thumbnail : "";
+      const entry = { site: siteOf(key), title: title || fallbackTitle(key), url: key, thumbnail: thumb, duration, position: Math.min(position, duration), buckets: bitmapBuckets(raw.buckets), watched: raw.watched === true, ts: Number.isFinite(raw.ts) ? raw.ts : updated, updated };
+      if (Number.isFinite(Number(raw.played)) && Number(raw.played) >= 0) entry.played = Number(raw.played);
+      if (raw.untagged === true) entry.untagged = true;
+      if (raw.cw === "auto" || raw.cw === "manual") entry.cw = raw.cw;
+      normalized[key] = entry;
+    });
+    const keys = Object.keys(normalized);
+    if (keys.length > MAX_PROGRESS) {
+      keys.filter(key => !normalized[key].cw).sort((a, b) => normalized[a].updated - normalized[b].updated || a.localeCompare(b))
+        .slice(0, Math.max(0, keys.length - MAX_PROGRESS)).forEach(key => delete normalized[key]);
+    }
+    return normalized;
+  }
+
+  let progressWriteBusy = false;
+  let pendingProgressWrites = {};
+
+  function flushProgressWrites() {
+    if (progressWriteBusy || !Object.keys(pendingProgressWrites).length) return;
+    progressWriteBusy = true;
+    const pending = pendingProgressWrites;
+    pendingProgressWrites = {};
+    chrome.storage.local.get({ [PROGRESS_KEY]: {} }, result => {
+      const current = normalizeProgress(result[PROGRESS_KEY]);
+      Object.entries(pending).forEach(([key, change]) => { if (change.entry) current[key] = change.entry; else delete current[key]; });
+      chrome.storage.local.set({ [PROGRESS_KEY]: normalizeProgress(current) }, () => {
+        Object.values(pending).forEach(change => change.callbacks.forEach(callback => callback()));
+        progressWriteBusy = false;
+        flushProgressWrites();
+      });
+    });
+  }
+
+  function writeProgress(key, entry, callback) {
+    const cb = typeof callback === "function" ? callback : () => {};
+    if (!canonicalUrl(key) || typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) { cb(); return; }
+    const pending = pendingProgressWrites[key] || { entry, callbacks: [] };
+    pending.entry = entry; pending.callbacks.push(cb); pendingProgressWrites[key] = pending;
+    flushProgressWrites();
+  }
+
+  // Playback can arrive from a player iframe while the top page owns the saved video identity.
+  // Keep coverage monotonic when a page and its frame save close together.
+  function mergeProgressEntry(base, update) {
+    const older = isObject(base) ? base : {};
+    const newer = isObject(update) ? update : {};
+    const oldBits = bitmapBuckets(older.buckets);
+    const newBits = bitmapBuckets(newer.buckets);
+    const buckets = oldBits.split("").map((digit, index) =>
+      (Number.parseInt(digit, 16) | Number.parseInt(newBits[index], 16)).toString(16)).join("");
+    return {
+      ...older,
+      ...newer,
+      buckets,
+      covered: Math.max(Number(older.covered) || 0, Number(newer.covered) || 0)
+    };
   }
 
   // Filter settings are deliberately small and boring: they are stored in siteRules and may also arrive from a
@@ -1328,6 +1415,7 @@ var HOA = Object.freeze((() => {
       hiddenItems: normalizeItems(source.hidden, { max: MAX_HIDDEN, withListed: true }),
       hiddenChannels: normalizeChannels(source.channels),
       watchedShown: normalizeWatchedShown(source.watchedShown),
+      watchProgress: normalizeProgress(source.watchProgress),
       addedItems: normalizeItems(source.added, { max: MAX_ADDED }),
       siteRules: sanitizeBackupRules(source.siteRules),
       addedViewPrefs: sanitizeBackupPrefs(source.prefs)
@@ -1361,6 +1449,7 @@ var HOA = Object.freeze((() => {
         hiddenItems: normalizeItems(value.hiddenItems, { max: MAX_HIDDEN, withListed: true }),
         hiddenChannels: normalizeChannels(value.hiddenChannels),
         watchedShown: normalizeWatchedShown(value.watchedShown),
+        watchProgress: normalizeProgress(value.watchProgress),
         addedItems: normalizeItems(value.addedItems, { max: MAX_ADDED }),
         siteRules: sanitizeBackupRules(value.siteRules),
         addedViewPrefs: sanitizeBackupPrefs(value.addedViewPrefs)
@@ -1407,6 +1496,7 @@ var HOA = Object.freeze((() => {
     // Channel records are not video items, so normalise the merged result with their dedicated schema.
     const channels = mergeBackupChannels(source.channels, imported.hiddenChannels);
     const watchedShown = normalizeWatchedShown({ ...normalizeWatchedShown(source.watchedShown), ...normalizeWatchedShown(imported.watchedShown) });
+    const watchProgress = normalizeProgress({ ...normalizeProgress(source.watchProgress), ...normalizeProgress(imported.watchProgress) });
     const siteRules = isObject(source.siteRules) ? { ...source.siteRules } : {};
     let siteCount = 0;
     const importedRules = sanitizeBackupRules(imported.siteRules);
@@ -1436,6 +1526,7 @@ var HOA = Object.freeze((() => {
       added: addedResult.items,
       channels: normalizeChannels(channels),
       watchedShown,
+      watchProgress,
       siteRules,
       prefs,
       counts: { added: addedResult.count, hidden: hiddenResult.count, sites: siteCount }
@@ -1449,15 +1540,16 @@ var HOA = Object.freeze((() => {
   function readLists(callback) {
     const cb = typeof callback === "function" ? callback : () => {};
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
-      cb({ hidden: {}, added: {}, channels: {}, watchedShown: {} });
+      cb({ hidden: {}, added: {}, channels: {}, watchedShown: {}, watchProgress: {} });
       return;
     }
-    chrome.storage.local.get({ [HIDDEN_KEY]: {}, [ADDED_KEY]: {}, [CHANNELS_KEY]: {}, [WATCHED_SHOWN_KEY]: {} }, result => {
+    chrome.storage.local.get({ [HIDDEN_KEY]: {}, [ADDED_KEY]: {}, [CHANNELS_KEY]: {}, [WATCHED_SHOWN_KEY]: {}, [PROGRESS_KEY]: {} }, result => {
       cb({
         hidden: normalizeItems(result[HIDDEN_KEY], { max: MAX_HIDDEN, withListed: true }),
         added: normalizeItems(result[ADDED_KEY], { max: MAX_ADDED, withListed: false }),
         channels: normalizeChannels(result[CHANNELS_KEY]),
-        watchedShown: normalizeWatchedShown(result[WATCHED_SHOWN_KEY])
+        watchedShown: normalizeWatchedShown(result[WATCHED_SHOWN_KEY]),
+        watchProgress: normalizeProgress(result[PROGRESS_KEY])
       });
     });
   }
@@ -1477,6 +1569,7 @@ var HOA = Object.freeze((() => {
     }
     if (lists && Object.prototype.hasOwnProperty.call(lists, "channels")) payload[CHANNELS_KEY] = normalizeChannels(lists.channels);
     if (lists && Object.prototype.hasOwnProperty.call(lists, "watchedShown")) payload[WATCHED_SHOWN_KEY] = normalizeWatchedShown(lists.watchedShown);
+    if (lists && Object.prototype.hasOwnProperty.call(lists, "watchProgress")) payload[PROGRESS_KEY] = normalizeProgress(lists.watchProgress);
     chrome.storage.local.set(payload, cb);
   }
 
@@ -1517,6 +1610,8 @@ var HOA = Object.freeze((() => {
     ADDED_KEY,
     SITES_KEY,
     SEEN_ROWS_KEY,
+    PROGRESS_KEY,
+    WATCH_SETTINGS_KEY,
     PREFS_KEY,
     THEME_KEY,
     BUTTON_EDGE_KEY,
@@ -1532,6 +1627,7 @@ var HOA = Object.freeze((() => {
     MAX_CHANNELS,
     MAX_WATCHED_SHOWN,
     MAX_ADDED,
+    MAX_PROGRESS,
     MAX_TITLE,
     MAX_URL,
     HOSTED_ADDED_URL,
@@ -1573,6 +1669,12 @@ var HOA = Object.freeze((() => {
     normalizePrefs,
     youtubeThumb,
     normalizeItems,
+    normalizeProgress,
+    normalizeWatchSettings,
+    bitmapBuckets,
+    bucketCount,
+    writeProgress,
+    mergeProgressEntry,
     normalizeChannels,
     normalizeWatchedShown,
     youtubeChannelKey,
