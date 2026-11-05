@@ -332,7 +332,7 @@
       const info = element("div", "hidden-info");
       const href = HOA.safeHref(entry.url);
       const fallbackName = (() => { const handle = key.match(/\|\/([^/]+)/); const named = key.match(/name:(.+)$/); return handle ? (handle[1].startsWith("@") ? handle[1] : handle[1]) : named ? named[1] : "Hidden channel"; })();
-      const knownTitles = new Set([...Object.values(hidden), ...Object.values(added)].filter(item => item && item.site === entry.site).map(item => String(item.title || "").trim().toLocaleLowerCase()));
+      const knownTitles = new Set(Object.values(hidden).filter(item => item && item.site === entry.site).map(item => String(item.title || "").trim().toLocaleLowerCase()));
       const storedName = String(entry.name || "").trim();
       const displayName = !storedName || storedName.length > 60 || knownTitles.has(storedName.toLocaleLowerCase()) ? fallbackName : storedName;
       const title = element(href ? "a" : "span", "hidden-title", displayName);
@@ -373,7 +373,11 @@
     title.appendChild(element("span", "count-badge", String(entries.length)));
     copy.appendChild(title);
     const allSites = new Set(entries.map(([key, entry]) => siteFor(key, entry)).filter(Boolean));
-    copy.appendChild(element("p", "muted", HOA.hiddenSummaryText(entries.length, allSites.size)));
+    const videoSummary = entries.length
+      ? `${entries.length} hidden video${entries.length === 1 ? "" : "s"} on ${allSites.size} website${allSites.size === 1 ? "" : "s"}`
+      : "";
+    const channelSummary = channelEntries.length ? `${channelEntries.length} hidden channel${channelEntries.length === 1 ? "" : "s"}` : "";
+    copy.appendChild(element("p", "muted", [videoSummary, channelSummary].filter(Boolean).join(" · ") || "No hidden videos."));
     const actions = element("div", "page-actions hidden-header-actions");
     const restoreAll = iconButton("restore-button header-restore-all", RESTORE_ALL_ICON, "Restore all: show every video in the feed again");
     restoreAll.id = "hidden-restore-all";
@@ -424,9 +428,10 @@
       root.appendChild(element("p", "empty-state hidden-empty muted", "No hidden videos or channels."));
     } else {
       const groupsRoot = element("div", "hidden-groups");
-      if (channelEntries.length) groupsRoot.appendChild(makeChannelsGroup(channelEntries));
-      if (watchedEntries.length) groupsRoot.appendChild(makeGroup({ site: "watched-videos", name: "Watched Videos", entries: watchedEntries, watched: true }, "watched"));
-      groups.forEach((group, index) => groupsRoot.appendChild(makeGroup(group, index)));
+      const addGroup = make => { try { groupsRoot.appendChild(make()); } catch (error) { console.error("AddOrHide: could not render hidden group", error); } };
+      if (channelEntries.length) addGroup(() => makeChannelsGroup(channelEntries));
+      if (watchedEntries.length) addGroup(() => makeGroup({ site: "watched-videos", name: "Watched Videos", entries: watchedEntries, watched: true }, "watched"));
+      groups.forEach((group, index) => addGroup(() => makeGroup(group, index)));
       root.appendChild(groupsRoot);
     }
     window.scrollTo(0, scrollTop);

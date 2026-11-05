@@ -43,6 +43,24 @@ function schedulePositionBreathingRoom() {
   if (!positionRoomFrame) positionRoomFrame = requestAnimationFrame(fitPositionBreathingRoom);
 }
 
+function appendContinueSwitch(container) {
+  const label = document.createElement("label");
+  label.className = "switch-row continue-watching-switch";
+  const input = document.createElement("input");
+  input.type = "checkbox"; input.setAttribute("role", "switch");
+  const text = document.createTextNode(" Auto-add to Continue Watching");
+  label.append(input, text); container.appendChild(label);
+  chrome.storage.local.get({ [HOA.WATCH_SETTINGS_KEY]: {} }, saved => {
+    input.checked = HOA.normalizeWatchSettings(saved[HOA.WATCH_SETTINGS_KEY]).continueWatching === "auto";
+  });
+  input.addEventListener("change", () => {
+    chrome.storage.local.get({ [HOA.WATCH_SETTINGS_KEY]: {} }, saved => {
+      const current = HOA.normalizeWatchSettings(saved[HOA.WATCH_SETTINGS_KEY]);
+      chrome.storage.local.set({ [HOA.WATCH_SETTINGS_KEY]: { ...current, continueWatching: input.checked ? "auto" : "off" } });
+    });
+  });
+}
+
 // Permissions are requested for the scheme the tab is really on (https almost everywhere).
 // Asks the content script on the active tab how many videos it recognised, so a silent miss is visible.
 function appendPageStatus(container) {
@@ -85,18 +103,6 @@ function appendPageStatus(container) {
       line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"}, but none got buttons. Reload the page; if it stays like this, send the details below.`;
     } else {
       line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"} on this page. Move your mouse over one to see Add and Hide.`;
-    }
-    if (reply.nowPlaying && reply.nowPlaying.key) {
-      chrome.storage.local.get({ [HOA.WATCH_SETTINGS_KEY]: {} }, saved => {
-      if (HOA.normalizeWatchSettings(saved[HOA.WATCH_SETTINGS_KEY]).continueWatching === "off") return;
-      const listed = reply.nowPlaying.cw;
-      const continueButton = button(listed ? "In Continue Watching" : "Add to Continue Watching", () => {
-        if (listed) return;
-        const entry = watchProgress[reply.nowPlaying.key] || { ...reply.nowPlaying, url: reply.nowPlaying.key, site: HOA.siteOf(reply.nowPlaying.key), thumbnail: "", buckets: HOA.bitmapBuckets(""), watched: false, ts: Date.now(), updated: Date.now() };
-        HOA.writeProgress(reply.nowPlaying.key, { ...entry, cw: "manual", updated: Date.now() }, () => { continueButton.textContent = "In Continue Watching"; continueButton.disabled = true; });
-      });
-      continueButton.className = "secondary-button continue-popup-button"; continueButton.disabled = Boolean(listed); line.appendChild(continueButton);
-      });
     }
     schedulePositionBreathingRoom();
   });
@@ -256,8 +262,8 @@ function addLearnedControl(host, catalog, rule, container) {
 }
 
 function appendFilterControls(container, catalogRule) {
-  const categories = catalogRule && Array.isArray(catalogRule.categories) ? catalogRule.categories : [];
-  const typeCategories = categories.filter(category => category.id !== "genres");
+  const categories = catalogRule && Array.isArray(catalogRule.categories) ? catalogRule.categories : [{ id: "watched", label: "Watched", hint: "Videos you have watched" }];
+  const typeCategories = categories.filter(category => category.id !== "genres").sort((left, right) => (right.id === "watched") - (left.id === "watched"));
   const genreCategory = categories.find(category => category.id === "genres");
   let kinds = HOA.normalizeHideKinds(siteRule(activeHost).hideKinds, categories.map(category => category.id));
   let keywords = HOA.normalizeKeywords(siteRule(activeHost).hideKeywords);
@@ -406,6 +412,7 @@ function renderSite() {
     label.appendChild(toggle);
     label.appendChild(document.createTextNode(" Hide the whole feed"));
     siteContent.appendChild(label);
+    appendContinueSwitch(siteContent);
     appendFilterControls(siteContent, catalogRule);
     schedulePositionBreathingRoom();
     return;
@@ -461,6 +468,7 @@ function renderSite() {
     ? `You taught ${learnedCount} kind${learnedCount === 1 ? "" : "s"} of card here`
     : (isCatalog ? "Supported" : "Pick the cards to finish setup");
   siteContent.appendChild(status);
+  appendContinueSwitch(siteContent);
   appendPageStatus(siteContent);
   if (!playerGranted) {
     const playerNote = document.createElement("p");

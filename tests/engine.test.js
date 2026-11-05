@@ -1149,16 +1149,29 @@ const CASES = [
     const page = await load({ html: "", url: "https://www.youtube.com/watch?v=abc123def45", testSeam: true });
     const ad = fakeVideo(page, { duration: 15 }); const main = fakeVideo(page, { duration: 100 });
     page.test.findPlayer(); main.play(30);
-    await wait(15);
+    await wait(45);
     const entry = page.store.watchProgress["https://www.youtube.com/watch?v=abc123def45"];
     check("a 15-second ad beside the main video is ignored", () => assert.equal(entry.duration, 100));
     check("main video is selected instead of the ad", () => assert.equal(entry.position, 30));
     page.window.close();
   }
-  for (const [mode, seconds, expected] of [["auto", 40, "auto"], ["manual", 120, undefined], ["off", 120, undefined]]) {
+  {
+    const key = "https://www.youtube.com/watch?v=onceonly123";
+    const first = await load({ html: '<ytd-watch-metadata><h1>First title</h1></ytd-watch-metadata>', url: key, testSeam: true });
+    fakeVideo(first).play(40); await wait(45);
+    const resumedStore = first.store.watchProgress; first.window.close();
+    const second = await load({ html: '<ytd-watch-metadata><h1>Updated title</h1></ytd-watch-metadata>', url: key, watchProgress: resumedStore, testSeam: true });
+    fakeVideo(second).play(40); await wait(45);
+    check("two YouTube page loads continue the same canonical progress entry", () => {
+      assert.deepEqual(Object.keys(second.store.watchProgress), [key]);
+      assert.ok(second.store.watchProgress[key].position >= resumedStore[key].position);
+    });
+    second.window.close();
+  }
+  for (const [mode, seconds, expected] of [["auto", 40, "auto"], ["manual", 40, "auto"], ["off", 120, undefined]]) {
     const page = await load({ html: "", url: "https://www.youtube.com/watch?v=abc123def45", watchSettings: { continueWatching: mode }, testSeam: true });
     fakeVideo(page).play(seconds);
-    await wait(15);
+    await wait(45);
     check(`${mode} Continue Watching mode saves the expected state`, () => assert.equal(page.store.watchProgress["https://www.youtube.com/watch?v=abc123def45"].cw, expected));
     page.window.close();
   }
@@ -1204,6 +1217,51 @@ const CASES = [
     let mutations = 0; const observer = new page.window.MutationObserver(records => { mutations += records.length; }); observer.observe(page.document.body, { attributes: true, childList: true, subtree: true });
     page.test.apply(); page.test.apply(); page.test.apply(); await wait(10); observer.disconnect();
     check("repeated apply is observer-idempotent", () => assert.equal(mutations, 0));
+    page.window.close();
+  }
+  {
+    const page = await load({ html: '<ytd-rich-item-renderer id="preview"><a id="thumbnail" href="/watch?v=preview12345"><video></video></a></ytd-rich-item-renderer>', url: "https://www.youtube.com/", testSeam: true });
+    const video = fakeVideo(page); page.document.getElementById("preview").appendChild(video); video.play(40); await wait(45);
+    check("YouTube home inline previews never create a progress entry", () => assert.deepEqual(page.store.watchProgress || {}, {}));
+    page.window.close();
+  }
+  {
+    const key = "https://www.youtube.com/watch?v=abc123def45";
+    const page = await load({ html: '<ytd-watch-metadata><h1>Exact page title</h1></ytd-watch-metadata>', url: key, testSeam: true });
+    fakeVideo(page).play(40); await wait(45);
+    const entry = page.store.watchProgress[key];
+    check("YouTube video pages track their canonical key, h1 title and video thumbnail", () => {
+      assert.equal(entry.url, key); assert.equal(entry.title, "Exact page title"); assert.equal(entry.thumbnail, "https://i.ytimg.com/vi/abc123def45/mqdefault.jpg");
+    });
+    page.window.close();
+  }
+  {
+    const key = "https://www.youtube.com/watch?v=keepkey1234";
+    const page = await load({ html: "", url: key, testSeam: true }); const video = fakeVideo(page);
+    video.play(30); page.window.history.pushState({}, "", "/"); video.currentTime = 40; video.play(20); await wait(45);
+    check("SPA navigation to a non-video page keeps the current tracker key", () => {
+      assert.ok(page.store.watchProgress[key]); assert.equal(page.store.watchProgress["https://www.youtube.com/"], undefined);
+    });
+    page.window.close();
+  }
+  {
+    const key = "https://www.youtube.com/watch?v=renderer123";
+    const watched = { [key]: { site: "youtube.com", title: "Renderer", url: key, thumbnail: "", duration: 100, position: 95, buckets: "fffffffffffffffffffffffff", watched: true, ts: 1, updated: 1 } };
+    const renderers = [
+      ["yt-lockup-view-model", key], ["ytd-compact-video-renderer", key],
+      ["ytd-video-renderer", "https://www.youtube.com/results?search_query=renderer"],
+      ["ytd-rich-grid-media", "https://www.youtube.com/@x/videos"],
+      ["ytd-grid-video-renderer", "https://www.youtube.com/@x/videos"],
+      ["ytd-playlist-video-renderer", "https://www.youtube.com/playlist?list=PLrenderer"]
+    ];
+    for (const [renderer, url] of renderers) {
+      const page = await load({ html: `<${renderer} id="card"><a id="thumbnail" href="/watch?v=renderer123"><img></a><a id="video-title" href="/watch?v=renderer123">Renderer</a></${renderer}>`, url, watchProgress: watched, testSeam: true });
+      check(`watched labels render on ${renderer} at its page route`, () => assert.ok(page.document.querySelector("#thumbnail[data-hoa-watched]")));
+      page.window.close();
+    }
+    const tubiKey = "https://tubitv.com/movies/watched";
+    const page = await load({ html: '<div id="card" data-test-id="web-ui-content-tile"><a class="web-content-tile__poster-link" href="/movies/watched"><img></a><span class="web-content-tile__title">Watched</span></div>', url: "https://tubitv.com/", watchProgress: { [tubiKey]: { site: "tubitv.com", title: "Watched", url: tubiKey, duration: 100, position: 95, buckets: "fffffffffffffffffffffffff", watched: true, ts: 1, updated: 1 } }, testSeam: true });
+    check("watched labels render on Tubi cards", () => assert.ok(page.document.querySelector("#card [data-hoa-watched]")));
     page.window.close();
   }
   console.log(`engine.test.js: ${passed} passed, 0 failed`);

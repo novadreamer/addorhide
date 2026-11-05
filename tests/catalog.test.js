@@ -89,13 +89,13 @@ check("non-built-in hosts are not static", () => catalog.rules.filter(rule => !r
   .forEach(rule => rule.hosts.forEach(host => assert.equal(staticHosts.has(host), false))));
 check("YouTube category order includes watched and comments", () => assert.deepEqual(
   catalog.byId("youtube").categories.map(category => category.id),
-  ["recommended", "watched", "shorts", "playlists", "mixes", "live", "music", "gaming", "podcasts", "movies", "posts", "fundraisers", "comments"]));
+  ["watched", "recommended", "shorts", "playlists", "mixes", "live", "music", "gaming", "podcasts", "movies", "posts", "fundraisers", "comments"]));
 check("YouTube gaming category has title terms", () => {
   const gaming = catalog.byId("youtube").categories.find(category => category.id === "gaming");
   assert.ok(Array.isArray(gaming.titleTerms) && gaming.titleTerms.includes("minecraft"));
 });
 check("TMDB retains Movies and TV categories plus Watched", () => assert.deepEqual(
-  catalog.byId("tmdb").categories.map(category => category.id), ["movies", "tv", "watched"]));
+  catalog.byId("tmdb").categories.map(category => category.id), ["watched", "movies", "tv"]));
 check("new ready-made site ids are present", () => ["xumo", "pluto", "roku", "fandango", "crunchyroll", "odysee", "kick", "rumble", "pbs", "vix", "shout", "justwatch", "rottentomatoes", "letterboxd"]
   .forEach(id => assert.ok(catalog.byId(id), id)));
 check("row-based catalog rules expose a Rows by name picker", () => ["tubi", "xumo", "pluto", "roku", "fandango", "crunchyroll", "twitch", "rumble", "kick", "odysee", "pbs", "vix", "shout"].forEach(id => {

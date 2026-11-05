@@ -279,6 +279,11 @@ check("equal values do not sort", () => assert.deepEqual(
   HOA.availableSorts([["a", { title: "A", ts: 1, duration: 60 }], ["b", { title: "B", ts: 2, duration: 60 }]]), ["added", "title"]));
 check("years without exact dates offer Year, not Date published", () => assert.deepEqual(
   HOA.availableSorts([["a", { title: "A", ts: 1, year: 1999 }], ["b", { title: "B", ts: 2, year: 2004 }]]), ["added", "title", "year"]));
+check("channel sort and offering use stored channel names", () => {
+  const entries = [["a", { title: "One", ts: 1, channel: "Zulu" }], ["b", { title: "Two", ts: 2, channel: "Alpha" }]];
+  assert.deepEqual(HOA.sortEntries(entries, "channel", "asc").map(pair => pair[0]), ["b", "a"]);
+  assert.ok(HOA.availableSorts(entries).includes("channel"));
+});
 
 const groupedPairs = [
   ["video", { title: "Video", kind: "video", type: "video", ts: 1, genres: ["Drama"] }],
@@ -294,6 +299,14 @@ check("videos and shorts only: By type adds nothing", () => assert.deepEqual(
   HOA.availableGroups(groupedPairs.slice(0, 2).map(([key, entry]) => [key, { ...entry, genres: ["Drama"] }])), ["none"]));
 check("one shared genre: By genre adds nothing", () => assert.deepEqual(
   HOA.availableGroups([["a", { type: "movie", genres: ["Drama"] }], ["b", { type: "movie", genres: ["Drama"] }]]), ["none"]));
+check("added grouping options require distinct non-trivial values", () => {
+  const entries = [["a", { type: "movie", ts: Date.now(), channel: "One", year: 1994, rating: "PG" }], ["b", { type: "movie", ts: Date.now() - 40 * 86400000, channel: "Two", year: 2004, rating: "R" }]];
+  const modes = HOA.availableGroups(entries);
+  ["channel", "added-date", "decade", "rating"].forEach(mode => assert.ok(modes.includes(mode), mode));
+  assert.deepEqual(HOA.groupEntries(entries, "added-date").map(group => group.label), ["Today", "Earlier"]);
+  assert.deepEqual(HOA.groupEntries(entries, "decade").map(group => group.label), ["1990s", "2000s"]);
+  assert.deepEqual(HOA.groupEntries(entries, "rating").map(group => group.label), ["PG", "R"]);
+});
 
 const bySite = HOA.groupBySite({
   "https://www.youtube.com/watch?v=aaaaaaaaaaa": { title: "Old", site: "youtube.com", ts: 1, icon: "https://old.example/icon" },
@@ -505,6 +518,16 @@ check("progress normalizer keeps a bitmap, played seconds and Continue Watching"
   const result = HOA.normalizeProgress({ [key]: { duration: 100, position: 40, played: 65, buckets: "f".repeat(25), watched: false, cw: "auto", updated: 1 } });
   assert.equal(result[key].played, 65); assert.equal(result[key].cw, "auto"); assert.equal(HOA.bucketCount(result[key].buckets), 100);
 });
+check("progress normalizer drops home records and merges canonical video duplicates", () => {
+  const key = "https://www.youtube.com/watch?v=abc123def45";
+  const result = HOA.normalizeProgress({
+    "https://www.youtube.com/": { duration: 100, position: 20, updated: 1 },
+    "https://www.youtube.com/watch": { duration: 100, position: 20, updated: 1 },
+    "https://www.youtube.com/watch?v=abc123def45&feature=share": { duration: 100, position: 20, played: 20, buckets: "8000000000000000000000000", updated: 1 },
+    [key]: { duration: 100, position: 40, played: 40, buckets: "0800000000000000000000000", updated: 2, cw: "manual" }
+  });
+  assert.deepEqual(Object.keys(result), [key]); assert.equal(result[key].position, 40); assert.equal(result[key].cw, "auto"); assert.equal(HOA.bucketCount(result[key].buckets), 2);
+});
 check("progress eviction keeps Continue Watching entries", () => {
   const entries = {}; for (let index = 0; index < 1502; index += 1) entries[`https://example.com/watch/${index}`] = { duration: 100, position: 1, updated: index, cw: index === 0 ? "manual" : undefined };
   const result = HOA.normalizeProgress(entries); assert.ok(result["https://example.com/watch/0"]); assert.equal(Object.keys(result).length, 1500);
@@ -512,6 +535,7 @@ check("progress eviction keeps Continue Watching entries", () => {
 check("watch settings normalize safe defaults", () => {
   assert.deepEqual(HOA.normalizeWatchSettings({}), { tagWatched: true, continueWatching: "auto" });
   assert.deepEqual(HOA.normalizeWatchSettings({ tagWatched: false, continueWatching: "off" }), { tagWatched: false, continueWatching: "off" });
+  assert.equal(HOA.normalizeWatchSettings({ continueWatching: "manual" }).continueWatching, "auto");
 });
 check("backup round trip retains watch progress", () => {
   const key = "https://example.com/watch/backup"; const backup = HOA.buildBackup({ hidden: {}, added: {}, siteRules: {}, prefs: {}, watchProgress: { [key]: { duration: 100, position: 25, updated: 1, buckets: "0".repeat(25) } } }, "1.1.0", now);

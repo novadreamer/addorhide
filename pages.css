@@ -407,3 +407,8 @@ button.filter-tool:disabled { opacity: .4; cursor: default; }
 .popup .button-controls .press-button.edge-button { width: 38px; min-width: 38px; min-height: 24px; }
 .popup .button-controls .press-button.edge-button svg { width: 38px; height: 25px; }
 .popup .position-buttons { gap: 4px; }
+
+/* Hover button and Position share one row, so the panel leaves the popup room for longer status text. */
+.popup .button-controls { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 14px; }
+.popup .button-controls .position-row { grid-template-columns: auto auto; column-gap: 8px; align-items: center; justify-self: end; }
+.popup .continue-watching-switch { justify-content: center; }

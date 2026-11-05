@@ -123,14 +123,22 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   assert.equal(genres.document.querySelector(".filter-popover"), genrePanel, "Escape leaves the outer popover open after closing Genres");
   genres.window.close();
   const playing = await loadPopup({ nowPlaying: { key: "https://tubitv.com/movies/1", title: "One", duration: 100, position: 30 } });
-  const continueButton = playing.document.querySelector(".continue-popup-button");
-  assert.ok(continueButton, "unlisted playing video offers Continue Watching");
-  continueButton.click(); await wait(45);
-  assert.equal(continueButton.disabled, true, "saving changes the popup action to its listed state");
+  const autoAdd = playing.document.querySelector(".continue-watching-switch input");
+  assert.ok(autoAdd && autoAdd.checked, "site card shows the enabled Auto-add Continue Watching switch without requiring playback");
+  assert.ok(playing.document.querySelector("section.popup-edge.panel .position-row"), "hover-button and position controls share a panel");
+  autoAdd.checked = false; autoAdd.dispatchEvent(new playing.window.Event("change", { bubbles: true })); await wait(12);
+  assert.equal(playing.store.watchSettings.continueWatching, "off", "Auto-add switch writes the global off setting");
   playing.window.close();
-  const off = await loadPopup({ nowPlaying: { key: "https://tubitv.com/movies/1", title: "One", duration: 100, position: 30 }, watchSettings: { continueWatching: "off" } });
-  assert.equal(off.document.querySelector(".continue-popup-button"), null, "Continue Watching action hides when disabled globally");
+  const off = await loadPopup({ watchSettings: { continueWatching: "off" } });
+  assert.equal(off.document.querySelector(".continue-watching-switch input").checked, false, "Auto-add switch reflects the global off setting");
   off.window.close();
+  for (const [url, host] of [["https://www.youtube.com/", "www.youtube.com"], ["https://tubitv.com/", "tubitv.com"], ["https://rumble.com/", "rumble.com"], ["https://example.test/", "example.test"]]) {
+    const types = await loadPopup({ url, siteRules: { [host]: { enabled: true } } });
+    types.document.querySelector(".filter-launch").click(); await wait(12);
+    const firstType = types.document.querySelector(".filter-popover .switch-row");
+    assert.match(firstType.textContent, /Watched/, `Watched is the first type for ${host}`);
+    types.window.close();
+  }
   const pbs = await loadPopup({ url: "https://www.pbs.org/", siteRules: { "www.pbs.org": { enabled: false } } });
   assert.ok(Array.from(pbs.document.querySelectorAll(".muted")).some(node => node.textContent === "To track what you watch here, allow its video player"), "PBS explains its player-origin permission before the click");
   pbs.document.querySelector(".primary-button").click(); await wait(10);
@@ -143,5 +151,5 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   assert.deepEqual(pbsMissingPlayer.requestedOrigins[0], ["https://player.pbs.org/*"], "player permission button requests only the player origin");
   assert.deepEqual(pbsMissingPlayer.registeredScripts.map(script => script.matches[0]), ["https://player.pbs.org/*"], "player permission registers the player-frame script");
   pbsMissingPlayer.window.close();
-  console.log("popup.test.js: 27 passed, 0 failed");
+  console.log("popup.test.js: 31 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

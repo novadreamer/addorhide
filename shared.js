@@ -43,7 +43,9 @@ var HOA = Object.freeze((() => {
 
   function normalizeWatchSettings(value) {
     const raw = isObject(value) ? value : {};
-    return { tagWatched: raw.tagWatched !== false, continueWatching: ["auto", "manual", "off"].includes(raw.continueWatching) ? raw.continueWatching : "auto" };
+    // 1.1.0 had a short-lived manual mode. Keep existing users opted in when it
+    // is encountered, rather than making their saved videos disappear.
+    return { tagWatched: raw.tagWatched !== false, continueWatching: raw.continueWatching === "off" ? "off" : "auto" };
   }
 
   function bitmapBuckets(value) {
@@ -58,7 +60,19 @@ var HOA = Object.freeze((() => {
     const normalized = {};
     if (!isObject(value)) return normalized;
     Object.keys(value).forEach(key => {
-      if (canonicalUrl(key) !== key || !isObject(value[key])) return;
+      const canonical = canonicalUrl(key);
+      if (!canonical || !isObject(value[key])) return;
+      // A home/listing page is never a resumable video. YouTube is stricter
+      // because its home page can host real <video> preview players.
+      let parsed;
+      try { parsed = new URL(canonical); } catch (error) { return; }
+      if (parsed.pathname === "/") return;
+      if (YOUTUBE_HOSTS.has(parsed.hostname)) {
+        const isWatch = parsed.pathname === "/watch" && Boolean(parsed.searchParams.get("v"));
+        const isShort = /^\/shorts\/[^/]+/.test(parsed.pathname);
+        const isLive = /^\/live\/[^/]+/.test(parsed.pathname);
+        if (!isWatch && !isShort && !isLive) return;
+      }
       const raw = value[key];
       const duration = Number(raw.duration);
       const position = Number(raw.position);
@@ -67,11 +81,20 @@ var HOA = Object.freeze((() => {
       if (!Number.isFinite(updated)) return;
       const title = typeof raw.title === "string" ? raw.title.trim().slice(0, MAX_TITLE) : fallbackTitle(key);
       const thumb = typeof raw.thumbnail === "string" && raw.thumbnail.length <= MAX_URL && (!raw.thumbnail || validHttpUrl(raw.thumbnail)) ? raw.thumbnail : "";
-      const entry = { site: siteOf(key), title: title || fallbackTitle(key), url: key, thumbnail: thumb, duration, position: Math.min(position, duration), buckets: bitmapBuckets(raw.buckets), watched: raw.watched === true, ts: Number.isFinite(raw.ts) ? raw.ts : updated, updated };
+      const entry = { site: siteOf(canonical), title: title || fallbackTitle(canonical), url: canonical, thumbnail: thumb, duration, position: Math.min(position, duration), buckets: bitmapBuckets(raw.buckets), watched: raw.watched === true, ts: Number.isFinite(raw.ts) ? raw.ts : updated, updated };
       if (Number.isFinite(Number(raw.played)) && Number(raw.played) >= 0) entry.played = Number(raw.played);
       if (raw.untagged === true) entry.untagged = true;
-      if (raw.cw === "auto" || raw.cw === "manual") entry.cw = raw.cw;
-      normalized[key] = entry;
+      if (raw.cw === "auto" || raw.cw === "manual") entry.cw = "auto";
+      const old = normalized[canonical];
+      if (!old) normalized[canonical] = entry;
+      else {
+        const latest = entry.updated >= old.updated ? entry : old;
+        const merged = mergeProgressEntry(old, entry);
+        normalized[canonical] = { ...latest, ...merged, title: latest.title || old.title, thumbnail: latest.thumbnail || old.thumbnail,
+          position: Math.max(old.position || 0, entry.position || 0), played: Math.max(old.played || 0, entry.played || 0),
+          watched: old.watched || entry.watched, updated: Math.max(old.updated, entry.updated) };
+        if (old.cw || entry.cw) normalized[canonical].cw = "auto";
+      }
     });
     const keys = Object.keys(normalized);
     if (keys.length > MAX_PROGRESS) {
@@ -90,6 +113,16 @@ var HOA = Object.freeze((() => {
     const pending = pendingProgressWrites;
     pendingProgressWrites = {};
     chrome.storage.local.get({ [PROGRESS_KEY]: {} }, result => {
+      // A rapid burst (notably timeupdate followed by ended) can arrive while
+      // the read is pending. Coalesce the newer value into this same write so
+      // storage never briefly publishes the stale first sample.
+      Object.entries(pendingProgressWrites).forEach(([key, change]) => {
+        const active = pending[key];
+        if (!active) return;
+        active.entry = change.entry;
+        active.callbacks.push(...change.callbacks);
+        delete pendingProgressWrites[key];
+      });
       const current = normalizeProgress(result[PROGRESS_KEY]);
       Object.entries(pending).forEach(([key, change]) => { if (change.entry) current[key] = change.entry; else delete current[key]; });
       chrome.storage.local.set({ [PROGRESS_KEY]: normalizeProgress(current) }, () => {
@@ -198,7 +231,7 @@ var HOA = Object.freeze((() => {
   const YOUTUBE_MEDIA_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"]);
   const TRACKING_PARAMS = new Set(["fbclid", "gclid", "igshid", "si", "pp", "feature", "ab_channel"]);
   const TYPES = ["video", "short", "movie", "tv", "live", "music", "sport", "other"];
-  const SORT_KEYS = ["added", "published", "views", "votes", "score", "duration", "title", "year"];
+  const SORT_KEYS = ["added", "published", "views", "votes", "score", "duration", "title", "year", "channel"];
   const TYPE_LABELS = Object.freeze({
     video: "Video",
     short: "Short",
@@ -1129,8 +1162,8 @@ var HOA = Object.freeze((() => {
         }
         return Number.isInteger(entry.year) ? Date.UTC(entry.year, 0, 1) : null;
       }
-      if (key === "title") {
-        return typeof entry.title === "string" ? entry.title : null;
+      if (key === "title" || key === "channel") {
+        return typeof entry[key] === "string" ? entry[key] : null;
       }
       if (key === "added") {
         return Number.isFinite(entry.ts) ? entry.ts : null;
@@ -1152,7 +1185,7 @@ var HOA = Object.freeze((() => {
         }
         if (!leftMissing) {
           let comparison;
-          if (key === "title") {
+          if (key === "title" || key === "channel") {
             comparison = String(left.value).localeCompare(String(right.value), undefined, { sensitivity: "base" });
           } else {
             comparison = left.value < right.value ? -1 : left.value > right.value ? 1 : 0;
@@ -1178,8 +1211,8 @@ var HOA = Object.freeze((() => {
       if (key === "added") {
         return Number.isFinite(entry.ts) ? entry.ts : null;
       }
-      if (key === "title") {
-        return typeof entry.title === "string" && entry.title ? entry.title.toLocaleLowerCase() : null;
+      if (key === "title" || key === "channel") {
+        return typeof entry[key] === "string" && entry[key] ? entry[key].toLocaleLowerCase() : null;
       }
       if (key === "published") {
         if (Number.isFinite(entry.published)) {
@@ -1241,6 +1274,47 @@ var HOA = Object.freeze((() => {
       });
       return Array.from(grouped.values()).sort((left, right) => left.label.localeCompare(right.label, undefined, { sensitivity: "base" }));
     }
+    if (mode === "channel") {
+      const grouped = new Map();
+      pairs.forEach(pair => {
+        const label = pair[1] && typeof pair[1].channel === "string" && pair[1].channel.trim() ? pair[1].channel.trim() : "No channel";
+        const id = label.toLocaleLowerCase();
+        if (!grouped.has(id)) grouped.set(id, { id, label, entries: [] });
+        grouped.get(id).entries.push(pair);
+      });
+      return Array.from(grouped.values()).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+    }
+    if (mode === "added-date") {
+      const now = Date.now(); const day = 86400000;
+      const buckets = [["today", "Today"], ["week", "This week"], ["month", "This month"], ["earlier", "Earlier"]].map(([id, label]) => ({ id, label, entries: [] }));
+      pairs.forEach(pair => { const age = now - Number(pair[1] && pair[1].ts || 0); const at = age < day ? 0 : age < day * 7 ? 1 : age < day * 31 ? 2 : 3; buckets[at].entries.push(pair); });
+      return buckets.filter(group => group.entries.length);
+    }
+    if (mode === "watched-date") {
+      const now = Date.now(); const day = 86400000;
+      const buckets = [["today", "Today"], ["week", "This week"], ["earlier", "Earlier"]].map(([id, label]) => ({ id, label, entries: [] }));
+      pairs.forEach(pair => { const age = now - Number(pair[1] && pair[1].updated || 0); const at = age < day ? 0 : age < day * 7 ? 1 : 2; buckets[at].entries.push(pair); });
+      return buckets.filter(group => group.entries.length);
+    }
+    if (mode === "site") {
+      const grouped = new Map();
+      pairs.forEach(pair => {
+        const site = pair[1] && pair[1].site || siteOf(pair[0]); const label = siteDisplayName(site);
+        if (!grouped.has(site)) grouped.set(site, { id: site, label, entries: [] });
+        grouped.get(site).entries.push(pair);
+      });
+      return Array.from(grouped.values()).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+    }
+    if (mode === "decade" || mode === "rating") {
+      const grouped = new Map();
+      pairs.forEach(pair => {
+        const raw = pair[1] && pair[1][mode === "decade" ? "year" : "rating"];
+        const label = mode === "decade" && Number.isInteger(raw) ? `${Math.floor(raw / 10) * 10}s` : (typeof raw === "string" && raw ? raw : mode === "decade" ? "Unknown decade" : "Unrated");
+        if (!grouped.has(label)) grouped.set(label, { id: label, label, entries: [] });
+        grouped.get(label).entries.push(pair);
+      });
+      return Array.from(grouped.values()).sort((a, b) => a.label.localeCompare(b.label));
+    }
     return [{ id: "all", label: "", entries: pairs }];
   }
 
@@ -1281,6 +1355,10 @@ var HOA = Object.freeze((() => {
     if (hasGenres && groupEntries(pairs, "genre").length >= 2) {
       result.push("genre");
     }
+    [["channel", "channel"], ["added-date", "ts"], ["decade", "year"], ["rating", "rating"]].forEach(([mode, field]) => {
+      const values = pairs.map(pair => pair[1] && pair[1][field]).filter(value => value !== null && value !== undefined && value !== "");
+      if (values.length >= 2 && groupEntries(pairs, mode).length >= 2) result.push(mode);
+    });
     return result;
   }
 
@@ -1318,14 +1396,14 @@ var HOA = Object.freeze((() => {
       if (Object.keys(result).length >= 200) {
         break;
       }
-      if (!looksLikeHostname(site) || !isObject(value[site])) {
+      if ((!looksLikeHostname(site) && site !== "continue-watching") || !isObject(value[site])) {
         continue;
       }
       const raw = value[site];
       const pref = {
         sort: SORT_KEYS.includes(raw.sort) ? raw.sort : "added",
         dir: raw.dir === "asc" || raw.dir === "desc" ? raw.dir : raw.sort === "title" ? "asc" : "desc",
-        group: raw.group === "type" || raw.group === "genre" ? raw.group : "none",
+        group: ["type", "genre", "channel", "added-date", "decade", "rating", "site", "watched-date"].includes(raw.group) ? raw.group : "none",
         collapsed: typeof raw.collapsed === "boolean" ? raw.collapsed : false
       };
       Object.defineProperty(result, site, { value: pref, enumerable: true, writable: true, configurable: true });

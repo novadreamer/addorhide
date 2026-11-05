@@ -20,7 +20,7 @@ const importDataInput = document.getElementById("import-data-input");
 const dataStatus = document.getElementById("data-status");
 const filterSites = document.getElementById("filter-sites");
 const tagWatchedInput = document.getElementById("tag-watched");
-const continueInputs = Array.from(document.querySelectorAll('input[name="continue-watching"]'));
+const continueInput = document.getElementById("auto-continue");
 
 let hidden = {};
 let added = {};
@@ -161,12 +161,12 @@ function loadWatchSettings() {
   chrome.storage.local.get({ [HOA.WATCH_SETTINGS_KEY]: {} }, result => {
     watchSettings = HOA.normalizeWatchSettings(result[HOA.WATCH_SETTINGS_KEY]);
     tagWatchedInput.checked = watchSettings.tagWatched;
-    continueInputs.forEach(input => { input.checked = input.value === watchSettings.continueWatching; });
+    continueInput.checked = watchSettings.continueWatching === "auto";
   });
 }
 function saveWatchSettings() { chrome.storage.local.set({ [HOA.WATCH_SETTINGS_KEY]: watchSettings }); }
 tagWatchedInput.addEventListener("change", () => { watchSettings = { ...watchSettings, tagWatched: tagWatchedInput.checked }; saveWatchSettings(); });
-continueInputs.forEach(input => input.addEventListener("change", () => { if (input.checked) { watchSettings = { ...watchSettings, continueWatching: input.value }; saveWatchSettings(); } }));
+continueInput.addEventListener("change", () => { watchSettings = { ...watchSettings, continueWatching: continueInput.checked ? "auto" : "off" }; saveWatchSettings(); });
 
 function bindBulkHide(input, host) {
   input.addEventListener("change", () => {

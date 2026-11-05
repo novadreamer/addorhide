@@ -28,6 +28,7 @@ var HOA_CATALOG = Object.freeze((() => {
     Object.freeze({
       id: "youtube",
       name: "YouTube",
+      watchPath: "^/(watch$|shorts/|live/)",
       builtIn: true,
       hosts: Object.freeze(["youtube.com"]),
       subdomains: true,
@@ -47,8 +48,8 @@ var HOA_CATALOG = Object.freeze((() => {
         ".ytContentMetadataViewModelMetadataRow:first-child .ytContentMetadataViewModelMetadataText", "a[href^=\"/@\"]"
       ]),
       categories: Object.freeze([
-        { id: "recommended", label: "Recommended", hint: "Ordinary suggested videos on Home and next to a playing video", fallback: true, pathPattern: "^/($|watch)" },
         { id: "watched", label: "Watched", hint: "Videos you have watched (YouTube's red progress bar)", card: { has: HOA_WATCHED_SELECTOR } },
+        { id: "recommended", label: "Recommended", hint: "Ordinary suggested videos on Home and next to a playing video", fallback: true, pathPattern: "^/($|watch)" },
         { id: "shorts", label: "Shorts", hint: "Short-form vertical videos", card: { is: "ytm-shorts-lockup-view-model-v2, ytm-shorts-lockup-view-model, ytd-reel-item-renderer", href: "/shorts/" }, containers: "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], grid-shelf-view-model:has(ytm-shorts-lockup-view-model-v2, ytm-shorts-lockup-view-model)", shelfTitle: "^Shorts$" },
         { id: "playlists", label: "Playlists", hint: "Playlists and collections", card: { has: "yt-collection-thumbnail-view-model, ytd-playlist-renderer, ytd-grid-playlist-renderer, ytd-compact-playlist-renderer", href: "list=(?!RD)" } },
         { id: "mixes", label: "Mixes", hint: "YouTube mixes and radio playlists", card: { has: "ytd-radio-renderer, ytd-compact-radio-renderer", href: "list=RD", text: "^(Mix -|My Mix)" } },
@@ -69,7 +70,7 @@ var HOA_CATALOG = Object.freeze((() => {
       // inside ytd-rich-item-renderer is handled once, through that wrapper.
       variants: Object.freeze([
         Object.freeze({
-          cardSelector: 'yt-lockup-view-model:has(a[href*="/watch?v="]):not(:has(yt-collection-thumbnail-view-model)), ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer',
+          cardSelector: 'yt-lockup-view-model:has(a[href*="/watch?v="]):not(:has(yt-collection-thumbnail-view-model)), ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer, ytd-rich-grid-media, ytd-playlist-video-renderer',
           linkSelector: YOUTUBE_LINK,
           titleCandidates: YOUTUBE_TITLES,
           // Hide the card's own slot too (a wrapper holding only this card), so the row closes the gap.
@@ -396,13 +397,13 @@ var HOA_CATALOG = Object.freeze((() => {
     })
   ]);
 
-  // Playback tracking supplies this filter on every supported site.  Keep it before Rows so the picker remains last.
+  // Playback tracking supplies this filter on every supported site. It is deliberately first:
+  // users reach Watched often, and every site's popup uses this same category order.
   const watchedRules = Object.freeze(rules.map(rule => {
     if ((rule.categories || []).some(category => category.id === "watched")) return rule;
     const categories = [...(rule.categories || [])];
     const watched = Object.freeze({ id: "watched", label: "Watched", hint: "Videos you watched to the end. On: hidden automatically and listed under Hidden Videos > Watched. Off: they stay, tagged Watched." });
-    const at = categories.findIndex(category => category.id === "genres");
-    categories.splice(at < 0 ? categories.length : at, 0, watched);
+    categories.unshift(watched);
     return Object.freeze({ ...rule, categories: Object.freeze(categories) });
   }));
 

@@ -73,6 +73,7 @@ window.__hoaLoaded = true;
   let waitingForBody = false;
   let filterVersion = 0;
   let filterSignature = "";
+  let watchedCardVersion = 0;
   const patternCache = new Map();
   let passCardText = new WeakMap();
   let passFilterText = new WeakMap();
@@ -80,6 +81,7 @@ window.__hoaLoaded = true;
   const pageDataCache = new Map();
   const shelfTitleCache = new WeakMap();
   const decisionCache = new WeakMap();
+  const watchedCardCache = new WeakMap();
   let containerFilterCache = null;
   const carouselObservers = new Map();
   let carouselFrame = 0;
@@ -206,7 +208,8 @@ window.__hoaLoaded = true;
       linkSelector: "",
       titleCandidates: [],
       adMarkers: [],
-      gridSelector: ""
+      gridSelector: "",
+      categories: [{ id: "watched", label: "Watched", hint: "Videos you have watched" }]
     };
     const validPicks = HOA.usablePicks(stored).filter(validSelector);
     if (!catalogRule && (!validPicks.length || !stored || stored.enabled !== true)) {
@@ -517,8 +520,16 @@ window.__hoaLoaded = true;
     const progress = current && watchProgress[current.key];
     // An explicit untag wins over YouTube's own resume bar until a fresh full watch replaces it.
     if (progress && progress.untagged) return false;
-    if (rule.id === "youtube" && watchedProgress(card)) return true;
-    return Boolean(progress && progress.watched);
+    if (progress && progress.watched) return true;
+    if (rule.id === "youtube") {
+      const key = current && current.key || "";
+      const cached = watchedCardCache.get(card);
+      if (cached && cached.version === watchedCardVersion && cached.key === key) return cached.watched;
+      const watched = Boolean(watchedProgress(card));
+      watchedCardCache.set(card, { version: watchedCardVersion, key, watched });
+      return watched;
+    }
+    return false;
   }
 
   function watchedEnabled(categories) {
@@ -1008,6 +1019,14 @@ window.__hoaLoaded = true;
   }
 
   function watchKey(rule) {
+    if (rule && rule.watchPath) {
+      try { if (!(new RegExp(rule.watchPath).test(location.pathname))) return null; } catch (error) { return null; }
+    } else if (location.pathname === "/") {
+      return null;
+    }
+    // A bare YouTube /watch is a shell, not a video. Its player can survive an
+    // SPA navigation, so never let it create a home/listing progress record.
+    if (HOA.siteOf(location.href) === "youtube.com" && location.pathname === "/watch" && !new URL(location.href).searchParams.get("v")) return null;
     let href = location.href;
     if (rule && rule.watchKey) {
       try { const match = location.pathname.match(new RegExp(rule.watchKey.pattern)); if (match) href = rule.watchKey.template.replace(/\$(\d+)/g, (_, index) => match[Number(index)] || ""); } catch (error) { /* optional mapping */ }
@@ -1208,6 +1227,8 @@ window.__hoaLoaded = true;
         return false;
       });
     }
+    const identity = channelIdentity(card, rule);
+    if (identity && identity.name) meta.channel = identity.name.trim().slice(0, HOA.MAX_TITLE);
     return Object.fromEntries(Object.entries(meta).filter(([, value]) => value !== null && value !== ""));
   }
 
@@ -1445,23 +1466,6 @@ window.__hoaLoaded = true;
       const hide = actionButton("Hide", () => hideEntry({ ...actions.hoaData, ...cardMeta(actions.hoaCard, actions.hoaRule, actions.hoaData.key) }, watchedCard(actions.hoaCard, actions.hoaRule, actions.hoaData)));
       hide.dataset.action = "hide";
       actions.appendChild(hide);
-      const continueButton = actionButton("", button => {
-        const entry = watchProgress[actions.hoaData.key];
-        if (!entry || entry.watched) return;
-        watchProgress = { ...watchProgress, [actions.hoaData.key]: { ...entry, cw: "manual", updated: Date.now() } };
-        HOA.writeProgress(actions.hoaData.key, watchProgress[actions.hoaData.key]); button.disabled = true; button.title = "In Continue Watching";
-      });
-      continueButton.dataset.action = "continue"; continueButton.title = "Continue watching later"; continueButton.setAttribute("aria-label", "Continue watching later");
-      if (card.querySelector("button svg, [role=button] svg")) {
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false");
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", "M12 4a8 8 0 1 0 7.45 11H17v-2h4.5v4.5h-2v-1.7A10 10 0 1 1 12 2v2zm-1 4h2v5l4 2.4-1 1.7-5-3V8z");
-        svg.appendChild(path); continueButton.appendChild(svg); continueButton.classList.add("hoa-icon-action");
-      } else {
-        continueButton.textContent = "◷"; continueButton.classList.add("hoa-icon-action");
-      }
-      actions.appendChild(continueButton);
       const unwatch = actionButton("✓", () => {
         const key = actions.hoaData && actions.hoaData.key; const prior = key && watchProgress[key];
         if (!prior) return;
@@ -1512,8 +1516,6 @@ window.__hoaLoaded = true;
       if (add.getAttribute("aria-label") !== label) add.setAttribute("aria-label", label);
       if (add.getAttribute("aria-pressed") !== String(isAdded)) add.setAttribute("aria-pressed", String(isAdded));
     }
-    const continueButton = actions.querySelector('[data-action="continue"]');
-    if (continueButton) { const entry = watchProgress[data.key]; const hidden = watchSettings.continueWatching === "off" || !entry || entry.watched || Boolean(entry.cw); const disabled = Boolean(entry && entry.cw); if (continueButton.hidden !== hidden) continueButton.hidden = hidden; if (continueButton.disabled !== disabled) continueButton.disabled = disabled; }
     const unwatch = actions.querySelector('[data-action="unwatch"]');
     if (unwatch) { const hidden = !(watchSettings.tagWatched && watchedCard(card, rule, data)); if (unwatch.hidden !== hidden) unwatch.hidden = hidden; }
   }
@@ -1997,6 +1999,7 @@ window.__hoaLoaded = true;
   }
 
   function scheduleApply() {
+    watchedCardVersion += 1;
     if (scheduled) return;
     scheduled = window.requestAnimationFrame(() => { lastApplyAt = Date.now(); apply(); });
   }
@@ -2039,9 +2042,20 @@ window.__hoaLoaded = true;
   }
 
   function pageTitle() {
-    const og = document.querySelector('meta[property="og:title"]');
-    const raw = (og && og.content) || document.title || "";
-    return HOA.cleanTitle(raw.replace(/\s+[|–—-]\s+[^|–—-]+$/, "")).slice(0, HOA.MAX_TITLE);
+    const youtube = HOA.siteOf(location.href) === "youtube.com";
+    const heading = youtube && document.querySelector("ytd-watch-metadata h1, #title h1");
+    const raw = (heading && heading.textContent) || document.title || "";
+    return HOA.cleanTitle(raw.replace(youtube ? /\s+-\s+YouTube$/i : /\s+[|–—-]\s+[^|–—-]+$/, "")).slice(0, HOA.MAX_TITLE);
+  }
+
+  function pageMetaForKey(key) {
+    const youtube = HOA.siteOf(key) === "youtube.com";
+    const canonical = document.querySelector('meta[property="og:url"], link[rel="canonical"]');
+    const canonicalKey = canonical && HOA.canonicalUrl(canonical.content || canonical.href, location.href);
+    const matches = canonicalKey === key;
+    const title = youtube ? pageTitle() : (matches ? HOA.cleanTitle(((document.querySelector('meta[property="og:title"]') || {}).content || pageTitle())).slice(0, HOA.MAX_TITLE) : pageTitle());
+    const thumbnail = youtube ? HOA.youtubeThumb(key) : (matches ? ((document.querySelector('meta[property="og:image"]') || {}).content || "") : "");
+    return { title, thumbnail };
   }
 
   function setBit(bitmap, index) {
@@ -2055,9 +2069,13 @@ window.__hoaLoaded = true;
     const merged = HOA.mergeProgressEntry(old, { buckets: values.buckets, covered: values.covered });
     const watched = HOA.bucketCount(merged.buckets) >= 90;
     const played = Math.max(0, Number(values.played) || 0);
-    const automatic = watchSettings.continueWatching === "auto" && played >= Math.min(60, duration < 240 ? duration * .25 : 60);
-    const entry = { ...merged, site: HOA.siteOf(key), title: old.title || pageTitle() || HOA.siteOf(key), url: key,
-      thumbnail: old.thumbnail || ((document.querySelector('meta[property="og:image"]') || {}).content || ""), duration,
+    // Treat an in-memory legacy "manual" value as auto too: a stale content
+    // script may receive it before storage-change normalization arrives.
+    const automatic = watchSettings.continueWatching !== "off" && played >= Math.min(60, duration < 240 ? duration * .25 : 60);
+    const meta = pageMetaForKey(key);
+    const generic = value => !value || value.toLocaleLowerCase() === HOA.siteOf(key).toLocaleLowerCase() || value.toLocaleLowerCase() === HOA.siteDisplayName(HOA.siteOf(key)).toLocaleLowerCase();
+    const entry = { ...merged, site: HOA.siteOf(key), title: generic(old.title) ? (meta.title || HOA.siteOf(key)) : old.title, url: key,
+      thumbnail: old.thumbnail || meta.thumbnail, duration,
       position: Math.min(Math.max(0, Number(values.position) || 0), duration), watched, played,
       ...(watched ? {} : automatic && watchSettings.continueWatching !== "off" ? { cw: old.cw || "auto" } : {}), ts: old.ts || Date.now(), updated: Date.now() };
     if (watched) { delete entry.cw; delete entry.untagged; }
@@ -2130,8 +2148,29 @@ window.__hoaLoaded = true;
     video.addEventListener("play", () => { playerTracker.last = video.currentTime || 0; maybeResume(playerTracker); });
   }
 
+  function trackableVideo(video, rule) {
+    if (childFrame) return true;
+    const key = watchKey(rule);
+    if (!key) return false;
+    // Preview players are embedded inside feed cards. Ignore them even if they
+    // happen to be larger than neighbouring cards during an animation.
+    try {
+      if ((rule.cardSelector && video.closest(rule.cardSelector))
+        || video.closest("ytd-video-preview, #inline-preview-player, ytd-miniplayer, .ytp-miniplayer-ui")) return false;
+    } catch (error) { /* a stale user selector must not stop tracking */ }
+    // Generic rules have no catalogue-level watch-path information. Avoid the
+    // common collection/search paths while still allowing normal detail URLs.
+    if (!rule || !rule.watchPath) {
+      const path = location.pathname.toLocaleLowerCase();
+      if (/\/(?:browse|search|results|feed|library|channels?|categories|collections?|discover|explore|videos?)\/?$/.test(path)) return false;
+    }
+    const box = video.getBoundingClientRect();
+    return !box.width || box.width >= 480 || box.width >= window.innerWidth * .45;
+  }
+
   function findPlayer() {
-    const videos = Array.from(document.querySelectorAll("video")).filter(video => Number.isFinite(video.duration) && video.duration >= 20);
+    const rule = hostnameRule();
+    const videos = Array.from(document.querySelectorAll("video")).filter(video => Number.isFinite(video.duration) && video.duration >= 20 && trackableVideo(video, rule));
     const visible = videos.filter(video => { const box = video.getBoundingClientRect(); return box.width > 0 && box.height > 0 && getComputedStyle(video).visibility !== "hidden"; });
     if (visible.length) { videos.length = 0; videos.push(...visible); }
     videos.sort((a, b) => b.duration - a.duration); if (videos[0]) attachTracker(videos[0]);

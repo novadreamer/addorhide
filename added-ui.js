@@ -9,9 +9,14 @@ const HOA_ADDED = (() => {
     score: "Rating",
     duration: "Duration",
     title: "A-Z",
-    year: "Year"
+    year: "Year",
+    channel: "Channel",
+    "last-watched": "Last watched",
+    "time-left": "Time left",
+    progress: "Progress",
+    site: "Site"
   };
-  const GROUP_LABELS = { none: "No grouping", type: "By type", genre: "By genre" };
+  const GROUP_LABELS = { none: "No grouping", type: "By type", genre: "By genre", channel: "By channel", "added-date": "By date added", decade: "By decade", rating: "By rating", site: "By site", "watched-date": "By date watched" };
   const TAG_TYPES = [
     ["video", "Video"], ["short", "Short"], ["movie", "Movie"], ["tv", "TV"],
     ["live", "Live"], ["music", "Music"], ["sport", "Sport"], ["other", "Other"]
@@ -40,7 +45,7 @@ const HOA_ADDED = (() => {
   }
 
   function defaultDirection(sort) {
-    return sort === "title" ? "asc" : "desc";
+    return ["title", "channel", "site"].includes(sort) ? "asc" : "desc";
   }
 
   function localDate(timestamp) {
@@ -569,7 +574,16 @@ const HOA_ADDED = (() => {
 
     function renderContinueWatching(entries) {
       if (!entries.length) return null;
-      const prefKey = "continueWatching"; const current = prefs[prefKey] || {};
+      const prefKey = "continue-watching"; const current = prefs[prefKey] || {};
+      const sortOptions = ["last-watched", "time-left", "progress", "title", "site"];
+      const sort = sortOptions.includes(current.sort) ? current.sort : "last-watched";
+      const dir = current.dir === "asc" || current.dir === "desc" ? current.dir : defaultDirection(sort);
+      const siteCount = new Set(entries.map(([, entry]) => entry.site).filter(Boolean)).size;
+      const watchedGroups = HOA.groupEntries(entries, "watched-date");
+      const groupOptions = ["none"];
+      if (siteCount >= 2) groupOptions.push("site");
+      if (watchedGroups.length >= 2) groupOptions.push("watched-date");
+      const groupMode = groupOptions.includes(current.group) ? current.group : "none";
       const section = element("section", "site-group continue-watching"); section.dataset.site = prefKey;
       const heading = element("div", "site-heading");
       const collapse = element("button", "collapse-button", current.collapsed ? "▸" : "▾"); collapse.type = "button";
@@ -577,7 +591,22 @@ const HOA_ADDED = (() => {
       collapse.addEventListener("click", () => { setPrefs(prefKey, { collapsed: !current.collapsed }); render(); });
       const identity = element("div", "site-identity"); identity.append(element("h2", "site-name-toggle", "Continue Watching"), element("span", "count-badge", String(entries.length)));
       heading.append(collapse, identity);
-      const controls = element("div", "site-controls"); const clear = element("button", `site-delete-all${siteDeleteConfirmations.has(prefKey) ? " armed" : ""}`); clear.type = "button";
+      const controls = element("div", "site-controls");
+      const sortSelect = makeSelect(prefKey, "sort", sortOptions, sort);
+      sortSelect.addEventListener("change", () => { setPrefs(prefKey, { sort: sortSelect.value, dir: defaultDirection(sortSelect.value) }); render(); });
+      controls.append(labelFor("Sort by", sortSelect), sortSelect);
+      const direction = element("button", "direction-button", dir === "asc" ? "↑" : "↓"); direction.type = "button";
+      direction.id = "added-direction-continue-watching";
+      direction.setAttribute("aria-label", `${SORT_LABELS[sort]}, ${dir === "asc" ? "ascending" : "descending"}`);
+      direction.title = `${SORT_LABELS[sort]}: ${dir === "asc" ? "ascending" : "descending"}`;
+      direction.addEventListener("click", () => { setPrefs(prefKey, { sort, dir: dir === "asc" ? "desc" : "asc" }); render(); });
+      controls.appendChild(direction);
+      if (groupOptions.length > 1) {
+        const groupSelect = makeSelect(prefKey, "group", groupOptions, groupMode);
+        groupSelect.addEventListener("change", () => { setPrefs(prefKey, { group: groupSelect.value }); render(); });
+        controls.append(labelFor("Group by", groupSelect), groupSelect);
+      }
+      const clear = element("button", `site-delete-all${siteDeleteConfirmations.has(prefKey) ? " armed" : ""}`); clear.type = "button";
       clear.innerHTML = siteDeleteConfirmations.has(prefKey) ? OPEN_BIN_ICON : BIN_ICON;
       clear.title = siteDeleteConfirmations.has(prefKey) ? "Click again to remove every Continue Watching video" : "Remove all Continue Watching videos";
       clear.setAttribute("aria-label", clear.title);
@@ -587,7 +616,22 @@ const HOA_ADDED = (() => {
       });
       controls.appendChild(clear); heading.appendChild(controls); section.appendChild(heading);
       if (current.collapsed) return section;
-      const grid = element("div", "added-card-grid landscape-grid"); entries.forEach(([key, entry]) => {
+      const valueFor = entry => {
+        if (sort === "last-watched") return Number(entry.updated) || 0;
+        if (sort === "time-left") return Math.max(0, Number(entry.duration) - Number(entry.position));
+        if (sort === "progress") return Number(entry.duration) > 0 ? Number(entry.position) / Number(entry.duration) : -1;
+        return sort === "site" ? HOA.siteDisplayName(entry.site) : entry.title;
+      };
+      const sorted = entries.slice().sort((left, right) => {
+        const first = valueFor(left[1]); const second = valueFor(right[1]);
+        const comparison = typeof first === "string" ? first.localeCompare(second, undefined, { sensitivity: "base" }) : first - second;
+        return comparison * (dir === "asc" ? 1 : -1) || left[1].title.localeCompare(right[1].title, undefined, { sensitivity: "base" });
+      });
+      const subgroups = HOA.orderGroupsBySort(HOA.groupEntries(sorted, groupMode), sorted, groupMode);
+      subgroups.forEach(subgroup => {
+        const body = element("section", "added-subgroup");
+        if (subgroup.label) { const name = element("h3", "subgroup-heading", subgroup.label); name.appendChild(element("span", "count-badge", String(subgroup.entries.length))); body.appendChild(name); }
+        const grid = element("div", "added-card-grid landscape-grid"); subgroup.entries.forEach(([key, entry]) => {
         const card = element("article", "added-card continue-card");
         let href = HOA.safeHref(key) || key;
         try { const url = new URL(href); if (HOA.siteOf(key) === "youtube.com") url.searchParams.set("t", `${Math.max(0, Math.floor(entry.position - 5))}s`); href = url.href; } catch (error) { /* keep the stored URL */ }
@@ -598,7 +642,8 @@ const HOA_ADDED = (() => {
         body.appendChild(element("p", "added-meta", `${HOA.formatDuration(Math.max(0, Math.floor(entry.duration - entry.position)))} left · ${HOA.siteDisplayName(entry.site)}`));
         const actions = element("div", "video-actions"); const remove = element("button", "icon-btn remove-button"); remove.type = "button"; remove.innerHTML = REMOVE_ICON; remove.title = "Remove from Continue Watching"; remove.setAttribute("aria-label", remove.title);
         remove.addEventListener("click", () => { HOA.readLists(lists => { const next = { ...lists.watchProgress }; if (next[key]) { next[key] = { ...next[key] }; delete next[key].cw; } HOA.writeLists({ watchProgress: next }, refresh); }); }); actions.appendChild(remove); body.appendChild(actions); card.appendChild(body); grid.appendChild(card);
-      }); section.appendChild(grid); return section;
+        }); body.appendChild(grid); section.appendChild(body);
+      }); return section;
     }
 
     // Every change rebuilds the list. Keep the reader where they were: the website section they were working
