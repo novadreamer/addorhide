@@ -1198,6 +1198,7 @@ const CASES = [
     const page = await load({ html, url: "https://www.youtube.com/", watchProgress: watched, testSeam: true });
     const card = page.document.getElementById("card");
     check("stored watched listing card gets the watched label", () => assert.ok(card.querySelector("[data-hoa-watched]")));
+    check("the unwatch button shows the struck-tick icon and names its action", () => { const button = buttons(card, "unwatch"); assert.ok(button.querySelector("svg path")); assert.equal(button.textContent, ""); assert.equal(button.getAttribute("aria-label"), "Remove Watched tag"); });
     buttons(card, "unwatch").click(); await wait(15);
     check("unwatch clears watched and records untagged", () => assert.equal(page.store.watchProgress[key].untagged, true));
     page.document.querySelector("#hoa-toast button").click(); await wait(35);

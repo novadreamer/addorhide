@@ -1269,6 +1269,19 @@ window.__hoaLoaded = true;
     return Object.fromEntries(Object.entries(meta).filter(([, value]) => value !== null && value !== ""));
   }
 
+  // A ticked circle struck through: the tick of the Watched tag, cancelled. Built node by node because YouTube's
+  // Trusted Types policy rejects markup strings, and the strike's gaps are drawn so no mask id is needed.
+  function unwatchIcon() {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("aria-hidden", "true");
+    ["M8.2 3.84A9 9 0 0 1 20.16 15.8", "M15.8 20.16A9 9 0 0 1 3.84 8.2", "M7.5 12.5l3 3 .9-1.05", "M14.2 11.2l2.3-2.7", "M3.5 3.5l17 17"].forEach(shape => {
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", shape);
+      svg.appendChild(path);
+    });
+    return svg;
+  }
+
   function actionButton(label, action) {
     const button = document.createElement("button");
     button.type = "button";
@@ -1503,14 +1516,15 @@ window.__hoaLoaded = true;
       const hide = actionButton("Hide", () => hideEntry({ ...actions.hoaData, ...cardMeta(actions.hoaCard, actions.hoaRule, actions.hoaData.key) }, watchedCard(actions.hoaCard, actions.hoaRule, actions.hoaData)));
       hide.dataset.action = "hide";
       actions.appendChild(hide);
-      const unwatch = actionButton("✓", () => {
+      const unwatch = actionButton("", () => {
         const key = actions.hoaData && actions.hoaData.key; const prior = key && watchProgress[key];
         if (!prior) return;
         watchProgress = { ...watchProgress, [key]: { ...prior, watched: false, untagged: true, buckets: HOA.bitmapBuckets("") } };
         HOA.writeProgress(key, watchProgress[key]); scheduleApply(true);
         showToast(key, "Watched tag removed", () => { watchProgress = { ...watchProgress, [key]: prior }; HOA.writeProgress(key, prior); scheduleApply(true); });
       });
-      unwatch.dataset.action = "unwatch"; unwatch.title = "Remove Watched tag"; unwatch.setAttribute("aria-label", "Remove Watched tag"); unwatch.hidden = true; actions.appendChild(unwatch);
+      unwatch.dataset.action = "unwatch"; unwatch.title = "Remove Watched tag"; unwatch.setAttribute("aria-label", "Remove Watched tag"); unwatch.hidden = true;
+      unwatch.classList.add("hoa-icon-action"); unwatch.appendChild(unwatchIcon()); actions.appendChild(unwatch);
       card.appendChild(actions);
     }
     actions.hoaData = data;

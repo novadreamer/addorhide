@@ -73,6 +73,8 @@
 .hoa-actions button[data-action="channel"]:hover, .hoa-actions button[data-action="channel"]:focus-visible { color: #fff; background: #8a4bd8; }
 .hoa-actions button.hoa-icon-action { min-width: 24px; min-height: 24px; padding: 0 5px; line-height: 22px; }
 .hoa-actions button.hoa-icon-action svg { width: 16px; height: 16px; fill: currentColor; vertical-align: middle; }
+.hoa-actions button[data-action="unwatch"] svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.hoa-actions button[data-action="unwatch"]:hover, .hoa-actions button[data-action="unwatch"]:focus-visible { color: #fff; background: #d9822b; }
 /* A pseudo element survives YouTube's view-model re-rendering, unlike a foreign child node. */
 [data-hoa-watched]::after {
   content: "✓ Watched" !important; display: block !important; position: absolute !important;

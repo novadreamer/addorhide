@@ -227,7 +227,7 @@ body.hoa-hidden-view main { max-width: 1180px; margin: 0 auto; }
 .hoa-hidden-view .site-controls select { min-height: 32px; max-width: 165px; padding: 5px 8px; color: var(--text); background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--radius-sm); font: inherit; }
 .hoa-hidden-view .direction-button { display: inline-grid; width: 32px; min-height: 32px; padding: 4px; place-items: center; color: var(--muted);
-  background: transparent; border-color: transparent; box-shadow: none; }
+  background: transparent; border-color: transparent; box-shadow: none; font-size: 18px; }
 .hoa-hidden-view .direction-button:hover:not(:disabled) { color: var(--text); background: transparent; }
 .hoa-hidden-view .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .hoa-hidden-view .hidden-subgroup + .hidden-subgroup { margin-top: 24px; }
