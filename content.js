@@ -503,14 +503,51 @@ window.__hoaLoaded = true;
   }
 
   function watchedProgress(card) {
-    const selector = typeof HOA_WATCHED_SELECTOR === "string" ? HOA_WATCHED_SELECTOR : "ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, [class*='WatchedProgressBarSegment'], [class*='ResumePlayback'], #progress.ytd-thumbnail-overlay-resume-playback-renderer";
-    let progress = null;
-    try { progress = card.querySelector(selector); } catch (error) { progress = null; }
-    if (!progress) return null;
-    const widthNode = progress.style && progress.style.width ? progress : progress.querySelector && progress.querySelector("[style*='width']") || progress;
-    const width = String(widthNode.style && widthNode.style.width || "").replace(/\s/g, "").toLowerCase();
-    const match = width.match(/^([\d.]+)%$/);
-    return match && Number(match[1]) >= 90 ? progress : null;
+    const selector = watchedSelector();
+    let progress = [];
+    try { progress = Array.from(card.querySelectorAll(selector)); } catch (error) { progress = []; }
+    const amount = node => {
+      const width = String(node.style && node.style.width || "").replace(/\s/g, "");
+      const widthMatch = width.match(/^([\d.]+)%$/);
+      if (widthMatch) return Number(widthMatch[1]);
+      const transform = String(node.style && node.style.transform || "");
+      const scale = transform.match(/scaleX\(\s*([\d.]+)\s*\)/i);
+      if (scale) return Number(scale[1]) * 100;
+      const value = Number(node.getAttribute && node.getAttribute("aria-valuenow"));
+      const maximum = Number(node.getAttribute && node.getAttribute("aria-valuemax"));
+      return Number.isFinite(value) ? value / (Number.isFinite(maximum) && maximum > 0 ? maximum : 100) * 100 : 0;
+    };
+    for (const bar of progress) {
+      if (insideVideoPlayer(bar)) continue;
+      const nodes = [bar, ...Array.from(bar.querySelectorAll("[style*='width'], [style*='transform'], [aria-valuenow]"))];
+      // The red segment is the measure when it exists: a track or unwatched segment is wide when little was watched.
+      const classOf = node => node.getAttribute("class") || "";
+      const watchedSegments = nodes.filter(node => node.id === "progress" || classOf(node).includes("WatchedProgressBarSegment"));
+      const measured = watchedSegments.length ? watchedSegments : nodes.filter(node => !/unwatched|background|track|buffer|host/i.test(classOf(node)));
+      if (measured.some(node => amount(node) >= 90)) return bar;
+    }
+    return null;
+  }
+
+  function insideVideoPlayer(node) {
+    return Boolean(node.closest && node.closest(".html5-video-player, ytd-video-preview, #inline-preview-player, [class*='ytp-']"));
+  }
+
+  function watchedSelector() {
+    return typeof HOA_WATCHED_SELECTOR === "string" ? HOA_WATCHED_SELECTOR
+      : "ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, [class*='WatchedProgressBarSegment'], [class*='ResumePlayback'], [class*='ProgressBar'], [class*='progress-bar'], ytd-thumbnail #progress, #progress.ytd-thumbnail-overlay-resume-playback-renderer";
+  }
+
+  function watchedProgressMutation(node, added = false) {
+    const rule = hostnameRule();
+    // The player's own bar changes many times a second during playback and must never start a filter pass.
+    if (!node || node.nodeType !== 1 || !rule || rule.id !== "youtube" || insideVideoPlayer(node)) return false;
+    const selector = watchedSelector();
+    try {
+      return Boolean(node.closest(selector)) || (added && Boolean(node.querySelector(selector)));
+    } catch (error) {
+      return false;
+    }
   }
 
   function watchedCard(card, rule, data = null) {
@@ -2181,7 +2218,7 @@ window.__hoaLoaded = true;
     addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveTracker(true); }); addEventListener("pagehide", () => saveTracker(true));
   }
   // Narrow test seam: production pages never create __hoaTest.
-  if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, applyAdded, compensateCarousels, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, keyForHref, attachTracker, findPlayer, activeCategories, keywordMatch: HOA.keywordMatch, saveTracker, watchedCard, frameEntry });
+  if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, applyAdded, compensateCarousels, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, keyForHref, attachTracker, findPlayer, activeCategories, keywordMatch: HOA.keywordMatch, saveTracker, watchedCard, frameEntry, watchedProgressMutation });
 
   function isOwnMutation(mutation) {
     if (mutation.target.closest && mutation.target.closest(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner")) return true;
@@ -2204,7 +2241,10 @@ window.__hoaLoaded = true;
   }
 
   function needsApply(mutation) {
-    return mutation.type === "attributes" ? lostOwnMark(mutation) || mutation.attributeName === "hidden" : !isOwnMutation(mutation);
+    return mutation.type === "attributes"
+      ? lostOwnMark(mutation) || mutation.attributeName === "hidden"
+        || ((mutation.attributeName === "style" || mutation.attributeName === "aria-valuenow" || mutation.attributeName === "aria-valuemax") && watchedProgressMutation(mutation.target))
+      : !isOwnMutation(mutation);
   }
 
   function observeRuleRoot(rule) {
@@ -2212,7 +2252,7 @@ window.__hoaLoaded = true;
     const root = selected || document.body;
     if (root && root !== observedRoot) {
       observer.disconnect();
-      observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden"], attributeOldValue: true });
+      observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "hidden", "style", "aria-valuenow", "aria-valuemax"], attributeOldValue: true });
       observedRoot = root;
     }
   }
@@ -2301,6 +2341,7 @@ window.__hoaLoaded = true;
       containerFilterCache = null;
       const addedNodes = childMutations.flatMap(mutation => Array.from(mutation.addedNodes));
       if (addedNodes.length) applyAdded(addedNodes);
+      if (addedNodes.some(node => watchedProgressMutation(node, true))) scheduleApply();
       if (childMutations.some(mutation => mutation.removedNodes.length)) scheduleApply();
     }
     if (mutations.some(mutation => mutation.type === "attributes" && needsApply(mutation))) scheduleApply();

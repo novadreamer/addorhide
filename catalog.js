@@ -10,7 +10,7 @@
 // and a second const declaration in the same content-script world throws and aborts the injection.
 // Kept outside the catalog so the content script uses precisely the same progress
 // selector for filtering and for the CSS-drawn Watched marker.
-var HOA_WATCHED_SELECTOR = "ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, [class*='WatchedProgressBarSegment'], [class*='ResumePlayback'], #progress.ytd-thumbnail-overlay-resume-playback-renderer";
+var HOA_WATCHED_SELECTOR = "ytd-thumbnail-overlay-resume-playback-renderer, yt-thumbnail-overlay-progress-bar-view-model, [class*='WatchedProgressBarSegment'], [class*='ResumePlayback'], [class*='ProgressBar'], [class*='progress-bar'], ytd-thumbnail #progress, #progress.ytd-thumbnail-overlay-resume-playback-renderer";
 
 var HOA_CATALOG = Object.freeze((() => {
   const YOUTUBE_LINK = 'a[href*="/watch?v="], a[href*="/shorts/"]';

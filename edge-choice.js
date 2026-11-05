@@ -13,11 +13,10 @@ function bindButtonControls(toggle, edgeGroup) {
     button.classList.add("is-pressed");
   };
   const showEnabled = enabled => {
-    // The button names what clicking it does: red Disable while the hover buttons show, green Enable while they
-    // are hidden.
-    // A round power button: the icon stays, its name (Disable / Enable) is in the tooltip and for screen readers.
+    // The ring describes the current state: green while the hover buttons show, red while they are hidden.
+    // The name of the action remains in the tooltip and for screen readers.
     if (!toggle.querySelector("svg")) {
-      toggle.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8"/><path d="M6.6 7.2a7.5 7.5 0 1 0 10.8 0"/></svg>';
+      toggle.innerHTML = '<svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><defs><linearGradient id="hoa-power-ring" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--power-ring-light)"/><stop offset="1" stop-color="var(--power-ring-dark)"/></linearGradient><linearGradient id="hoa-power-disc" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#eef0f1"/><stop offset="1" stop-color="#aeb5b9"/></linearGradient></defs><circle cx="32" cy="32" r="31.5" fill="url(#hoa-power-ring)"/><circle cx="32" cy="32" r="29.9" fill="none" stroke="rgba(255,255,255,.72)" stroke-width=".8"/><circle cx="32" cy="32" r="23.2" fill="url(#hoa-power-disc)" stroke="#fff" stroke-width="1.5"/><path d="M32 18.2v13.2M24.2 22.2a12.6 12.6 0 1 0 15.6 0" fill="none" stroke="#47525a" stroke-width="4" stroke-linecap="round"/><path d="M31.2 18.2v13.2M23.6 21.8a13.2 13.2 0 1 0 16.8 0" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".8" stroke-linecap="round"/></svg>';
     }
     toggle.setAttribute("aria-label", enabled ? "Turn off" : "Turn on");
     toggle.title = enabled ? "Turn off: hide the hover buttons on thumbnails" : "Turn on: show the hover buttons on thumbnails";

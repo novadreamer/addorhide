@@ -199,43 +199,34 @@ body.popup main { display: flex; flex-direction: column; min-height: 0; }
 .control-row { display: flex; gap: 12px; align-items: center; }
 .button-controls .control-label { font-weight: 600; }
 .position-buttons { display: grid; gap: 6px; }
-/* Enable/Disable: a top-lit, convex dome with a diffuse contact shadow rather than a hard lower rim. */
+.position-pill { display: block; width: 20px; height: 8px; margin: -1px auto; border: 2px solid var(--edge-outline, #47525a); border-radius: 999px; }
+/* The current state lives in the power button's coloured ring: green when the hover controls show, red when off. */
 .button-controls .press-button.toggle-button {
-  position: relative; isolation: isolate; display: grid; place-items: center; width: 56px; height: 56px; min-width: 0; min-height: 0; margin-bottom: 6px; padding: 0;
-  border: 1px solid #188546; border-radius: 50%; color: #fff; font-size: 0;
-  background: radial-gradient(circle at 50% 18%, rgba(255, 255, 255, .6) 0 2%, transparent 25%), radial-gradient(circle at 50% 32%, #40cb7b 0%, #1f9d55 58%, #157b42 100%);
-  box-shadow: 0 7px 13px rgba(18, 42, 28, .28), 0 2px 4px rgba(0, 0, 0, .2), inset 0 1px 1px rgba(255, 255, 255, .82), inset 0 -4px 6px rgba(6, 72, 35, .32), inset 2px 0 3px rgba(255, 255, 255, .12);
+  --power-ring-light: #43c984; --power-ring-dark: #137447;
+  display: grid; width: 60px; height: 60px; min-width: 0; min-height: 0; margin-bottom: 6px; padding: 0; place-items: center;
+  background: transparent; border: 0; border-radius: 50%; color: transparent; font-size: 0;
+  box-shadow: 0 7px 13px rgba(24, 38, 42, .28), 0 2px 4px rgba(0, 0, 0, .16);
   transition: transform 100ms ease-out, box-shadow 100ms ease-out, filter 150ms ease-out;
 }
-.button-controls .press-button.toggle-button::before {
-  position: absolute; z-index: -1; top: 5px; right: 9px; left: 9px; height: 18px; content: ""; pointer-events: none;
-  background: radial-gradient(ellipse at 50% 0, rgba(255, 255, 255, .62), rgba(255, 255, 255, 0) 70%); border-radius: 50%;
-}
 .button-controls .press-button.toggle-button[data-enabled="true"] {
-  border-color: #b72f3c;
-  background: radial-gradient(circle at 50% 18%, rgba(255, 255, 255, .58) 0 2%, transparent 25%), radial-gradient(circle at 50% 32%, #f26470 0%, #d93a49 58%, #ad2432 100%);
-  box-shadow: 0 7px 13px rgba(65, 15, 22, .3), 0 2px 4px rgba(0, 0, 0, .2), inset 0 1px 1px rgba(255, 255, 255, .82), inset 0 -4px 6px rgba(100, 14, 25, .34), inset 2px 0 3px rgba(255, 255, 255, .12);
+  --power-ring-light: #50d58f; --power-ring-dark: #117243;
 }
-.button-controls .press-button.toggle-button svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .32)); }
+.button-controls .press-button.toggle-button[data-enabled="false"] { --power-ring-light: #f06b73; --power-ring-dark: #a51f31; }
+.button-controls .press-button.toggle-button svg { display: block; width: 60px; height: 60px; }
 .button-controls .press-button.toggle-button:hover:not(:disabled) { filter: brightness(1.06) saturate(1.03); }
 .button-controls .press-button.toggle-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 75%, #fff); outline-offset: 3px; }
 .button-controls .press-button.toggle-button:active:not(:disabled) {
   transform: translateY(2px) scale(.98);
-  box-shadow: 0 3px 7px rgba(18, 42, 28, .24), inset 0 3px 7px rgba(6, 72, 35, .34), inset 0 1px 1px rgba(255, 255, 255, .32);
-}
-.button-controls .press-button.toggle-button[data-enabled="true"]:active:not(:disabled) {
-  box-shadow: 0 3px 7px rgba(65, 15, 22, .26), inset 0 3px 7px rgba(100, 14, 25, .36), inset 0 1px 1px rgba(255, 255, 255, .3);
+  box-shadow: 0 3px 7px rgba(24, 38, 42, .24);
 }
 .button-controls .press-button.edge-button {
-  --edge-top: #fff; --edge-bottom: #c9cbd3;
+  --edge-fill: #edf0f1; --edge-outline: #47525a;
   display: grid; width: 46px; min-width: 46px; min-height: 30px; padding: 0; place-items: center;
   color: #1d1d27; background: transparent; border-color: transparent; box-shadow: none; line-height: 1;
 }
 .button-controls .press-button.edge-button svg { display: block; width: 46px; height: 30px; overflow: visible; filter: drop-shadow(0 2px 1px rgba(0, 0, 0, .24)) drop-shadow(0 4px 5px rgba(0, 0, 0, .16)); }
-.button-controls .press-button.edge-button path { stroke: rgba(93, 96, 110, .52); stroke-width: 1; stroke-linejoin: round; }
-.button-controls .press-button.edge-button[aria-pressed="true"] { --edge-top: #ffe987; --edge-bottom: #ffd23f; color: #5e4300; }
-.button-controls .press-button.edge-button[aria-pressed="true"] path { stroke: #d39400; }
+.button-controls .press-button.edge-button path { stroke: var(--edge-outline); stroke-width: 2.2; stroke-linejoin: round; }
+.button-controls .press-button.edge-button[aria-pressed="true"] { --edge-fill: #ffd84d; --edge-outline: #a97000; color: #5e4300; }
 .button-controls .press-button.edge-button:hover:not(:disabled) svg { filter: brightness(1.05) drop-shadow(0 3px 2px rgba(0, 0, 0, .25)) drop-shadow(0 5px 6px rgba(0, 0, 0, .16)); }
 .button-controls .press-button.edge-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .button-controls .press-button.edge-button:active:not(:disabled) { transform: translateY(2px) scale(.97); box-shadow: none; }
@@ -251,9 +242,6 @@ body.popup main { display: flex; flex-direction: column; min-height: 0; }
   box-shadow: 0 2px 0 rgba(0, 0, 0, .18), 0 3px 8px rgba(0, 0, 0, .08);
   transition: transform 90ms ease-out, box-shadow 90ms ease-out, background-color 150ms ease-out;
 }
-/* Action colours: green Enable (buttons hidden now), red Disable (buttons showing now). */
-.button-controls .toggle-button { color: #fff; background: #1f9d55; border: 1px solid #188546; }
-.button-controls .toggle-button[data-enabled="true"] { background: #d93a49; border-color: #b72f3c; }
 .button-controls .press-button:hover:not(:disabled) { filter: brightness(1.04); }
 /* Pressed: the button sinks while held, then springs back. */
 .button-controls .press-button:active:not(:disabled) {
@@ -278,9 +266,9 @@ body.popup main { overflow: visible; scrollbar-width: auto; }
 .popup .button-controls .press-button.toggle-button { min-height: 0; }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .button-controls .press-button.edge-button:not([aria-pressed="true"]) { --edge-top: #fbfbff; --edge-bottom: #aeb1be; }
+  :root:not([data-theme="light"]) .button-controls .press-button.edge-button:not([aria-pressed="true"]) { --edge-fill: #e8eaed; --edge-outline: #c6cbd1; }
 }
-:root[data-theme="dark"] .button-controls .press-button.edge-button:not([aria-pressed="true"]) { --edge-top: #fbfbff; --edge-bottom: #aeb1be; }
+:root[data-theme="dark"] .button-controls .press-button.edge-button:not([aria-pressed="true"]) { --edge-fill: #e8eaed; --edge-outline: #c6cbd1; }
 
 /* The arrow buttons sit on the centre line (under Enable); "Position" hangs to their left. */
 .button-controls .position-row { display: grid; grid-template-columns: 1fr auto 1fr; justify-self: stretch; }
@@ -401,14 +389,12 @@ button.filter-tool:disabled { opacity: .4; cursor: default; }
   background: var(--surface); border: 1px solid var(--border); border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,.16); font-size: 12px; text-align: center; }
 .popup .site-toast:empty { display: none; }
 /* Smaller power and position buttons: more room before the popup would need to scroll. */
-.popup .button-controls .press-button.toggle-button { width: 46px; height: 46px; margin-bottom: 3px; }
-.popup .button-controls .press-button.toggle-button::before { top: 4px; right: 7px; left: 7px; height: 14px; }
-.popup .button-controls .press-button.toggle-button svg { width: 21px; height: 21px; }
 .popup .button-controls .press-button.edge-button { width: 38px; min-width: 38px; min-height: 24px; }
 .popup .button-controls .press-button.edge-button svg { width: 38px; height: 25px; }
-.popup .position-buttons { gap: 4px; }
+.popup .position-buttons { gap: 2px; }
 
 /* Hover button and Position share one row, so the panel leaves the popup room for longer status text. */
-.popup .button-controls { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 14px; }
-.popup .button-controls .position-row { grid-template-columns: auto auto; column-gap: 8px; align-items: center; justify-self: end; }
-.popup .continue-watching-switch { justify-content: center; }
+.popup .button-controls { grid-template-columns: minmax(0, 1fr) 1px auto; align-items: stretch; column-gap: 14px; }
+.popup .popup-control-divider { display: block; width: 1px; align-self: stretch; justify-self: stretch; background: var(--border); }
+.popup .button-controls .position-row { grid-template-columns: auto auto; column-gap: 8px; align-items: center; align-content: center; justify-self: end; }
+.popup .continue-watching-switch { justify-content: flex-start; }

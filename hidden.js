@@ -14,6 +14,8 @@
   let channelsRemoveTimer = 0;
   let removeAllButton = null;
   const siteRemoveConfirmations = new Map();
+  const SORT_LABELS = { added: "Date hidden", published: "Date published", views: "Views", votes: "Votes", score: "Rating", duration: "Duration", title: "Name", year: "Year", channel: "Channel", site: "Site" };
+  const GROUP_LABELS = { none: "No grouping", type: "By type", genre: "By genre", channel: "By channel", "added-date": "By date hidden", decade: "By decade", rating: "By rating", site: "By site" };
   const RESTORE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 4.5 4 9.5l5 5"/><path d="M4.5 9.5H14a6 6 0 0 1 0 12h-3"/></svg>';
   const RESTORE_ALL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.5 4.5 3 9l4.5 4.5"/><path d="M12 4.5 7.5 9l4.5 4.5"/><path d="M8 9h7a6 6 0 0 1 0 12h-3"/></svg>';
   const REMOVE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M8.8 8.8l6.4 6.4M15.2 8.8l-6.4 6.4"/></svg>';
@@ -39,9 +41,13 @@
     }
     const result = {};
     Object.entries(value).forEach(([site, setting]) => {
-      if (setting && typeof setting === "object" && setting.collapsed === true) {
-        result[site] = { collapsed: true };
-      }
+      if (!setting || typeof setting !== "object" || Array.isArray(setting)) return;
+      const pref = {};
+      if (setting.collapsed === true) pref.collapsed = true;
+      if (["added", "published", "views", "votes", "score", "duration", "title", "year", "channel", "site"].includes(setting.sort)) pref.sort = setting.sort;
+      if (setting.dir === "asc" || setting.dir === "desc") pref.dir = setting.dir;
+      if (["none", "type", "genre", "channel", "added-date", "decade", "rating", "site"].includes(setting.group)) pref.group = setting.group;
+      if (Object.keys(pref).length) result[site] = pref;
     });
     return result;
   }
@@ -100,12 +106,18 @@
     return tile;
   }
 
-  function setCollapsed(site, collapsed) {
-    prefs = { ...prefs, [site]: { collapsed: Boolean(collapsed) } };
+  function defaultDirection(sort) {
+    return ["title", "channel", "site"].includes(sort) ? "asc" : "desc";
+  }
+
+  function setPrefs(site, changes) {
+    prefs = { ...prefs, [site]: { ...(prefs[site] || {}), ...changes } };
     ignoreOwnStorageChange = true;
     chrome.storage.local.set({ [HIDDEN_PREFS_KEY]: prefs }, () => void chrome.runtime.lastError);
     render();
   }
+
+  function setCollapsed(site, collapsed) { setPrefs(site, { collapsed: Boolean(collapsed) }); }
 
   function toggleSite(site) {
     setCollapsed(site, !(prefs[site] && prefs[site].collapsed === true));
@@ -214,8 +226,40 @@
     return row;
   }
 
+  function hiddenView(entries, prefKey, custom) {
+    const current = prefs[prefKey] || {};
+    const sorts = custom && custom.sorts ? custom.sorts(entries) : HOA.availableSorts(entries);
+    const sort = sorts.includes(current.sort) ? current.sort : (sorts.includes("added") ? "added" : sorts[0] || "added");
+    const groups = custom && custom.groups ? custom.groups(entries) : HOA.availableGroups(entries);
+    return { current, sorts, sort, dir: current.dir === "asc" || current.dir === "desc" ? current.dir : defaultDirection(sort),
+      groups, group: groups.includes(current.group) ? current.group : "none" };
+  }
+
+  function makeSubgroup(subgroup, groupIndex) {
+    const section = element("section", "hidden-subgroup");
+    if (subgroup.label) {
+      const heading = element("h3", "subgroup-heading", subgroup.label);
+      heading.appendChild(element("span", "count-badge", String(subgroup.entries.length)));
+      section.appendChild(heading);
+    }
+    subgroup.entries.forEach(([key, entry], index) => section.appendChild(makeRow(key, entry, `${groupIndex}-${index}`)));
+    return section;
+  }
+
+  function channelTitle(key, entry) {
+    const handle = String(key).match(/\|\/([^/]+)/);
+    const named = String(key).match(/name:(.+)$/);
+    const fallback = handle ? handle[1] : named ? named[1] : "Hidden channel";
+    const knownTitles = new Set(Object.values(hidden).filter(item => item && item.site === entry.site)
+      .map(item => String(item.title || "").trim().toLocaleLowerCase()));
+    const stored = String(entry.name || "").trim();
+    return !stored || stored.length > 60 || knownTitles.has(stored.toLocaleLowerCase()) ? fallback : stored;
+  }
+
   function makeGroup(group, groupIndex) {
-    const collapsed = prefs[group.site] && prefs[group.site].collapsed === true;
+    const prefKey = group.watched ? "watched-videos" : group.site;
+    const view = hiddenView(group.entries, prefKey);
+    const collapsed = view.current.collapsed === true;
     const section = element("section", "site-group");
     section.dataset.site = group.site;
     const slug = group.site.replace(/[^a-z0-9]+/gi, "-") || "site";
@@ -225,7 +269,7 @@
     collapse.id = `hidden-collapse-${slug}-${groupIndex}`;
     collapse.setAttribute("aria-expanded", String(!collapsed));
     collapse.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${group.name}`);
-    collapse.addEventListener("click", () => toggleSite(group.site));
+    collapse.addEventListener("click", () => toggleSite(prefKey));
     heading.appendChild(collapse);
     if (group.watched) {
       const watchedTile = element("div", "site-logo watched-logo"); watchedTile.innerHTML = WATCHED_ICON; heading.appendChild(watchedTile);
@@ -236,24 +280,27 @@
     const name = element("h2", "site-name-toggle", group.name);
     name.tabIndex = 0;
     name.setAttribute("role", "button");
-    name.addEventListener("click", () => toggleSite(group.site));
+    name.addEventListener("click", () => toggleSite(prefKey));
     name.addEventListener("keydown", event => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        toggleSite(group.site);
+        toggleSite(prefKey);
       }
     });
     identity.appendChild(name);
     identity.appendChild(element("span", "count-badge", String(group.entries.length)));
     heading.appendChild(identity);
-    // The group's buttons share the heading's last column (the Watched group has two).
+    const controls = HOA.makeViewControls({ document, key: prefKey, idPrefix: "hidden", sorts: view.sorts, sort: view.sort,
+      dir: view.dir, groups: view.groups, group: view.group, sortLabels: SORT_LABELS, groupLabels: GROUP_LABELS,
+      defaultDirection, onChange(changes) { setPrefs(prefKey, changes); } });
+    heading.appendChild(controls);
+    // The group's buttons share the heading's last column.
     const headingActions = element("div", "site-heading-actions");
-    if (group.watched) {
-      const restoreAll = iconButton("restore-button group-restore-all", RESTORE_ALL_ICON, "Show all watched videos again");
-      restoreAll.id = `hidden-restore-watched-${groupIndex}`;
-      restoreAll.addEventListener("click", () => restoreEntries(group.entries.map(([key]) => key), "Returned to feed."));
-      headingActions.appendChild(restoreAll);
-    }
+    const restoreAll = iconButton("restore-button group-restore-all", RESTORE_ALL_ICON,
+      group.watched ? "Show all watched videos again" : `Show all ${group.name} videos again`);
+    restoreAll.id = `hidden-restore-${group.watched ? "watched" : slug}-${groupIndex}`;
+    restoreAll.addEventListener("click", () => restoreEntries(group.entries.map(([key]) => key), "Returned to feed."));
+    headingActions.appendChild(restoreAll);
     // A bin icon (the whole button); while it waits for the second click it shows an open bin with a "?".
     const armed = siteRemoveConfirmations.has(group.site);
     const removeAll = element("button", `site-remove-all${armed ? " armed" : ""}`);
@@ -284,14 +331,23 @@
     section.appendChild(heading);
     if (!collapsed) {
       const body = element("div", "site-group-body");
-      group.entries.forEach(([key, entry], index) => body.appendChild(makeRow(key, entry, `${groupIndex}-${index}`)));
+      // No preference is the old page: retain its stored newest-first ordering without adding headings.
+      const sorted = view.sort === "added" && view.dir === "desc" ? group.entries : HOA.sortEntries(group.entries, view.sort, view.dir);
+      const subgroups = view.group === "none" ? [{ label: "", entries: sorted }]
+        : HOA.orderGroupsBySort(HOA.groupEntries(sorted, view.group), sorted, view.group);
+      subgroups.forEach(subgroup => body.appendChild(makeSubgroup(subgroup, groupIndex)));
       section.appendChild(body);
     }
     return section;
   }
 
   function makeChannelsGroup(channelEntries) {
-    const collapsed = prefs.channels && prefs.channels.collapsed === true;
+    const channelSites = new Set(channelEntries.map(([, entry]) => entry && entry.site).filter(Boolean));
+    const view = hiddenView(channelEntries, "channels", {
+      sorts(entries) { return HOA.availableSorts(entries).filter(sort => sort === "added" || sort === "title").concat(channelSites.size >= 2 ? ["site"] : []); },
+      groups() { return channelSites.size >= 2 ? ["none", "site"] : ["none"]; }
+    });
+    const collapsed = view.current.collapsed === true;
     const section = element("section", "site-group channels-group");
     const heading = element("div", "site-heading");
     const collapse = element("button", "collapse-button", collapsed ? "▸" : "▾");
@@ -302,6 +358,21 @@
     identity.appendChild(element("h2", "site-name-toggle", "Channels"));
     identity.appendChild(element("span", "count-badge", String(channelEntries.length)));
     heading.appendChild(identity);
+    const controls = HOA.makeViewControls({ document, key: "channels", idPrefix: "hidden", sorts: view.sorts, sort: view.sort,
+      dir: view.dir, groups: view.groups, group: view.group, sortLabels: SORT_LABELS, groupLabels: GROUP_LABELS,
+      defaultDirection, onChange(changes) { setPrefs("channels", changes); } });
+    heading.appendChild(controls);
+    const headingActions = element("div", "site-heading-actions");
+    const restoreAll = iconButton("restore-button group-restore-all", RESTORE_ALL_ICON, "Show all channels again");
+    restoreAll.id = "hidden-restore-channels";
+    restoreAll.addEventListener("click", () => {
+      channels = {};
+      ignoreOwnStorageChange = true;
+      HOA.writeLists({ channels });
+      pageStatusText = "Channels visible again.";
+      render();
+    });
+    headingActions.appendChild(restoreAll);
     const removeAll = element("button", "site-remove-all");
     removeAll.type = "button";
     removeAll.innerHTML = BIN_ICON;
@@ -322,19 +393,28 @@
       channelsRemoveTimer = window.setTimeout(() => { channelsRemoveTimer = 0; render(); }, 4000);
       render();
     });
-    heading.appendChild(removeAll);
+    headingActions.appendChild(removeAll);
+    heading.appendChild(headingActions);
     section.appendChild(heading);
     if (collapsed) return section;
     const body = element("div", "site-group-body");
-    channelEntries.forEach(([key, entry], index) => {
+    const sorted = view.sort === "added" && view.dir === "desc" ? channelEntries : view.sort === "site"
+      ? channelEntries.slice().sort((left, right) => String(left[1].site || "").localeCompare(String(right[1].site || "")) * (view.dir === "asc" ? 1 : -1))
+      : HOA.sortEntries(channelEntries, view.sort, view.dir);
+    const subgroups = view.group === "none" ? [{ label: "", entries: sorted }]
+      : HOA.orderGroupsBySort(HOA.groupEntries(sorted, view.group), sorted, view.group);
+    subgroups.forEach(subgroup => {
+      if (subgroup.label) {
+        const subgroupHeading = element("h3", "subgroup-heading", subgroup.label);
+        subgroupHeading.appendChild(element("span", "count-badge", String(subgroup.entries.length)));
+        body.appendChild(subgroupHeading);
+      }
+      subgroup.entries.forEach(([key, entry], index) => {
       const row = element("article", "hidden-row");
       const rowTile = element("div", "hidden-thumbnail-placeholder watched-logo"); rowTile.innerHTML = PERSON_ICON; row.appendChild(rowTile);
       const info = element("div", "hidden-info");
       const href = HOA.safeHref(entry.url);
-      const fallbackName = (() => { const handle = key.match(/\|\/([^/]+)/); const named = key.match(/name:(.+)$/); return handle ? (handle[1].startsWith("@") ? handle[1] : handle[1]) : named ? named[1] : "Hidden channel"; })();
-      const knownTitles = new Set(Object.values(hidden).filter(item => item && item.site === entry.site).map(item => String(item.title || "").trim().toLocaleLowerCase()));
-      const storedName = String(entry.name || "").trim();
-      const displayName = !storedName || storedName.length > 60 || knownTitles.has(storedName.toLocaleLowerCase()) ? fallbackName : storedName;
+      const displayName = channelTitle(key, entry);
       const title = element(href ? "a" : "span", "hidden-title", displayName);
       if (href) { title.href = href; title.addEventListener("click", event => { event.preventDefault(); openLink(href); }); }
       info.appendChild(title);
@@ -348,6 +428,7 @@
       actions.appendChild(unhide);
       row.appendChild(actions);
       body.appendChild(row);
+      });
     });
     section.appendChild(body);
     return section;
@@ -366,7 +447,7 @@
     const watchedKeys = new Set(watchedEntries.map(([key]) => key));
     Object.entries(watchProgress).filter(([key, entry]) => entry && entry.watched && !entry.untagged && !watchedKeys.has(key)).forEach(([key, entry]) => watchedEntries.push([key, { title: entry.title, thumb: entry.thumbnail || "", site: entry.site, kind: HOA.kindOf(key), ts: entry.updated, listed: false, watched: true, reason: "watched" }]));
     const groups = groupsFor(entries.filter(([, entry]) => entry.reason !== "watched" && entry.watched !== true));
-    const channelEntries = Object.entries(channels);
+    const channelEntries = Object.entries(channels).map(([key, entry]) => [key, { ...entry, title: channelTitle(key, entry) }]);
     const header = element("header", "hidden-header");
     const copy = element("div", "hidden-header-copy");
     const title = element("h1", "", "Hidden videos");

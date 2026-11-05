@@ -1220,6 +1220,41 @@ const CASES = [
     page.window.close();
   }
   {
+    const card = (id, video, bar = "") => `<ytd-video-renderer id="${id}"><ytd-thumbnail><a id="thumbnail" href="/watch?v=${video}"><img></a>${bar}</ytd-thumbnail><a id="video-title" href="/watch?v=${video}">${id}</a></ytd-video-renderer>`;
+    const untaggedKey = "https://www.youtube.com/watch?v=untagged009";
+    const html = [
+      card("new-layout", "newlayout01", '<ytd-thumbnail-overlay-resume-playback-renderer></ytd-thumbnail-overlay-resume-playback-renderer><yt-thumbnail-overlay-progress-bar-view-model><span style="width:100%"></span></yt-thumbnail-overlay-progress-bar-view-model>'),
+      card("forty", "fortybar001", '<ytd-thumbnail-overlay-resume-playback-renderer style="width:40%"></ytd-thumbnail-overlay-resume-playback-renderer><yt-thumbnail-overlay-progress-bar-view-model><span style="width:40%"></span></yt-thumbnail-overlay-progress-bar-view-model>'),
+      card("legacy", "legacybar01", '<div id="progress" style="width:95%"></div>'),
+      card("scaled", "scaledbar01", '<yt-thumbnail-overlay-progress-bar-view-model><span style="transform:scaleX(.95)"></span></yt-thumbnail-overlay-progress-bar-view-model>'),
+      card("track", "trackbar001", '<yt-thumbnail-overlay-progress-bar-view-model><div class="ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment" style="width:10%"></div><div class="ytThumbnailOverlayProgressBarHostUnwatchedProgressBarSegment" style="width:90%"></div></yt-thumbnail-overlay-progress-bar-view-model>'),
+      card("host", "hostbar0001", '<div class="ytThumbnailOverlayProgressBarHost" style="width:100%"><div class="ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment" style="width:30%"></div></div>'),
+      card("late", "latebar0001"),
+      card("widened", "widebar0001", '<yt-thumbnail-overlay-progress-bar-view-model id="wide-bar" style="width:40%"></yt-thumbnail-overlay-progress-bar-view-model>'),
+      card("preview", "previewbar01", '<div class="html5-video-player"><yt-thumbnail-overlay-progress-bar-view-model style="width:100%"></yt-thumbnail-overlay-progress-bar-view-model></div>'),
+      card("untagged-bar", "untagged009", '<yt-thumbnail-overlay-progress-bar-view-model style="width:100%"></yt-thumbnail-overlay-progress-bar-view-model>')
+    ].join("");
+    const page = await load({ html, url: "https://www.youtube.com/results?search_query=x", watchProgress: {
+      [untaggedKey]: { site: "youtube.com", title: "Untagged", url: untaggedKey, thumbnail: "", duration: 100, position: 95, buckets: "fffffffffffffffffffffffff", watched: false, untagged: true, ts: 1, updated: 1 }
+    }, testSeam: true });
+    check("YouTube search cards inspect every progress bar representation", () => {
+      assert.ok(page.document.querySelector("#new-layout [data-hoa-watched]")); assert.equal(page.document.querySelector("#forty [data-hoa-watched]"), null);
+      assert.ok(page.document.querySelector("#legacy [data-hoa-watched]")); assert.ok(page.document.querySelector("#scaled [data-hoa-watched]"));
+      assert.equal(page.document.querySelector("#preview [data-hoa-watched]"), null); assert.equal(page.document.querySelector("#untagged-bar [data-hoa-watched]"), null);
+    });
+    check("a wide unwatched track or bar host does not count as watched", () => { assert.equal(page.document.querySelector("#track [data-hoa-watched]"), null); assert.equal(page.document.querySelector("#host [data-hoa-watched]"), null); });
+    check("the video player's own progress bar never starts a filter pass", () => {
+      const player = page.document.createElement("div"); player.className = "html5-video-player"; player.innerHTML = '<div class="ytp-progress-bar"><div class="ytp-play-progress" style="transform:scaleX(.5)"></div></div>'; page.document.body.appendChild(player);
+      assert.equal(page.window.__hoaTest.watchedProgressMutation(player.querySelector(".ytp-play-progress")), false);
+      assert.equal(page.window.__hoaTest.watchedProgressMutation(player.querySelector(".ytp-progress-bar")), false);
+    });
+    const late = page.document.createElement("yt-thumbnail-overlay-progress-bar-view-model"); late.style.width = "100%"; page.document.querySelector("#late ytd-thumbnail").appendChild(late); await wait(30);
+    check("a progress bar appended after the first pass tags its card", () => assert.ok(page.document.querySelector("#late [data-hoa-watched]")));
+    page.document.getElementById("wide-bar").style.width = "95%"; await wait(30);
+    check("a widened YouTube progress bar makes its card watched", () => assert.ok(page.document.querySelector("#widened [data-hoa-watched]")));
+    page.window.close();
+  }
+  {
     const page = await load({ html: '<ytd-rich-item-renderer id="preview"><a id="thumbnail" href="/watch?v=preview12345"><video></video></a></ytd-rich-item-renderer>', url: "https://www.youtube.com/", testSeam: true });
     const video = fakeVideo(page); page.document.getElementById("preview").appendChild(video); video.play(40); await wait(45);
     check("YouTube home inline previews never create a progress entry", () => assert.deepEqual(page.store.watchProgress || {}, {}));

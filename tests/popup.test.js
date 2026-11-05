@@ -19,6 +19,7 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, statusRows, nowPlaying, watchSettings, playerGranted = true } = {}) {
   const dom = new JSDOM(read("popup.html"), { url: "https://extension.test/popup.html", runScripts: "outside-only", pretendToBeVisual: true });
   const { window } = dom;
+  window.document.head.insertAdjacentHTML("beforeend", `<style>${read("pages.css")}</style>`);
   const host = new URL(url).hostname;
   const store = { siteRules: siteRules || { [host]: { enabled: true } } };
   if (seenRows) store.seenRows = seenRows;
@@ -132,6 +133,23 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   const off = await loadPopup({ watchSettings: { continueWatching: "off" } });
   assert.equal(off.document.querySelector(".continue-watching-switch input").checked, false, "Auto-add switch reflects the global off setting");
   off.window.close();
+  const controls = await loadPopup();
+  const power = controls.document.getElementById("buttons-toggle");
+  assert.equal(power.dataset.enabled, "true", "power control exposes the enabled state for its green ring");
+  assert.ok(power.querySelector("svg[viewBox='0 0 64 64']"), "power control injects the round SVG redraw");
+  assert.match(controls.window.getComputedStyle(power).getPropertyValue("--power-ring-light"), /50d58f/i, "enabled power ring is green");
+  power.click(); await wait(10);
+  assert.equal(power.dataset.enabled, "false", "power control flips state when pressed");
+  assert.match(controls.window.getComputedStyle(power).getPropertyValue("--power-ring-light"), /f06b73/i, "disabled power ring is red");
+  assert.equal(controls.document.querySelectorAll(".position-buttons .edge-button").length, 2, "position arrows remain available");
+  assert.ok(controls.document.querySelector(".position-buttons .position-pill"), "position arrows include their decorative pill");
+  assert.ok(controls.document.querySelector(".popup-control-divider"), "popup divides power and position controls");
+  controls.window.close();
+  const optionsDom = new JSDOM(read("options.html"), { url: "https://extension.test/options.html", runScripts: "outside-only", pretendToBeVisual: true });
+  const optionStore = {}; optionsDom.window.chrome = { runtime: { lastError: null }, storage: { local: { get(defaults, callback) { callback({ ...defaults, ...optionStore }); }, set(values) { Object.assign(optionStore, values); } } } };
+  optionsDom.window.eval(["shared.js", "edge-choice.js"].map(read).join("\n;\n")); await wait(5);
+  assert.ok(optionsDom.window.document.querySelector("#buttons-toggle svg"), "Options binds the shared power control");
+  assert.ok(optionsDom.window.document.querySelector(".position-pill"), "Options keeps the position-pill markup"); optionsDom.window.close();
   for (const [url, host] of [["https://www.youtube.com/", "www.youtube.com"], ["https://tubitv.com/", "tubitv.com"], ["https://rumble.com/", "rumble.com"], ["https://example.test/", "example.test"]]) {
     const types = await loadPopup({ url, siteRules: { [host]: { enabled: true } } });
     types.document.querySelector(".filter-launch").click(); await wait(12);
@@ -151,5 +169,5 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   assert.deepEqual(pbsMissingPlayer.requestedOrigins[0], ["https://player.pbs.org/*"], "player permission button requests only the player origin");
   assert.deepEqual(pbsMissingPlayer.registeredScripts.map(script => script.matches[0]), ["https://player.pbs.org/*"], "player permission registers the player-frame script");
   pbsMissingPlayer.window.close();
-  console.log("popup.test.js: 31 passed, 0 failed");
+  console.log("popup.test.js: 39 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

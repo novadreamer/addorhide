@@ -933,6 +933,12 @@ var HOA = Object.freeze((() => {
         target.rating = rating;
       }
     }
+    if (typeof raw.channel === "string") {
+      const channel = raw.channel.trim();
+      if (channel.length >= 1 && channel.length <= MAX_TITLE) {
+        target.channel = channel;
+      }
+    }
   }
 
   function normalizeItems(value, options) {
@@ -1344,6 +1350,65 @@ var HOA = Object.freeze((() => {
     return ordered.filter(group => !noGenre.includes(group)).concat(noGenre);
   }
 
+  // The Added and Hidden pages use the same compact sort / direction / grouping controls.
+  // Keeping the builder here also keeps their keyboard labels and persistence behaviour in step.
+  function makeViewControls(options) {
+    const settings = options || {};
+    const doc = settings.document;
+    if (!doc) return null;
+    const slug = String(settings.key || "group").replace(/[^a-z0-9]+/gi, "-") || "group";
+    const labels = settings.sortLabels || {};
+    const groupLabels = settings.groupLabels || {};
+    const controls = doc.createElement("div");
+    controls.className = "site-controls";
+    const makeSelect = (kind, values, selected) => {
+      const select = doc.createElement("select");
+      select.id = `${settings.idPrefix || "view"}-${kind}-${slug}`;
+      values.forEach(value => {
+        const option = doc.createElement("option");
+        option.value = value;
+        option.textContent = kind === "sort" ? labels[value] : groupLabels[value];
+        option.selected = value === selected;
+        select.appendChild(option);
+      });
+      return select;
+    };
+    const labelFor = (text, control) => {
+      const label = doc.createElement("label");
+      label.className = "visually-hidden";
+      label.htmlFor = control.id;
+      label.textContent = text;
+      return label;
+    };
+    const save = changes => { if (typeof settings.onChange === "function") settings.onChange(changes); };
+    const sorts = Array.isArray(settings.sorts) ? settings.sorts : [];
+    const groups = Array.isArray(settings.groups) ? settings.groups : [];
+    if (sorts.length >= 2) {
+      const select = makeSelect("sort", sorts, settings.sort);
+      select.addEventListener("change", () => save({ sort: select.value, dir: settings.defaultDirection(select.value) }));
+      controls.append(labelFor("Sort by", select), select);
+    }
+    if (sorts.length) {
+      const button = doc.createElement("button");
+      button.type = "button";
+      button.className = "direction-button";
+      button.id = `${settings.idPrefix || "view"}-direction-${slug}`;
+      button.textContent = settings.dir === "asc" ? "↑" : "↓";
+      const sortLabel = labels[settings.sort] || settings.sort;
+      const directionLabel = settings.dir === "asc" ? "ascending" : "descending";
+      button.setAttribute("aria-label", `${sorts.length === 1 ? `${sortLabel}, ` : ""}${directionLabel}`);
+      button.title = `${sortLabel}: ${directionLabel}`;
+      button.addEventListener("click", () => save({ sort: settings.sort, dir: settings.dir === "asc" ? "desc" : "asc" }));
+      controls.appendChild(button);
+    }
+    if (groups.length > 1) {
+      const select = makeSelect("group", groups, settings.group);
+      select.addEventListener("change", () => save({ group: select.value }));
+      controls.append(labelFor("Group by", select), select);
+    }
+    return controls;
+  }
+
   function availableGroups(entries) {
     const pairs = Array.isArray(entries) ? entries : [];
     const result = ["none"];
@@ -1743,6 +1808,7 @@ var HOA = Object.freeze((() => {
     availableGroups,
     usablePicks,
     orderGroupsBySort,
+    makeViewControls,
     groupBySite,
     normalizePrefs,
     youtubeThumb,

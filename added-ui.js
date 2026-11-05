@@ -44,6 +44,20 @@ const HOA_ADDED = (() => {
     return label;
   }
 
+  // Continue Watching has a slightly different set of sort keys from the shared site controls.
+  function makeSelect(site, kind, values, selected) {
+    const select = document.createElement("select");
+    select.id = `added-${kind}-${site.replace(/[^a-z0-9]+/gi, "-")}`;
+    values.forEach(value => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = kind === "sort" ? SORT_LABELS[value] : GROUP_LABELS[value];
+      option.selected = value === selected;
+      select.appendChild(option);
+    });
+    return select;
+  }
+
   function defaultDirection(sort) {
     return ["title", "channel", "site"].includes(sort) ? "asc" : "desc";
   }
@@ -152,19 +166,6 @@ const HOA_ADDED = (() => {
       }, { once: true });
       image.src = icon;
       return tile;
-    }
-
-    function makeSelect(site, kind, values, selected) {
-      const select = document.createElement("select");
-      select.id = `added-${kind}-${site.replace(/[^a-z0-9]+/gi, "-")}`;
-      values.forEach(value => {
-        const option = document.createElement("option");
-        option.value = value;
-        option.textContent = kind === "sort" ? SORT_LABELS[value] : GROUP_LABELS[value];
-        option.selected = value === selected;
-        select.appendChild(option);
-      });
-      return select;
     }
 
     function makeMeta(entry) {
@@ -493,40 +494,10 @@ const HOA_ADDED = (() => {
           `No popup player · opens on ${HOA.playerSiteName(group.site)}`));
       }
       heading.appendChild(identity);
-      const controls = element("div", "site-controls");
       // Only controls that change something for this website are shown (see HOA.availableSorts/Groups).
-      if (sorts.length >= 2) {
-        const sortSelect = makeSelect(group.site, "sort", sorts, sort);
-        sortSelect.addEventListener("change", () => {
-          const nextSort = sortSelect.value;
-          setPrefs(group.site, { sort: nextSort, dir: defaultDirection(nextSort) });
-          render();
-        });
-        controls.appendChild(labelFor("Sort by", sortSelect));
-        controls.appendChild(sortSelect);
-      }
-      if (sorts.length >= 1) {
-        const direction = element("button", "direction-button", dir === "asc" ? "↑" : "↓");
-        direction.type = "button";
-        direction.id = `added-direction-${slug}`;
-        const label = sorts.length === 1 ? `${SORT_LABELS[sort]}, ` : "";
-        direction.setAttribute("aria-label", `${label}${dir === "asc" ? "ascending" : "descending"}`);
-        direction.title = `${SORT_LABELS[sort]}: ${dir === "asc" ? "ascending" : "descending"}`;
-        direction.addEventListener("click", () => {
-          setPrefs(group.site, { sort, dir: dir === "asc" ? "desc" : "asc" });
-          render();
-        });
-        controls.appendChild(direction);
-      }
-      if (groups.length > 1) {
-        const groupSelect = makeSelect(group.site, "group", groups, groupMode);
-        groupSelect.addEventListener("change", () => {
-          setPrefs(group.site, { group: groupSelect.value });
-          render();
-        });
-        controls.appendChild(labelFor("Group by", groupSelect));
-        controls.appendChild(groupSelect);
-      }
+      const controls = HOA.makeViewControls({ document, key: group.site, idPrefix: "added", sorts, sort, dir,
+        groups, group: groupMode, sortLabels: SORT_LABELS, groupLabels: GROUP_LABELS, defaultDirection,
+        onChange(changes) { setPrefs(group.site, changes); render(); } });
       // A bin icon (the whole button); while it waits for the second click it shows an open bin with a "?".
       const armed = siteDeleteConfirmations.has(group.site);
       const deleteAll = element("button", `site-delete-all${armed ? " armed" : ""}`);
