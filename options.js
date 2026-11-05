@@ -21,6 +21,8 @@ const dataStatus = document.getElementById("data-status");
 const filterSites = document.getElementById("filter-sites");
 const tagWatchedInput = document.getElementById("tag-watched");
 const continueInput = document.getElementById("auto-continue");
+const clearWatchHistoryButton = document.getElementById("clear-watch-history-button");
+const watchStatus = document.getElementById("watch-status");
 
 let hidden = {};
 let added = {};
@@ -243,8 +245,22 @@ unhideAllButton.addEventListener("click", () => {
   if (!window.confirm("Unhide everything, including videos removed from the list?")) {
     return;
   }
-  hidden = {};
-  HOA.writeLists({ hidden }, () => setStatus(hiddenStatus, "Everything unhidden.", "success"));
+  HOA.readLists(lists => {
+    const next = HOA.prepareUnhideAll(lists);
+    hidden = next.hidden;
+    HOA.writeLists(next, () => setStatus(hiddenStatus, "Everything unhidden.", "success"));
+  });
+});
+
+clearWatchHistoryButton.addEventListener("click", () => {
+  if (!window.confirm("Clear Watched tags and Continue Watching for every video?")) {
+    return;
+  }
+  HOA.readLists(lists => {
+    const next = HOA.clearWatchHistory(lists);
+    hidden = next.hidden;
+    HOA.writeLists(next, () => setStatus(watchStatus, "Watch history cleared.", "success"));
+  });
 });
 
 function openAddedPage() {
@@ -392,6 +408,9 @@ function storageSnapshot(callback) {
     [HOA.CHANNELS_KEY]: {},
     [HOA.WATCHED_SHOWN_KEY]: {},
     [HOA.PROGRESS_KEY]: {},
+    [HOA.SEEN_ROWS_KEY]: {},
+    hiddenViewPrefs: {},
+    [HOA.WATCH_SETTINGS_KEY]: {},
     [HOA.SITES_KEY]: {},
     [HOA.PREFS_KEY]: {}
   }, callback);
@@ -406,6 +425,9 @@ function exportData() {
       channels: result[HOA.CHANNELS_KEY],
       watchedShown: result[HOA.WATCHED_SHOWN_KEY],
       watchProgress: result[HOA.PROGRESS_KEY],
+      seenRows: result[HOA.SEEN_ROWS_KEY],
+      hiddenViewPrefs: result.hiddenViewPrefs,
+      watchSettings: result[HOA.WATCH_SETTINGS_KEY],
       siteRules: result[HOA.SITES_KEY],
       prefs: result[HOA.PREFS_KEY]
     }, manifest.version || "", Date.now());
@@ -467,6 +489,9 @@ function importDataFile(file) {
         channels: current[HOA.CHANNELS_KEY],
         watchedShown: current[HOA.WATCHED_SHOWN_KEY],
         watchProgress: current[HOA.PROGRESS_KEY],
+        seenRows: current[HOA.SEEN_ROWS_KEY],
+        hiddenViewPrefs: current.hiddenViewPrefs,
+        watchSettings: current[HOA.WATCH_SETTINGS_KEY],
         siteRules: current[HOA.SITES_KEY],
         prefs: current[HOA.PREFS_KEY]
       }, parsed.backup);
@@ -480,6 +505,9 @@ function importDataFile(file) {
         [HOA.CHANNELS_KEY]: merged.channels,
         [HOA.WATCHED_SHOWN_KEY]: merged.watchedShown,
         [HOA.PROGRESS_KEY]: merged.watchProgress,
+        [HOA.SEEN_ROWS_KEY]: merged.seenRows,
+        hiddenViewPrefs: merged.hiddenViewPrefs,
+        [HOA.WATCH_SETTINGS_KEY]: merged.watchSettings,
         [HOA.SITES_KEY]: merged.siteRules,
         [HOA.PREFS_KEY]: merged.prefs
       }, () => {

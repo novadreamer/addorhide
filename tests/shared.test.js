@@ -324,6 +324,8 @@ check("prefs defaults and invalid fields", () => assert.deepEqual(HOA.normalizeP
   "other.com": { sort: "added", dir: "desc", group: "none", collapsed: false }
 }));
 check("prefs keep valid values", () => assert.deepEqual(HOA.normalizePrefs({ "example.com": { sort: "year", dir: "asc", group: "genre", collapsed: true } })["example.com"], { sort: "year", dir: "asc", group: "genre", collapsed: true }));
+check("prefs keep valid page tabs settings", () => assert.deepEqual(HOA.normalizePrefs({ __page: { grouping: "tabs", sort: "recent", dir: "desc", selectedTab: "example.com" } }).__page, { grouping: "tabs", sort: "recent", dir: "desc", selectedTab: "example.com" }));
+check("prefs normalize invalid page tabs settings", () => assert.deepEqual(HOA.normalizePrefs({ __page: { grouping: "grid", sort: "date", dir: "sideways", selectedTab: "not a host" } }).__page, { grouping: "none", sort: "name", dir: "asc", selectedTab: "" }));
 check("prefs invalid root", () => assert.deepEqual(HOA.normalizePrefs(null), {}));
 const manyPrefs = {};
 for (let index = 0; index < 201; index += 1) {
@@ -350,8 +352,6 @@ check("listed hidden", () => assert.deepEqual(HOA.listedHidden(hidden).map(pair 
 const added = HOA.toggleAdded({}, watch, { title: "Watch", thumb: "", kind: "video", ts: 10, views: 12 });
 check("toggle adds", () => assert.ok(added[watch]));
 check("toggle removes", () => assert.equal(Object.keys(HOA.toggleAdded(added, watch, added[watch])).length, 0));
-check("group by kind", () => assert.equal(HOA.groupByKind({ [watch]: { kind: "video" }, [short]: { kind: "short" } }).short.length, 1));
-
 check("usable picks ignore bare tags", () => assert.deepEqual(HOA.usablePicks({ pickedSelectors: ["a", "a.card", " div ", "li.slide"] }), ["a.card", "li.slide"]));
 check("usable picks read the legacy cardSelector", () => assert.deepEqual(HOA.usablePicks({ cardSelector: "div.tile" }), ["div.tile"]));
 check("usable picks of nothing", () => assert.deepEqual(HOA.usablePicks(undefined), []));
@@ -499,20 +499,6 @@ check("shared.js and catalog.js can be injected twice into one world", () => {
   assert.equal(vm.runInContext("typeof HOA.canonicalUrl + typeof HOA_CATALOG.find", sandbox), "functionfunction");
 });
 
-check("turning Watched off drops only that site's auto-hidden entries", () => {
-  const yt = "https://www.youtube.com/watch?v=watched1234";
-  const manual = "https://www.youtube.com/watch?v=manual12345";
-  const tubi = "https://tubitv.com/movies/123";
-  const out = HOA.withoutAutoWatched({
-    [yt]: { site: "youtube.com", reason: "watched", ts: 1 },
-    [manual]: { site: "youtube.com", watched: true, ts: 1 },
-    [tubi]: { site: "tubitv.com", reason: "watched", ts: 1 }
-  }, { [yt]: 1, [tubi]: 1 }, "www.youtube.com");
-  assert.ok(out.changed);
-  assert.deepEqual(Object.keys(out.hidden).sort(), [manual, tubi].sort());
-  assert.deepEqual(Object.keys(out.watchedShown), [tubi]);
-});
-
 check("progress normalizer keeps a bitmap, played seconds and Continue Watching", () => {
   const key = "https://example.com/watch/one";
   const result = HOA.normalizeProgress({ [key]: { duration: 100, position: 40, played: 65, buckets: "f".repeat(25), watched: false, cw: "auto", updated: 1 } });
@@ -532,6 +518,10 @@ check("progress eviction keeps Continue Watching entries", () => {
   const entries = {}; for (let index = 0; index < 1502; index += 1) entries[`https://example.com/watch/${index}`] = { duration: 100, position: 1, updated: index, cw: index === 0 ? "manual" : undefined };
   const result = HOA.normalizeProgress(entries); assert.ok(result["https://example.com/watch/0"]); assert.equal(Object.keys(result).length, 1500);
 });
+check("progress eviction caps Continue Watching-only history", () => {
+  const entries = {}; for (let index = 0; index < 1501; index += 1) entries[`https://example.com/watch/cw-${index}`] = { duration: 100, position: 1, updated: index, cw: "auto" };
+  const result = HOA.normalizeProgress(entries); assert.equal(Object.keys(result).length, 1500); assert.equal(result["https://example.com/watch/cw-0"], undefined);
+});
 check("watch settings normalize safe defaults", () => {
   assert.deepEqual(HOA.normalizeWatchSettings({}), { tagWatched: true, continueWatching: "auto" });
   assert.deepEqual(HOA.normalizeWatchSettings({ tagWatched: false, continueWatching: "off" }), { tagWatched: false, continueWatching: "off" });
@@ -540,6 +530,34 @@ check("watch settings normalize safe defaults", () => {
 check("backup round trip retains watch progress", () => {
   const key = "https://example.com/watch/backup"; const backup = HOA.buildBackup({ hidden: {}, added: {}, siteRules: {}, prefs: {}, watchProgress: { [key]: { duration: 100, position: 25, updated: 1, buckets: "0".repeat(25) } } }, "1.1.0", now);
   const result = HOA.parseBackup(JSON.stringify(backup)); assert.equal(result.ok, true); assert.ok(result.backup.watchProgress[key]);
+});
+check("unhide all retains watched videos as user-shown", () => {
+  const auto = "https://www.youtube.com/watch?v=autowatched";
+  const progressed = "https://www.youtube.com/watch?v=progressed1";
+  const next = HOA.prepareUnhideAll({ hidden: { [auto]: { title: "Auto", thumb: "", ts: 1, reason: "watched" } }, watchedShown: {}, watchProgress: {
+    [progressed]: { duration: 100, position: 95, updated: 1, watched: true, buckets: "f".repeat(25) }
+  } }, 9);
+  assert.deepEqual(next.hidden, {}); assert.deepEqual(next.watchedShown, { [auto]: 9, [progressed]: 9 });
+});
+check("clear watch history returns watched-hidden videos and clears tracking", () => {
+  const watchedKey = "https://www.youtube.com/watch?v=clearwatch1";
+  const manualKey = "https://www.youtube.com/watch?v=manualhide1";
+  const next = HOA.clearWatchHistory({ hidden: {
+    [watchedKey]: { title: "Watched", thumb: "", ts: 1, reason: "watched" },
+    [manualKey]: { title: "Manual", thumb: "", ts: 1 }
+  }, watchedShown: { [watchedKey]: 1 }, watchProgress: { [watchedKey]: { duration: 100, position: 95, updated: 1, watched: true } } });
+  assert.deepEqual(Object.keys(next.hidden), [manualKey]); assert.deepEqual(next.watchedShown, {}); assert.deepEqual(next.watchProgress, {});
+});
+check("backup round trip retains rows, hidden view settings and watch settings", () => {
+  const data = HOA.buildBackup({ hidden: {}, added: {}, siteRules: {}, prefs: {}, seenRows: { "example.com": ["Drama", "Drama", "Comedy"] },
+    hiddenViewPrefs: { "example.com": { sort: "title", collapsed: true }, "watched-videos": { group: "site" } },
+    watchSettings: { tagWatched: false, continueWatching: "off" } }, "1.1.0", now);
+  const parsed = HOA.parseBackup(JSON.stringify(data));
+  const merged = HOA.mergeBackup({ seenRows: { "example.com": ["Action"] }, hiddenViewPrefs: { "example.com": { dir: "asc" } }, watchSettings: { tagWatched: true, continueWatching: "auto" } }, parsed.backup);
+  assert.deepEqual(parsed.backup.seenRows["example.com"], ["Drama", "Comedy"]);
+  assert.deepEqual(merged.seenRows["example.com"], ["Action", "Drama", "Comedy"]);
+  assert.deepEqual(merged.hiddenViewPrefs["example.com"], { dir: "asc", sort: "title", collapsed: true });
+  assert.deepEqual(merged.watchSettings, { tagWatched: false, continueWatching: "off" });
 });
 
 console.log(`shared.test.js: ${passed} passed, 0 failed`);

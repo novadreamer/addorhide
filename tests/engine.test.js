@@ -33,7 +33,7 @@ function check(name, fn) {
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings, watchProgress, noBody = false, testSeam = false, childFrame = false }) {
+async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings, watchProgress, noBody = false, testSeam = false, childFrame = false, incognito = false }) {
   const html = suppliedHtml === undefined ? fs.readFileSync(path.join(__dirname, "fixtures", fixture), "utf8") : suppliedHtml;
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
     url, runScripts: "outside-only", pretendToBeVisual: true
@@ -48,6 +48,7 @@ async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings
   const messageListeners = [];
   const clone = value => JSON.parse(JSON.stringify(value));
   window.chrome = {
+    extension: incognito ? { inIncognitoContext: true } : undefined,
     runtime: { id: "test-extension", lastError: null, getURL: value => value, getManifest: () => ({ version: "test" }),
       onMessage: { addListener: listener => messageListeners.push(listener) }, sendMessage(message, callback) { window.__hoaSentMessages.push(message); if (callback) callback(window.__hoaFrameReply || {}); } },
     storage: {
@@ -1095,6 +1096,27 @@ const CASES = [
     const entry = page.store.watchProgress["https://www.youtube.com/watch?v=abc123def45"];
     check("partial 50 percent watch stays unwatched", () => assert.equal(entry.watched, false));
     check("seek then ended preserves only contiguous coverage", () => assert.ok(bucketCount(entry.buckets) < 90 && entry.position === 100));
+    page.window.close();
+  }
+  {
+    const key = "https://www.youtube.com/watch?v=abc123def45";
+    const page = await load({ html: "", url: key, testSeam: true, incognito: true });
+    fakeVideo(page).play(120); await wait(35);
+    check("incognito playback never records progress", () => assert.deepEqual(page.store.watchProgress || {}, {}));
+    check("incognito playback does not relay frame progress", () => assert.deepEqual(page.window.__hoaSentMessages, []));
+    page.window.close();
+  }
+  {
+    const key = "https://www.youtube.com/watch?v=abc123def45";
+    const page = await load({ html: "", url: key, watchSettings: { tagWatched: false, continueWatching: "off" },
+      siteRules: { "www.youtube.com": { hideKinds: [] } }, testSeam: true });
+    const video = fakeVideo(page, { duration: 300 }); video.play(120); await wait(35);
+    check("disabled watch features do not record playback", () => assert.deepEqual(page.store.watchProgress || {}, {}));
+    await new Promise(resolve => page.window.chrome.storage.local.set({ watchSettings: { tagWatched: false, continueWatching: "auto" } }, resolve));
+    await wait(15); video.play(40); await wait(35);
+    check("enabling a watch feature starts recording from then", () => {
+      assert.ok(page.store.watchProgress[key]); assert.ok(page.store.watchProgress[key].played <= 40.1);
+    });
     page.window.close();
   }
   {

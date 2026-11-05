@@ -8,7 +8,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "description": "Save videos you like to your own list and hide the recommendations you don't want, on YouTube and other video sites you choose.",
+  "description": "Save videos, hide what you don't want, tag what you've watched and resume where you left off, on YouTube and sites you choose.",
   "permissions": [
     "storage",
     "scripting",

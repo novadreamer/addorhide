@@ -204,7 +204,13 @@ const HOA_SITES = Object.freeze((() => {
     readRules(rules => {
       const next = { ...rules };
       delete next[hostname];
-      setRules(next, () => removePermissionAndScript(hostname, () => cb({ ok: true })));
+      setRules(next, () => {
+        chrome.storage.local.get({ seenRows: {} }, result => {
+          const seenRows = result.seenRows && typeof result.seenRows === "object" ? { ...result.seenRows } : {};
+          delete seenRows[hostname];
+          chrome.storage.local.set({ seenRows }, () => removePermissionAndScript(hostname, () => cb({ ok: true })));
+        });
+      });
     });
   }
 

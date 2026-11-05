@@ -109,6 +109,10 @@ const HOA_ADDED = (() => {
     header.appendChild(headerActions);
     rootElement.appendChild(header);
 
+    const pageToolbar = element("div", "added-page-toolbar");
+    pageToolbar.hidden = true;
+    rootElement.appendChild(pageToolbar);
+
     const empty = element("p", "empty-state muted");
     empty.hidden = true;
     const emptyIcon = element("span", "empty-icon");
@@ -462,8 +466,9 @@ const HOA_ADDED = (() => {
       return section;
     }
 
-    function renderSite(group) {
+    function renderSite(group, options = {}) {
       const sitePrefs = prefs[group.site] || {};
+      const tabMode = !!options.tabMode;
       const sorts = HOA.availableSorts(group.entries);
       const sort = sorts.includes(sitePrefs.sort) ? sitePrefs.sort : (sorts.includes("added") ? "added" : sorts[0] || "added");
       const dir = sitePrefs.dir === "asc" || sitePrefs.dir === "desc" ? sitePrefs.dir : defaultDirection(sort);
@@ -471,6 +476,11 @@ const HOA_ADDED = (() => {
       const groupMode = groups.includes(sitePrefs.group) ? sitePrefs.group : "none";
       const section = element("section", "site-group");
       section.dataset.site = group.site;
+      if (tabMode) {
+        section.id = options.panelId;
+        section.setAttribute("role", "tabpanel");
+        section.setAttribute("aria-labelledby", options.tabId);
+      }
       const slug = group.site.replace(/[^a-z0-9]+/gi, "-");
       const heading = element("div", "site-heading");
       const collapse = element("button", "collapse-button", sitePrefs.collapsed ? "▸" : "▾");
@@ -482,7 +492,7 @@ const HOA_ADDED = (() => {
         setPrefs(group.site, { collapsed: !sitePrefs.collapsed });
         render();
       });
-      heading.appendChild(collapse);
+      if (!tabMode) heading.appendChild(collapse);
       heading.appendChild(makeLogo(group));
       const identity = element("div", "site-identity");
       const name = element("h2", "", group.name);
@@ -533,7 +543,7 @@ const HOA_ADDED = (() => {
       controls.appendChild(deleteAll);
       heading.appendChild(controls);
       section.appendChild(heading);
-      if (!sitePrefs.collapsed) {
+      if (tabMode || !sitePrefs.collapsed) {
         const body = element("div", "site-group-body");
         const sorted = HOA.sortEntries(group.entries, sort, dir);
         HOA.orderGroupsBySort(HOA.groupEntries(sorted, groupMode), sorted, groupMode)
@@ -543,9 +553,10 @@ const HOA_ADDED = (() => {
       return section;
     }
 
-    function renderContinueWatching(entries) {
+    function renderContinueWatching(entries, options = {}) {
       if (!entries.length) return null;
       const prefKey = "continue-watching"; const current = prefs[prefKey] || {};
+      const tabMode = !!options.tabMode;
       const sortOptions = ["last-watched", "time-left", "progress", "title", "site"];
       const sort = sortOptions.includes(current.sort) ? current.sort : "last-watched";
       const dir = current.dir === "asc" || current.dir === "desc" ? current.dir : defaultDirection(sort);
@@ -556,12 +567,17 @@ const HOA_ADDED = (() => {
       if (watchedGroups.length >= 2) groupOptions.push("watched-date");
       const groupMode = groupOptions.includes(current.group) ? current.group : "none";
       const section = element("section", "site-group continue-watching"); section.dataset.site = prefKey;
+      if (tabMode) {
+        section.id = options.panelId;
+        section.setAttribute("role", "tabpanel");
+        section.setAttribute("aria-labelledby", options.tabId);
+      }
       const heading = element("div", "site-heading");
       const collapse = element("button", "collapse-button", current.collapsed ? "▸" : "▾"); collapse.type = "button";
       collapse.setAttribute("aria-expanded", String(!current.collapsed)); collapse.setAttribute("aria-label", `${current.collapsed ? "Expand" : "Collapse"} Continue Watching`);
       collapse.addEventListener("click", () => { setPrefs(prefKey, { collapsed: !current.collapsed }); render(); });
       const identity = element("div", "site-identity"); identity.append(element("h2", "site-name-toggle", "Continue Watching"), element("span", "count-badge", String(entries.length)));
-      heading.append(collapse, identity);
+      if (tabMode) heading.append(identity); else heading.append(collapse, identity);
       const controls = element("div", "site-controls");
       const sortSelect = makeSelect(prefKey, "sort", sortOptions, sort);
       sortSelect.addEventListener("change", () => { setPrefs(prefKey, { sort: sortSelect.value, dir: defaultDirection(sortSelect.value) }); render(); });
@@ -586,7 +602,7 @@ const HOA_ADDED = (() => {
         siteDeleteConfirmations.set(prefKey, window.setTimeout(() => { siteDeleteConfirmations.delete(prefKey); render(); }, 4000)); render();
       });
       controls.appendChild(clear); heading.appendChild(controls); section.appendChild(heading);
-      if (current.collapsed) return section;
+      if (current.collapsed && !tabMode) return section;
       const valueFor = entry => {
         if (sort === "last-watched") return Number(entry.updated) || 0;
         if (sort === "time-left") return Math.max(0, Number(entry.duration) - Number(entry.position));
@@ -620,9 +636,76 @@ const HOA_ADDED = (() => {
     // Every change rebuilds the list. Keep the reader where they were: the website section they were working
     // in stays at the same height on screen (otherwise the page jumped to the top), and focus returns to
     // the same control.
+    function pagePrefs() {
+      const current = prefs.__page || {};
+      return {
+        grouping: current.grouping === "tabs" ? "tabs" : "none",
+        sort: current.sort === "recent" ? "recent" : "name",
+        dir: current.dir === "desc" || current.dir === "asc" ? current.dir : current.sort === "recent" ? "desc" : "asc",
+        selectedTab: typeof current.selectedTab === "string" ? current.selectedTab : ""
+      };
+    }
+
+    function pageDirection(sort) {
+      return sort === "recent" ? "desc" : "asc";
+    }
+
+    function sortPageGroups(groups, page) {
+      return groups.slice().sort((left, right) => {
+        let comparison;
+        if (page.sort === "recent") {
+          const newest = group => Math.max(...group.entries.map(([, entry]) => Number(entry && entry.ts) || 0));
+          comparison = newest(left) - newest(right);
+        } else {
+          comparison = left.name.localeCompare(right.name, undefined, { sensitivity: "base" })
+            || left.site.localeCompare(right.site);
+        }
+        return comparison * (page.dir === "asc" ? 1 : -1);
+      });
+    }
+
+    function makeContinueTabIcon() {
+      const icon = element("div", "site-logo continue-tab-icon");
+      icon.setAttribute("aria-hidden", "true");
+      icon.appendChild(element("span", "", "▶"));
+      return icon;
+    }
+
+    function pageLabel(text, control) {
+      const label = element("label", "page-control-label", text);
+      label.htmlFor = control.id;
+      return label;
+    }
+
+    function makePageToolbar(sections, page) {
+      while (pageToolbar.firstChild) pageToolbar.firstChild.remove();
+      pageToolbar.hidden = sections.length < 2;
+      if (pageToolbar.hidden) return;
+      const controls = element("div", "site-controls page-controls");
+      const grouping = document.createElement("select"); grouping.id = "added-page-grouping";
+      [["none", "No grouping"], ["tabs", "Tabs"]].forEach(([value, label]) => {
+        const option = document.createElement("option"); option.value = value; option.textContent = label;
+        option.selected = page.grouping === value; grouping.appendChild(option);
+      });
+      grouping.addEventListener("change", () => { setPrefs("__page", { grouping: grouping.value }); render(); });
+      controls.append(pageLabel("Group page", grouping), grouping);
+      const sort = document.createElement("select"); sort.id = "added-page-sort"; sort.title = "Continue Watching always stays first";
+      [["name", "Name"], ["recent", "Recently added"]].forEach(([value, label]) => {
+        const option = document.createElement("option"); option.value = value; option.textContent = label;
+        option.selected = page.sort === value; sort.appendChild(option);
+      });
+      sort.addEventListener("change", () => { setPrefs("__page", { sort: sort.value, dir: pageDirection(sort.value) }); render(); });
+      controls.append(pageLabel("Sort", sort), sort);
+      const direction = element("button", "direction-button", page.dir === "asc" ? "↑" : "↓"); direction.type = "button";
+      direction.id = "added-page-direction"; direction.title = `${page.sort === "recent" ? "Recently added" : "Name"}: ${page.dir === "asc" ? "ascending" : "descending"}`;
+      direction.setAttribute("aria-label", direction.title);
+      direction.addEventListener("click", () => { setPrefs("__page", { dir: page.dir === "asc" ? "desc" : "asc" }); render(); });
+      controls.appendChild(direction); pageToolbar.appendChild(controls);
+    }
+
     function render() {
       const focused = document.activeElement;
-      const focusId = focused && focused.id && groupsRoot.contains(focused) ? focused.id : "";
+      const focusId = focused && focused.id && (groupsRoot.contains(focused) || pageToolbar.contains(focused)) ? focused.id : "";
       const anchor = focused && focused.closest ? focused.closest(".site-group") : null;
       const anchorSite = anchor ? anchor.dataset.site : "";
       const anchorTop = anchor ? anchor.getBoundingClientRect().top : 0;
@@ -633,6 +716,8 @@ const HOA_ADDED = (() => {
       }
       const groups = HOA.groupBySite(added);
       const continuing = Object.entries(watchProgress).filter(([, entry]) => entry && entry.cw && !entry.watched).sort((a, b) => b[1].updated - a[1].updated);
+      const page = pagePrefs();
+      const orderedGroups = sortPageGroups(groups, page);
       const videoCount = groups.reduce((count, group) => count + group.entries.length, 0);
       introSummary.textContent = videoCount || !continuing.length ? `${HOA.addedSummaryText(videoCount, groups.length)}${continuing.length ? ` · ${continuing.length} to continue` : ""}`
         : `${continuing.length} to continue watching.`;
@@ -641,7 +726,54 @@ const HOA_ADDED = (() => {
       clearButton.setAttribute("aria-disabled", String(videoCount === 0));
       clearButton.title = videoCount === 0 ? "Nothing to clear: no videos have been added yet"
         : "Clear page: delete every added video (asks first)";
-      const continueSection = renderContinueWatching(continuing); if (continueSection) groupsRoot.appendChild(continueSection); groups.forEach(group => groupsRoot.appendChild(renderSite(group)));
+      const sections = [];
+      if (continuing.length) sections.push({ key: "continue-watching", name: "Continue Watching", entries: continuing, continueWatching: true });
+      orderedGroups.forEach(group => sections.push({ key: group.site, name: group.name, group }));
+      makePageToolbar(sections, page);
+      const tabs = page.grouping === "tabs" && sections.length >= 2;
+      if (tabs) {
+        const selectedMissing = !!page.selectedTab && !sections.some(section => section.key === page.selectedTab);
+        const selected = selectedMissing ? sections[0].key : (page.selectedTab || sections[0].key);
+        if (selectedMissing) setPrefs("__page", { selectedTab: selected });
+        const tabList = element("div", "added-tab-list"); tabList.setAttribute("role", "tablist"); tabList.setAttribute("aria-label", "Added Videos sections");
+        const selectTab = key => {
+          setPrefs("__page", { selectedTab: key }); render();
+          const next = document.getElementById(`added-tab-${key.replace(/[^a-z0-9]+/gi, "-")}`);
+          if (next) next.focus({ preventScroll: true });
+        };
+        sections.forEach((section, index) => {
+          const slug = section.key.replace(/[^a-z0-9]+/gi, "-");
+          const tab = element("button", "added-page-tab"); tab.type = "button"; tab.id = `added-tab-${slug}`;
+          tab.setAttribute("role", "tab"); tab.setAttribute("aria-selected", String(section.key === selected));
+          tab.setAttribute("aria-controls", `added-tabpanel-${slug}`); tab.tabIndex = section.key === selected ? 0 : -1;
+          tab.appendChild(section.continueWatching ? makeContinueTabIcon() : makeLogo(section.group));
+          tab.appendChild(element("span", "tab-name", section.name));
+          tab.appendChild(element("span", "count-badge", String(section.continueWatching ? section.entries.length : section.group.entries.length)));
+          tab.addEventListener("click", () => selectTab(section.key));
+          tab.addEventListener("keydown", event => {
+            let nextIndex = index;
+            if (event.key === "ArrowRight") nextIndex = (index + 1) % sections.length;
+            else if (event.key === "ArrowLeft") nextIndex = (index + sections.length - 1) % sections.length;
+            else if (event.key === "Home") nextIndex = 0;
+            else if (event.key === "End") nextIndex = sections.length - 1;
+            else return;
+            event.preventDefault(); selectTab(sections[nextIndex].key);
+          });
+          tabList.appendChild(tab);
+        });
+        groupsRoot.appendChild(tabList);
+        const active = sections.find(section => section.key === selected);
+        const slug = active.key.replace(/[^a-z0-9]+/gi, "-");
+        const options = { tabMode: true, tabId: `added-tab-${slug}`, panelId: `added-tabpanel-${slug}` };
+        groupsRoot.appendChild(active.continueWatching ? renderContinueWatching(active.entries, options) : renderSite(active.group, options));
+        if (selectedMissing && focusId) {
+          const fallbackTab = document.getElementById(`added-tab-${selected.replace(/[^a-z0-9]+/gi, "-")}`);
+          if (fallbackTab) fallbackTab.focus({ preventScroll: true });
+        }
+      } else {
+        const continueSection = renderContinueWatching(continuing); if (continueSection) groupsRoot.appendChild(continueSection);
+        orderedGroups.forEach(group => groupsRoot.appendChild(renderSite(group)));
+      }
       groupsRoot.style.minHeight = "";
       const nextAnchor = anchorSite
         ? Array.from(groupsRoot.querySelectorAll(".site-group")).find(section => section.dataset.site === anchorSite)

@@ -98,8 +98,11 @@ var HOA = Object.freeze((() => {
     });
     const keys = Object.keys(normalized);
     if (keys.length > MAX_PROGRESS) {
-      keys.filter(key => !normalized[key].cw).sort((a, b) => normalized[a].updated - normalized[b].updated || a.localeCompare(b))
-        .slice(0, Math.max(0, keys.length - MAX_PROGRESS)).forEach(key => delete normalized[key]);
+      const excess = keys.length - MAX_PROGRESS;
+      const oldestFirst = list => list.sort((a, b) => normalized[a].updated - normalized[b].updated || a.localeCompare(b));
+      const nonContinuing = oldestFirst(keys.filter(key => !normalized[key].cw));
+      const continuing = oldestFirst(keys.filter(key => normalized[key].cw));
+      nonContinuing.concat(continuing).slice(0, excess).forEach(key => delete normalized[key]);
     }
     return normalized;
   }
@@ -1078,27 +1081,20 @@ var HOA = Object.freeze((() => {
     return normalizeWatchedShown(next);
   }
 
-  // Turning a site's Watched switch off returns the videos that switch hid (reason "watched"); videos the
-  // user hid by hand stay hidden. Their watchedShown opt-outs go too, so turning it on again starts fresh.
-  function withoutAutoWatched(hidden, shown, host) {
-    const site = String(host || "").replace(/^www\./, "");
-    const nextHidden = { ...(hidden || {}) };
-    const nextShown = { ...(shown || {}) };
-    let changed = false;
-    Object.entries(nextHidden).forEach(([key, entry]) => {
-      if (entry && entry.reason === "watched" && String(entry.site || siteOf(key) || "").replace(/^www\./, "") === site) {
-        delete nextHidden[key];
-        delete nextShown[key];
-        changed = true;
-      }
-    });
-    return { hidden: nextHidden, watchedShown: nextShown, changed };
-  }
-
   function clearAutoWatched(host) {
     readLists(lists => {
-      const next = withoutAutoWatched(lists.hidden, lists.watchedShown, host);
-      if (next.changed) writeLists({ hidden: next.hidden, watchedShown: next.watchedShown });
+      const site = String(host || "").replace(/^www\./, "");
+      const hidden = { ...lists.hidden };
+      const watchedShown = { ...lists.watchedShown };
+      let changed = false;
+      Object.entries(hidden).forEach(([key, entry]) => {
+        if (entry && entry.reason === "watched" && String(entry.site || siteOf(key) || "").replace(/^www\./, "") === site) {
+          delete hidden[key];
+          delete watchedShown[key];
+          changed = true;
+        }
+      });
+      if (changed) writeLists({ hidden, watchedShown });
     });
   }
 
@@ -1135,14 +1131,6 @@ var HOA = Object.freeze((() => {
       next[key] = normalized[key];
     }
     return normalizeItems(next, { max: MAX_ADDED });
-  }
-
-  function groupByKind(entries) {
-    const result = { video: [], short: [] };
-    Object.entries(entries || {}).forEach(pair => {
-      result[pair[1] && pair[1].kind === "short" ? "short" : "video"].push(pair);
-    });
-    return result;
   }
 
   function entryType(pair) {
@@ -1457,14 +1445,26 @@ var HOA = Object.freeze((() => {
     if (!isObject(value)) {
       return result;
     }
+    let siteCount = 0;
     for (const site of Object.keys(value)) {
-      if (Object.keys(result).length >= 200) {
-        break;
+      if (site !== "__page" && siteCount >= 200) {
+        continue;
       }
-      if ((!looksLikeHostname(site) && site !== "continue-watching") || !isObject(value[site])) {
+      if ((!looksLikeHostname(site) && site !== "continue-watching" && site !== "__page") || !isObject(value[site])) {
         continue;
       }
       const raw = value[site];
+      if (site === "__page") {
+        const selectedTab = typeof raw.selectedTab === "string" && (raw.selectedTab === "continue-watching" || looksLikeHostname(raw.selectedTab))
+          ? raw.selectedTab : "";
+        Object.defineProperty(result, site, { value: {
+          grouping: raw.grouping === "tabs" ? "tabs" : "none",
+          sort: raw.sort === "recent" ? "recent" : "name",
+          dir: raw.dir === "asc" || raw.dir === "desc" ? raw.dir : raw.sort === "recent" ? "desc" : "asc",
+          selectedTab
+        }, enumerable: true, writable: true, configurable: true });
+        continue;
+      }
       const pref = {
         sort: SORT_KEYS.includes(raw.sort) ? raw.sort : "added",
         dir: raw.dir === "asc" || raw.dir === "desc" ? raw.dir : raw.sort === "title" ? "asc" : "desc",
@@ -1472,6 +1472,7 @@ var HOA = Object.freeze((() => {
         collapsed: typeof raw.collapsed === "boolean" ? raw.collapsed : false
       };
       Object.defineProperty(result, site, { value: pref, enumerable: true, writable: true, configurable: true });
+      siteCount += 1;
     }
     return result;
   }
@@ -1529,10 +1530,19 @@ var HOA = Object.freeze((() => {
       return result;
     }
     Object.keys(value).forEach(site => {
-      if (!backupHostname(site) || !isObject(value[site])) {
+      if ((!backupHostname(site) && site !== "__page") || !isObject(value[site])) {
         return;
       }
       const raw = value[site];
+      if (site === "__page") {
+        const pref = {};
+        if (raw.grouping === "none" || raw.grouping === "tabs") pref.grouping = raw.grouping;
+        if (raw.sort === "name" || raw.sort === "recent") pref.sort = raw.sort;
+        if (raw.dir === "asc" || raw.dir === "desc") pref.dir = raw.dir;
+        if (typeof raw.selectedTab === "string" && (raw.selectedTab === "continue-watching" || backupHostname(raw.selectedTab))) pref.selectedTab = raw.selectedTab;
+        result[site] = pref;
+        return;
+      }
       const pref = {};
       ["sort", "dir", "group"].forEach(field => {
         if (typeof raw[field] === "string" && raw[field].length <= 20) {
@@ -1547,6 +1557,49 @@ var HOA = Object.freeze((() => {
     return result;
   }
 
+  function sanitizeBackupHiddenPrefs(value) {
+    const result = {};
+    if (!isObject(value)) return result;
+    Object.keys(value).forEach(site => {
+      if ((!backupHostname(site) && site !== "watched-videos") || !isObject(value[site])) return;
+      const raw = value[site];
+      const pref = {};
+      ["sort", "dir", "group"].forEach(field => {
+        if (typeof raw[field] === "string" && raw[field].length <= 20) pref[field] = raw[field];
+      });
+      if (typeof raw.collapsed === "boolean") pref.collapsed = raw.collapsed;
+      result[site] = pref;
+    });
+    return result;
+  }
+
+  function sanitizeBackupSeenRows(value) {
+    const result = {};
+    if (!isObject(value)) return result;
+    Object.keys(value).forEach(host => {
+      if (!backupHostname(host) || !Array.isArray(value[host])) return;
+      result[host] = normalizeSectionTitles(value[host]).slice(-150);
+    });
+    return result;
+  }
+
+  function prepareUnhideAll(lists, nowMs) {
+    const source = isObject(lists) ? lists : {};
+    const watchedKeys = [
+      ...Object.entries(normalizeItems(source.hidden, { max: MAX_HIDDEN, withListed: true }))
+        .filter(([, entry]) => entry.reason === "watched").map(([key]) => key),
+      ...Object.entries(normalizeProgress(source.watchProgress)).filter(([, entry]) => entry.watched).map(([key]) => key)
+    ];
+    return { hidden: {}, watchedShown: markWatchedShown(source.watchedShown, watchedKeys, nowMs) };
+  }
+
+  function clearWatchHistory(lists) {
+    const source = isObject(lists) ? lists : {};
+    const hidden = normalizeItems(source.hidden, { max: MAX_HIDDEN, withListed: true });
+    Object.keys(hidden).forEach(key => { if (hidden[key].reason === "watched") delete hidden[key]; });
+    return { hidden, watchedShown: {}, watchProgress: {} };
+  }
+
   function buildBackup(data, version, nowMs) {
     const source = isObject(data) ? data : {};
     const timestamp = Number.isFinite(nowMs) ? nowMs : Date.now();
@@ -1559,6 +1612,9 @@ var HOA = Object.freeze((() => {
       hiddenChannels: normalizeChannels(source.channels),
       watchedShown: normalizeWatchedShown(source.watchedShown),
       watchProgress: normalizeProgress(source.watchProgress),
+      seenRows: sanitizeBackupSeenRows(source.seenRows),
+      hiddenViewPrefs: sanitizeBackupHiddenPrefs(source.hiddenViewPrefs),
+      watchSettings: normalizeWatchSettings(source.watchSettings),
       addedItems: normalizeItems(source.added, { max: MAX_ADDED }),
       siteRules: sanitizeBackupRules(source.siteRules),
       addedViewPrefs: sanitizeBackupPrefs(source.prefs)
@@ -1593,6 +1649,9 @@ var HOA = Object.freeze((() => {
         hiddenChannels: normalizeChannels(value.hiddenChannels),
         watchedShown: normalizeWatchedShown(value.watchedShown),
         watchProgress: normalizeProgress(value.watchProgress),
+        seenRows: sanitizeBackupSeenRows(value.seenRows),
+        hiddenViewPrefs: sanitizeBackupHiddenPrefs(value.hiddenViewPrefs),
+        watchSettings: isObject(value.watchSettings) ? normalizeWatchSettings(value.watchSettings) : null,
         addedItems: normalizeItems(value.addedItems, { max: MAX_ADDED }),
         siteRules: sanitizeBackupRules(value.siteRules),
         addedViewPrefs: sanitizeBackupPrefs(value.addedViewPrefs)
@@ -1640,6 +1699,17 @@ var HOA = Object.freeze((() => {
     const channels = mergeBackupChannels(source.channels, imported.hiddenChannels);
     const watchedShown = normalizeWatchedShown({ ...normalizeWatchedShown(source.watchedShown), ...normalizeWatchedShown(imported.watchedShown) });
     const watchProgress = normalizeProgress({ ...normalizeProgress(source.watchProgress), ...normalizeProgress(imported.watchProgress) });
+    const seenRows = sanitizeBackupSeenRows(source.seenRows);
+    Object.entries(sanitizeBackupSeenRows(imported.seenRows)).forEach(([host, rows]) => {
+      seenRows[host] = normalizeSectionTitles([...(seenRows[host] || []), ...rows]).slice(-150);
+    });
+    const hiddenViewPrefs = { ...sanitizeBackupHiddenPrefs(source.hiddenViewPrefs) };
+    Object.entries(sanitizeBackupHiddenPrefs(imported.hiddenViewPrefs)).forEach(([site, pref]) => {
+      hiddenViewPrefs[site] = { ...(hiddenViewPrefs[site] || {}), ...pref };
+    });
+    const sourceWatchSettings = normalizeWatchSettings(source.watchSettings);
+    const watchSettings = imported.watchSettings === null || imported.watchSettings === undefined
+      ? sourceWatchSettings : normalizeWatchSettings({ ...sourceWatchSettings, ...imported.watchSettings });
     const siteRules = isObject(source.siteRules) ? { ...source.siteRules } : {};
     let siteCount = 0;
     const importedRules = sanitizeBackupRules(imported.siteRules);
@@ -1670,6 +1740,9 @@ var HOA = Object.freeze((() => {
       channels: normalizeChannels(channels),
       watchedShown,
       watchProgress,
+      seenRows,
+      hiddenViewPrefs,
+      watchSettings,
       siteRules,
       prefs,
       counts: { added: addedResult.count, hidden: hiddenResult.count, sites: siteCount }
@@ -1767,10 +1840,8 @@ var HOA = Object.freeze((() => {
     normalizeKeywords,
     keywordMatch,
     MAX_HIDDEN,
-    MAX_CHANNELS,
     MAX_WATCHED_SHOWN,
     MAX_ADDED,
-    MAX_PROGRESS,
     MAX_TITLE,
     MAX_URL,
     HOSTED_ADDED_URL,
@@ -1826,8 +1897,9 @@ var HOA = Object.freeze((() => {
     channelNameKey,
     channelLinkKey,
     markWatchedShown,
-    withoutAutoWatched,
     clearAutoWatched,
+    prepareUnhideAll,
+    clearWatchHistory,
     buildBackup,
     parseBackup,
     mergeBackup,
@@ -1835,7 +1907,6 @@ var HOA = Object.freeze((() => {
     restoreKeys,
     removeFromList,
     toggleAdded,
-    groupByKind,
     safeHref,
     readLists,
     writeLists,

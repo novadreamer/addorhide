@@ -9,6 +9,7 @@ window.__hoaLoaded = true;
   const ownInstance = Math.random().toString(36).slice(2) + Date.now().toString(36);
   const rootElement = document.documentElement;
   const childFrame = (() => { if (window.__hoaTestChildFrame) return true; try { return window.top !== window; } catch (error) { return true; } })();
+  const isIncognitoContext = () => typeof chrome !== "undefined" && Boolean(chrome.extension && chrome.extension.inIncognitoContext === true);
   const ownExtension = (() => {
     try {
       return chrome.runtime.id || "";
@@ -70,6 +71,7 @@ window.__hoaLoaded = true;
   let lastApplyAt = 0;
   let listsReady = false;
   let siteRulesReady = false;
+  let watchSettingsReady = false;
   let waitingForBody = false;
   let filterVersion = 0;
   let filterSignature = "";
@@ -89,6 +91,7 @@ window.__hoaLoaded = true;
   let lastSeenRows = [];
   let lastRowsReadAt = 0;
   let playerTracker = null;
+  let playbackTrackerStarted = false;
   let lastProgressWrite = 0;
   let frameProgressState = null;
   let frameResumeSent = false;
@@ -571,6 +574,11 @@ window.__hoaLoaded = true;
 
   function watchedEnabled(categories) {
     return categories.selected.some(category => category.id === "watched");
+  }
+
+  function shouldRecordWatchProgress(rule = hostnameRule()) {
+    return !isIncognitoContext() && watchSettingsReady && siteRulesReady && (watchSettings.tagWatched || watchSettings.continueWatching !== "off"
+      || childFrame || Boolean(rule && watchedEnabled(activeCategories(rule))));
   }
 
   function thumbnailForWatchedLabel(card) {
@@ -2139,6 +2147,7 @@ window.__hoaLoaded = true;
   }
 
   function frameEntry(progress) {
+    if (!shouldRecordWatchProgress()) return null;
     if (!progress || !Number.isFinite(progress.duration) || progress.duration < 20) return null;
     const key = watchKey(hostnameRule());
     if (!key) return null;
@@ -2152,6 +2161,8 @@ window.__hoaLoaded = true;
 
   function saveTracker(force = false) {
     const tracker = playerTracker; if (!tracker || !tracker.video || !Number.isFinite(tracker.video.duration)) return;
+    const rule = hostnameRule();
+    if (!shouldRecordWatchProgress(rule)) return;
     if (!force && Date.now() - lastProgressWrite < 10000) return;
     lastProgressWrite = Date.now();
     if (childFrame) {
@@ -2166,11 +2177,12 @@ window.__hoaLoaded = true;
     const entry = trackerEntry(tracker); if (!entry) return;
     if (entry.watched) delete entry.cw;
     watchProgress = { ...watchProgress, [entry.url]: entry }; HOA.writeProgress(entry.url, entry);
-    if (entry.watched && watchedEnabled(activeCategories(hostnameRule()))) queueWatched({ key: entry.url, title: entry.title, thumb: entry.thumbnail, site: entry.site, kind: HOA.kindOf(entry.url), ts: Date.now() });
+    if (entry.watched && watchedEnabled(activeCategories(rule))) queueWatched({ key: entry.url, title: entry.title, thumb: entry.thumbnail, site: entry.site, kind: HOA.kindOf(entry.url), ts: Date.now() });
     scheduleApply();
   }
 
   function maybeResume(tracker) {
+    if (isIncognitoContext()) return;
     const entry = tracker.key && watchProgress[tracker.key];
     if (watchSettings.continueWatching === "off" || !entry || !entry.cw || entry.position < 30 || entry.position >= entry.duration - 30 || tracker.resumed || Math.abs(entry.duration - tracker.video.duration) > entry.duration * .05 || tracker.video.currentTime >= 10) return;
     tracker.resumed = true; tracker.video.currentTime = Math.max(0, entry.position - 5);
@@ -2191,10 +2203,11 @@ window.__hoaLoaded = true;
   }
 
   function attachTracker(video) {
+    if (isIncognitoContext()) return;
     if (!video || !Number.isFinite(video.duration) || video.duration < 20 || playerTracker && playerTracker.video === video) return;
     playerTracker = { video, key: childFrame ? "" : watchKey(hostnameRule()), last: video.currentTime || 0, bits: HOA.bitmapBuckets(""), basePlayed: 0, covered: 0, bucketSeconds: Array(100).fill(0), resumed: false };
     resetTracker(playerTracker, playerTracker.key);
-    const update = () => { const tracker = playerTracker; if (!tracker || tracker.video !== video) return; syncTrackerKey(tracker); if (video.paused || video.playbackRate > 2) return; const now = video.currentTime || 0; const delta = now - tracker.last; tracker.last = now; if (delta <= 0 || delta > 2.5) return; const index = Math.min(99, Math.floor(now / video.duration * 100)); tracker.bucketSeconds[index] += delta; tracker.covered += delta; if (tracker.bucketSeconds[index] >= video.duration / 100 * .7) tracker.bits = setBit(tracker.bits, index); saveTracker(false); };
+    const update = () => { const tracker = playerTracker; if (!tracker || tracker.video !== video) return; syncTrackerKey(tracker); const now = video.currentTime || 0; if (!shouldRecordWatchProgress()) { tracker.last = now; return; } if (video.paused || video.playbackRate > 2) return; const delta = now - tracker.last; tracker.last = now; if (delta <= 0 || delta > 2.5) return; const index = Math.min(99, Math.floor(now / video.duration * 100)); tracker.bucketSeconds[index] += delta; tracker.covered += delta; if (tracker.bucketSeconds[index] >= video.duration / 100 * .7) tracker.bits = setBit(tracker.bits, index); saveTracker(false); };
     video.addEventListener("timeupdate", update); video.addEventListener("loadedmetadata", () => syncTrackerKey(playerTracker)); video.addEventListener("pause", () => saveTracker(true)); video.addEventListener("ended", () => saveTracker(true));
     video.addEventListener("play", () => { playerTracker.last = video.currentTime || 0; maybeResume(playerTracker); });
   }
@@ -2228,6 +2241,8 @@ window.__hoaLoaded = true;
   }
 
   function startPlaybackTracker() {
+    if (isIncognitoContext() || playbackTrackerStarted || !watchSettingsReady || !siteRulesReady) return;
+    playbackTrackerStarted = true;
     findPlayer(); document.addEventListener("loadedmetadata", findPlayer, true); document.addEventListener("durationchange", findPlayer, true);
     addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveTracker(true); }); addEventListener("pagehide", () => saveTracker(true));
   }
@@ -2235,11 +2250,11 @@ window.__hoaLoaded = true;
   if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, applyAdded, compensateCarousels, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, keyForHref, attachTracker, findPlayer, activeCategories, keywordMatch: HOA.keywordMatch, saveTracker, watchedCard, frameEntry, watchedProgressMutation });
 
   function isOwnMutation(mutation) {
-    if (mutation.target.closest && mutation.target.closest(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner")) return true;
+    if (mutation.target.closest && mutation.target.closest(".hoa-actions, #hoa-toast, #hoa-banner")) return true;
     const nodes = [...(mutation.addedNodes || []), ...(mutation.removedNodes || [])];
     return nodes.length > 0 && nodes.every(node => node.nodeType === 1
-      && (node.matches(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner")
-        || node.querySelector(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner")));
+      && (node.matches(".hoa-actions, #hoa-toast, #hoa-banner")
+        || node.querySelector(".hoa-actions, #hoa-toast, #hoa-banner")));
   }
 
   // A site that rewrites a card's class attribute (Tubi does this as its page finishes loading) wipes our
@@ -2282,11 +2297,12 @@ window.__hoaLoaded = true;
     scheduleApply();
     startPlaybackTracker();
   });
-  chrome.storage.local.get({ [HOA.WATCH_SETTINGS_KEY]: {} }, result => { watchSettings = HOA.normalizeWatchSettings(result[HOA.WATCH_SETTINGS_KEY]); scheduleApply(); });
+  chrome.storage.local.get({ [HOA.WATCH_SETTINGS_KEY]: {} }, result => { watchSettings = HOA.normalizeWatchSettings(result[HOA.WATCH_SETTINGS_KEY]); watchSettingsReady = true; scheduleApply(); startPlaybackTracker(); });
   chrome.storage.local.get({ [HOA.SITES_KEY]: {} }, result => {
     siteRules = result[HOA.SITES_KEY] && typeof result[HOA.SITES_KEY] === "object" ? result[HOA.SITES_KEY] : {};
     siteRulesReady = true;
     scheduleApply();
+    startPlaybackTracker();
   });
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") {
@@ -2388,7 +2404,7 @@ window.__hoaLoaded = true;
       }
       if (message && message.type === "hoa-load-rows" && !retired) {
         const startX = scrollX; const startY = scrollY; const started = Date.now(); let steady = 0; let height = document.documentElement.scrollHeight;
-        const step = () => { const nextHeight = document.documentElement.scrollHeight; steady = nextHeight <= height ? steady + 1 : 0; height = Math.max(height, nextHeight); if (steady >= 3 || Date.now() - started >= 20000) { scrollTo({ left: startX, top: startY, behavior: "instant" }); const rule = hostnameRule(); const count = rule ? HOA.normalizeSectionTitles(sectionRows(rule).rows.map(row => row.title)).length : 0; const host = rule && rule.hosts && rule.hosts[0]; if (host) chrome.storage.local.get({ seenRowsScanned: {} }, saved => chrome.storage.local.set({ seenRowsScanned: { ...(saved.seenRowsScanned || {}), [host]: Date.now() } })); sendResponse({ done: true, rows: count }); return; } scrollBy(0, Math.max(innerHeight || 600, 200)); window.setTimeout(step, 350); };
+        const step = () => { const nextHeight = document.documentElement.scrollHeight; steady = nextHeight <= height ? steady + 1 : 0; height = Math.max(height, nextHeight); if (steady >= 3 || Date.now() - started >= 20000) { scrollTo({ left: startX, top: startY, behavior: "instant" }); const rule = hostnameRule(); const count = rule ? HOA.normalizeSectionTitles(sectionRows(rule).rows.map(row => row.title)).length : 0; sendResponse({ done: true, rows: count }); return; } scrollBy(0, Math.max(innerHeight || 600, 200)); window.setTimeout(step, 350); };
         step(); return true;
       }
       // A replaced (retired) copy of this script stays registered as a listener; only the live one answers.

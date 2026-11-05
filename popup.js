@@ -576,7 +576,7 @@ function render() {
   const addedCount = Object.keys(added || {}).length;
   const continuing = Object.values(watchProgress).filter(entry => entry && entry.cw && !entry.watched).length;
   openAddedButton.disabled = addedCount === 0 && continuing === 0;
-  addedSummary.textContent = addedCount || !continuing ? `${HOA.addedCountText(addedCount, HOA.groupBySite(added).length)}${continuing ? ` · ${continuing} to continue` : ""}`
+  addedSummary.textContent = addedCount || !continuing ? continuing ? `${HOA.addedCountText(addedCount, HOA.groupBySite(added).length).replace(/\.$/, "")} · ${continuing} to continue.` : HOA.addedCountText(addedCount, HOA.groupBySite(added).length)
     : `${continuing} to continue watching.`;
   schedulePositionBreathingRoom();
 }

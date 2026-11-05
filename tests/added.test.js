@@ -11,16 +11,17 @@ const root = path.join(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function load() {
+async function load(initial = {}) {
   const dom = new JSDOM('<!doctype html><main id="added-root"></main>', { url: "https://extension.test/added.html", runScripts: "outside-only", pretendToBeVisual: true });
   const { window } = dom;
   window.scrollTo = () => {}; window.scrollBy = () => {};
   const key = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
   const keyTwo = "https://tubitv.com/movies/2";
-  const store = { addedItems: {}, hiddenItems: {}, hiddenChannels: {}, watchedShown: {}, addedViewPrefs: {}, watchProgress: {
+  const defaults = { addedItems: {}, hiddenItems: {}, hiddenChannels: {}, watchedShown: {}, addedViewPrefs: {}, watchProgress: {
     [key]: { site: "youtube.com", title: "A video", url: key, thumbnail: "", duration: 600, position: 125, buckets: "0000000000000000000000000", watched: false, cw: "auto", ts: 1, updated: 2 },
     [keyTwo]: { site: "tubitv.com", title: "B video", url: keyTwo, thumbnail: "", duration: 600, position: 300, buckets: "0000000000000000000000000", watched: false, cw: "auto", ts: 1, updated: Date.now() }
   } };
+  const store = { ...defaults, ...initial };
   const listeners = []; const clone = value => JSON.parse(JSON.stringify(value));
   window.confirm = () => true;
   window.chrome = { storage: { local: {
@@ -53,5 +54,59 @@ async function load() {
   assert.ok(page.document.querySelector(".continue-watching .site-delete-all").classList.contains("armed"), "delete-all arms before deleting");
   page.document.querySelector(".continue-watching .site-delete-all").click(); await wait(30);
   assert.ok(!page.store.watchProgress[page.key].cw && !page.store.watchProgress[page.keyTwo].cw, "second delete-all click clears Continue Watching but retains progress");
-  page.window.close(); console.log("added.test.js: 13 passed, 0 failed");
+  page.window.close();
+
+  const oneSite = await load({ addedItems: {
+    "https://www.youtube.com/watch?v=abcdefghijk": { site: "youtube.com", title: "One", thumb: "", ts: 1 }
+  }, watchProgress: {} });
+  assert.equal(oneSite.document.querySelector(".added-page-toolbar").hidden, true, "page toolbar stays hidden with one section");
+  assert.equal(oneSite.document.querySelectorAll(".site-group").length, 1, "one section stays stacked");
+  oneSite.window.close();
+
+  const videos = {
+    "https://www.youtube.com/watch?v=abcdefghijk": { site: "youtube.com", title: "Zebra", thumb: "", ts: 10 },
+    "https://www.youtube.com/watch?v=abcdefghijl": { site: "youtube.com", title: "Alpha", thumb: "", ts: 9 },
+    "https://www.dailymotion.com/video/xbd3ori": { site: "dailymotion.com", title: "Apple", thumb: "", ts: 20 }
+  };
+  const tabProgress = {
+    "https://www.youtube.com/watch?v=zyxwvutsrqp": { site: "youtube.com", title: "Continue", url: "https://www.youtube.com/watch?v=zyxwvutsrqp", duration: 100, position: 25, buckets: "0".repeat(25), watched: false, cw: "auto", ts: 1, updated: 30 }
+  };
+  const tabs = await load({ addedItems: videos, watchProgress: tabProgress, addedViewPrefs: { "youtube.com": { collapsed: true } } });
+  assert.equal(tabs.document.querySelector("#added-page-grouping").value, "none", "default page grouping is stacked");
+  assert.equal(tabs.document.querySelectorAll(".site-group").length, 3, "stacked mode renders every section");
+  const grouping = tabs.document.querySelector("#added-page-grouping"); grouping.value = "tabs"; grouping.dispatchEvent(new tabs.window.Event("change", { bubbles: true })); await wait(30);
+  const tabButtons = Array.from(tabs.document.querySelectorAll("[role='tab']"));
+  assert.equal(tabButtons.length, 3, "Tabs renders every section as a tab");
+  assert.deepEqual(tabButtons.map(tab => tab.querySelector(".count-badge").textContent), ["1", "1", "2"], "tabs show section counts");
+  assert.equal(tabs.document.querySelectorAll("[role='tabpanel']").length, 1, "Tabs renders only the selected section");
+  tabButtons[1].click(); await wait(30);
+  assert.equal(tabs.store.addedViewPrefs.__page.selectedTab, "dailymotion.com", "clicking a tab persists its selection");
+  const selectedTab = tabs.document.querySelector("[role='tab'][aria-selected='true']");
+  selectedTab.dispatchEvent(new tabs.window.KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); await wait(30);
+  assert.equal(tabs.document.querySelector("[role='tab'][aria-selected='true']").textContent.includes("YouTube"), true, "arrow keys select the next tab");
+  tabs.document.querySelector("[role='tab'][aria-selected='true']").dispatchEvent(new tabs.window.KeyboardEvent("keydown", { key: "Home", bubbles: true })); await wait(30);
+  assert.equal(tabs.document.querySelector("[role='tab'][aria-selected='true']").textContent.includes("Continue Watching"), true, "Home selects the first tab");
+  tabs.document.querySelector("[role='tab'][aria-selected='true']").dispatchEvent(new tabs.window.KeyboardEvent("keydown", { key: "End", bubbles: true })); await wait(30);
+  assert.equal(tabs.document.querySelector("[role='tab'][aria-selected='true']").textContent.includes("YouTube"), true, "End selects the last tab");
+  const siteTab = tabs.document.querySelector("#added-tab-youtube-com"); siteTab.click(); await wait(30);
+  assert.equal(tabs.document.querySelector(".site-group .collapse-button"), null, "tabs hide collapse controls");
+  assert.ok(tabs.document.querySelector(".site-group-body"), "tabs show a collapsed section body");
+  assert.equal(tabs.store.addedViewPrefs["youtube.com"].collapsed, true, "tabs do not change the stored collapse preference");
+  const siteSort = tabs.document.querySelector(".site-group select[id^='added-sort-']"); siteSort.value = "title"; siteSort.dispatchEvent(new tabs.window.Event("change", { bubbles: true })); await wait(30);
+  assert.equal(tabs.store.addedViewPrefs["youtube.com"].sort, "title", "site controls remain active inside tabs");
+  const pageSort = tabs.document.querySelector("#added-page-sort"); pageSort.value = "name"; pageSort.dispatchEvent(new tabs.window.Event("change", { bubbles: true })); await wait(30);
+  assert.deepEqual(Array.from(tabs.document.querySelectorAll("[role='tab']")).map(tab => tab.querySelector(".tab-name").textContent), ["Continue Watching", "Dailymotion", "YouTube"], "Name sorts website tabs ascending after Continue Watching");
+  tabs.document.querySelector("#added-page-direction").click(); await wait(30);
+  assert.deepEqual(Array.from(tabs.document.querySelectorAll("[role='tab']")).map(tab => tab.querySelector(".tab-name").textContent), ["Continue Watching", "YouTube", "Dailymotion"], "page direction reverses website tabs without moving Continue Watching");
+  pageSort.value = "recent"; pageSort.dispatchEvent(new tabs.window.Event("change", { bubbles: true })); await wait(30);
+  assert.deepEqual(Array.from(tabs.document.querySelectorAll("[role='tab']")).map(tab => tab.querySelector(".tab-name").textContent), ["Continue Watching", "Dailymotion", "YouTube"], "Recently added orders tabs by newest entry");
+  const stackedGrouping = tabs.document.querySelector("#added-page-grouping"); stackedGrouping.value = "none"; stackedGrouping.dispatchEvent(new tabs.window.Event("change", { bubbles: true })); await wait(30);
+  assert.deepEqual(Array.from(tabs.document.querySelectorAll(".site-group")).map(section => section.dataset.site), ["continue-watching", "dailymotion.com", "youtube.com"], "Recently added orders stacked sections while Continue Watching stays first");
+  const tabGrouping = tabs.document.querySelector("#added-page-grouping"); tabGrouping.value = "tabs"; tabGrouping.dispatchEvent(new tabs.window.Event("change", { bubbles: true })); await wait(30);
+  assert.equal(tabs.document.querySelector("[role='tab'][aria-selected='true']").textContent.includes("YouTube"), true, "switching back to tabs keeps the selected tab");
+  const remountRoot = tabs.document.createElement("main"); tabs.document.body.appendChild(remountRoot); tabs.window.HOA_ADDED.mount(remountRoot); await wait(30);
+  assert.equal(remountRoot.querySelector("[role='tab'][aria-selected='true']").textContent.includes("YouTube"), true, "selected tab persists after a remount");
+  tabs.window.chrome.storage.local.set({ addedItems: { "https://www.dailymotion.com/video/xbd3ori": videos["https://www.dailymotion.com/video/xbd3ori"] } }); await wait(40);
+  assert.equal(tabs.document.querySelector("[role='tab'][aria-selected='true']").textContent.includes("Continue Watching"), true, "a removed selected site falls back to the first remaining tab");
+  tabs.window.close(); console.log("added.test.js: 32 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

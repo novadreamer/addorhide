@@ -94,4 +94,24 @@ check("wildcard host rejected", () => assert.equal(SITES.hostFromPattern("*://*.
 check("pattern without path rejected", () => assert.equal(SITES.hostFromPattern("*://example.com"), null));
 check("YouTube host from pattern", () => assert.equal(SITES.hostFromPattern("*://youtube.com/*"), "youtube.com"));
 
+{
+  const previousChrome = global.chrome;
+  const store = { siteRules: { "example.com": { enabled: true } }, seenRows: { "example.com": ["Drama"], "other.com": ["Comedy"] } };
+  global.chrome = {
+    runtime: { lastError: null },
+    storage: { local: {
+      get(defaults, callback) { const result = {}; Object.keys(defaults).forEach(key => { result[key] = key in store ? store[key] : defaults[key]; }); callback(result); },
+      set(values, callback) { Object.assign(store, values); if (callback) callback(); }
+    } },
+    permissions: { remove(_details, callback) { callback(); } },
+    scripting: { unregisterContentScripts(_details, callback) { callback(); } }
+  };
+  SITES.forgetSite("example.com", result => assert.equal(result.ok, true));
+  check("forgetting a site also removes its remembered rows", () => {
+    assert.equal(store.siteRules["example.com"], undefined);
+    assert.deepEqual(store.seenRows, { "other.com": ["Comedy"] });
+  });
+  global.chrome = previousChrome;
+}
+
 console.log(`sites.test.js: ${passed} passed, 0 failed`);

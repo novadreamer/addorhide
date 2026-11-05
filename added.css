@@ -36,6 +36,27 @@ body.hoa-added-view main {
 }
 
 .hoa-added-page .empty-state { margin: 14px 0 24px; }
+.hoa-added-page .added-page-toolbar { display: flex; justify-content: flex-end; margin: -14px 0 18px; }
+.hoa-added-page .page-controls { justify-content: flex-end; }
+.hoa-added-page .page-control-label { margin-left: 8px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.hoa-added-page .added-tab-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: -10px; }
+.hoa-added-page .added-page-tab {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 9px 6px 6px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.hoa-added-page .added-page-tab[aria-selected="true"] { color: var(--accent); border-color: var(--accent); background: var(--surface-2); }
+.hoa-added-page .added-page-tab .site-logo { width: 28px; height: 28px; border-radius: 7px; }
+.hoa-added-page .added-page-tab .site-monogram { border-radius: 4px; }
+.hoa-added-page .continue-tab-icon { color: var(--accent); font-size: 12px; }
+.hoa-added-page .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hoa-added-page .added-groups { display: grid; gap: 28px; }
 .hoa-added-page .site-group { min-width: 0; }
 .hoa-added-page .site-heading {
@@ -319,6 +340,8 @@ body.hoa-added-view main {
 }
 
 @media (max-width: 700px) {
+  .hoa-added-page .added-page-toolbar { justify-content: flex-start; }
+  .hoa-added-page .page-controls { justify-content: flex-start; }
   .hoa-added-page .site-heading { grid-template-columns: auto auto minmax(0, 1fr); }
   .hoa-added-page .site-controls { grid-column: 1 / -1; justify-content: flex-start; padding-left: 42px; }
 }
@@ -348,4 +371,3 @@ body.hoa-added-view main {
 .hoa-added-page .continue-watching { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
 .hoa-added-page .continue-card .card-link { position: relative; }
 .hoa-added-page .continue-progress { position: absolute; right: 0; bottom: 0; left: 0; height: 4px; background: linear-gradient(90deg, var(--accent) var(--hoa-progress), rgba(255,255,255,.3) var(--hoa-progress)); }
-.hoa-added-page .continue-card .card-remove { float: right; min-width: 28px; min-height: 28px; padding: 0; color: var(--danger); background: transparent; border: 0; font-size: 20px; }
