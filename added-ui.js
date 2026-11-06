@@ -583,10 +583,11 @@ const HOA_ADDED = (() => {
       if (tabMode) heading.append(identity); else heading.append(collapse, identity);
       const controls = element("div", "site-controls"); const sortSelect = makeSelect(prefKey, "sort", sortOptions, sort);
       sortSelect.addEventListener("change", () => { setPrefs(prefKey, { sort: sortSelect.value, dir: defaultDirection(sortSelect.value) }); render(); });
-      controls.append(labelFor("Sort by", sortSelect), sortSelect);
+      // One item has nothing to put in order.
+      if (entries.length > 1) controls.append(labelFor("Sort by", sortSelect), sortSelect);
       const direction = element("button", "direction-button", dir === "asc" ? "↑" : "↓"); direction.type = "button"; direction.id = `added-direction-${prefKey}`;
       direction.title = `${SORT_LABELS[sort]}: ${dir === "asc" ? "ascending" : "descending"}`; direction.setAttribute("aria-label", direction.title);
-      direction.addEventListener("click", () => { setPrefs(prefKey, { dir: dir === "asc" ? "desc" : "asc" }); render(); }); controls.appendChild(direction);
+      direction.addEventListener("click", () => { setPrefs(prefKey, { dir: dir === "asc" ? "desc" : "asc" }); render(); }); if (entries.length > 1) controls.appendChild(direction);
       if (groupOptions.length > 1) { const groupSelect = makeSelect(prefKey, "group", groupOptions, groupMode); groupSelect.addEventListener("change", () => { setPrefs(prefKey, { group: groupSelect.value }); render(); }); controls.append(labelFor("Group by", groupSelect), groupSelect); }
       const clear = element("button", `site-delete-all${siteDeleteConfirmations.has(prefKey) ? " armed" : ""}`); clear.type = "button"; clear.innerHTML = siteDeleteConfirmations.has(prefKey) ? OPEN_BIN_ICON : BIN_ICON;
       clear.title = siteDeleteConfirmations.has(prefKey) ? `Click again to remove every ${label} video` : `Remove all ${label} videos`; clear.setAttribute("aria-label", clear.title);

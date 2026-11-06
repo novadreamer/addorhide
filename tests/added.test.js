@@ -151,6 +151,13 @@ async function load(initial = {}) {
   assert.deepEqual(Array.from(categories.document.querySelectorAll(".site-group")).map(section => section.dataset.site), ["added-channels", "added-categories", "youtube.com"], "Categories follows Channels and is excluded from website sections");
   const categorySection = categories.document.querySelector(".added-categories");
   assert.ok(categorySection.querySelector(".category-card"), "category cards use their own portrait card treatment");
+  assert.ok(categorySection.querySelector("#added-direction-added-categories"), "two categories can be sorted");
+  const oneCategory = await load({ addedItems: { [categoryOne]: { site: "twitch.tv", title: "Just Chatting", thumb: "", kind: "category", ts: 20 } } });
+  const lone = oneCategory.document.querySelector(".added-categories");
+  assert.ok(lone.querySelector(".category-card"), "a single category is still listed");
+  assert.equal(lone.querySelector("select[id^='added-sort-']"), null, "one category has no sort menu");
+  assert.equal(lone.querySelector(".direction-button"), null, "one category has no sort direction");
+  assert.ok(lone.querySelector(".site-delete-all"), "one category keeps its delete button");
   assert.ok(categorySection.querySelector(".hoa-placeholder svg"), "categories without art use the four-square placeholder");
   const categorySort = categorySection.querySelector("select"); assert.deepEqual(Array.from(categorySort.options).map(option => option.value), ["added", "title", "site"], "category controls offer Date added, Name, and Site sorting");
   categorySort.value = "site"; categorySort.dispatchEvent(new categories.window.Event("change", { bubbles: true })); await wait(25);
