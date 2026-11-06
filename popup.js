@@ -576,15 +576,17 @@ function render() {
   // Added Videos works the same way: off while nothing is added, with the count underneath.
   const addedEntries = Object.entries(added || {});
   const channelCount = addedEntries.filter(([key, entry]) => entry && (entry.kind === "channel" || HOA.kindOf(key) === "channel")).length;
-  const videoAdded = Object.fromEntries(addedEntries.filter(([key, entry]) => !entry || (entry.kind !== "channel" && HOA.kindOf(key) !== "channel")));
+  const categoryCount = addedEntries.filter(([key, entry]) => entry && (entry.kind === "category" || HOA.kindOf(key) === "category")).length;
+  const videoAdded = Object.fromEntries(addedEntries.filter(([key, entry]) => !entry || ((entry.kind !== "channel" && HOA.kindOf(key) !== "channel") && (entry.kind !== "category" && HOA.kindOf(key) !== "category"))));
   const addedCount = Object.keys(videoAdded).length;
   const continuing = Object.values(watchProgress).filter(entry => entry && entry.cw && !entry.watched).length;
   const later = Object.keys(watchLater || {}).length;
-  openAddedButton.disabled = addedCount === 0 && channelCount === 0 && continuing === 0 && later === 0;
+  openAddedButton.disabled = addedCount === 0 && channelCount === 0 && categoryCount === 0 && continuing === 0 && later === 0;
   addedSummary.textContent = addedCount || !continuing ? continuing ? `${HOA.addedCountText(addedCount, HOA.groupBySite(videoAdded).length).replace(/\.$/, "")} · ${continuing} to continue.` : HOA.addedCountText(addedCount, HOA.groupBySite(videoAdded).length)
     : `${continuing} to continue watching.`;
   if (later) addedSummary.textContent = `${addedSummary.textContent.replace(/\.$/, "")} · ${later} to watch later.`;
   if (channelCount) addedSummary.textContent = `${addedSummary.textContent.replace(/\.$/, "")} · ${channelCount} channel${channelCount === 1 ? "" : "s"} added.`;
+  if (categoryCount) addedSummary.textContent = `${addedSummary.textContent.replace(/\.$/, "")} · ${categoryCount} ${categoryCount === 1 ? "category" : "categories"} added.`;
   schedulePositionBreathingRoom();
 }
 

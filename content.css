@@ -35,6 +35,8 @@
 .hoa-actions button { text-shadow: 0 1px 2px rgba(0, 0, 0, .75); }
 /* Copy of the bar drawn above a site layer that covers the card (see syncFloatBar in content.js). */
 .hoa-actions.hoa-float { position: fixed !important; right: auto; opacity: 1; pointer-events: auto; z-index: 2147483647 !important; }
+/* A site's own button rule (Xumo: button { display: block }) beats the browser's default for [hidden]. */
+.hoa-actions button[hidden] { display: none !important; }
 .hoa-actions.hoa-float[hidden] { display: none !important; }
 /* Fixed in the top layer of the page rather than inside the player, so no player overlay can sit over it or take its clicks. */
 #hoa-watch-later {

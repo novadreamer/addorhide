@@ -611,6 +611,20 @@ check("normalizing existing added items derives channel kind without overwriting
   const items = HOA.normalizeItems({ [channel]: { title: "Creator", thumb: "", ts: 1 }, [short]: { title: "Short", thumb: "", ts: 2, kind: "short" } });
   assert.equal(items[channel].kind, "channel"); assert.equal(items[short].kind, "short");
 });
+check("category URLs accept supported category paths and reject lookalikes", () => {
+  ["https://www.twitch.tv/directory/category/just-chatting", "https://www.twitch.tv/directory/category/just-chatting/videos", "https://www.twitch.tv/directory/event/just-chatting", "https://www.twitch.tv/category/films", "https://example.com/category/films", "https://example.com/categories/films/popular"].forEach(url => assert.equal(HOA.isCategoryUrl(url), true, url));
+  ["https://www.twitch.tv/directory/category/just-chatting", "https://www.twitch.tv/directory/category/just-chatting/videos", "https://www.twitch.tv/directory/game/just-chatting", "https://www.twitch.tv/category/films", "https://example.com/category/films", "https://example.com/categories/films/popular"].forEach(url => assert.equal(HOA.isCategoryUrl(url), true, url));
+  ["https://www.twitch.tv/streamer", "https://www.twitch.tv/videos/1", "https://www.twitch.tv/directory", "https://www.twitch.tv/directory/all", "https://example.com/videos/category/films", "https://example.com/watch/category/films", "https://example.com/shorts/category/films", "https://example.com/categories/films/popular/extra"].forEach(url => assert.equal(HOA.isCategoryUrl(url), false, url));
+});
+check("categories are never channels and normalize from saved URLs", () => {
+  const category = "https://www.twitch.tv/directory/category/just-chatting";
+  const short = "https://www.youtube.com/shorts/abc123def45";
+  assert.equal(HOA.isChannelUrl(category), false);
+  assert.equal(HOA.kindOf(category), "category");
+  const items = HOA.normalizeItems({ [category]: { title: "Just Chatting", thumb: "", ts: 1 }, [short]: { title: "Short", thumb: "", ts: 2, kind: "short" } });
+  assert.equal(items[category].kind, "category");
+  assert.equal(items[short].kind, "short");
+});
 check("player surface distinguishes real players from thumbnail and hover-preview cards", () => {
   const rect = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height });
   const video = { closest: () => null, getBoundingClientRect: () => rect(0, 0, 100, 100) };

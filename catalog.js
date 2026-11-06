@@ -210,8 +210,8 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "twitch", name: "Twitch", builtIn: false, hosts: Object.freeze(["twitch.tv"]), subdomains: true,
-      cardSelector: 'article:has(a[data-a-target="preview-card-image-link"])',
-      linkSelector: 'a[data-a-target="preview-card-image-link"]', titleCandidates: Object.freeze(["h4", "h3"]),
+      cardSelector: 'article:has(a[data-a-target="preview-card-image-link"]), .game-card:has(a[data-a-target="tw-box-art-card-link"])',
+      linkSelector: 'a[data-a-target="preview-card-image-link"], a[data-a-target="tw-box-art-card-link"]', titleCandidates: Object.freeze(["h4", "h3", "h2"]),
       typeFixed: "live", removeClimb: true,
       meta: Object.freeze({ texts: Object.freeze(["*"]), genres: 'a[data-a-target="preview-card-game-link"]' }),
       channelLinkSelector: 'a[data-a-target="preview-card-channel-link"]', channelNameSelector: 'a[data-a-target="preview-card-channel-link"] p[title]',

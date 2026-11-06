@@ -1450,6 +1450,21 @@ const CASES = [
     check("a video arriving later removes only that player surface bar", () => { assert.equal(arriving.document.querySelector(".surface .hoa-actions"), null); assert.ok(arriving.document.querySelector(".thumb .hoa-actions")); });
     arriving.window.close();
   }
+  {
+    const category = await load({ html: '<div class="game-card"><a data-a-target="tw-box-art-card-link" href="/directory/category/just-chatting"><img alt="Just Chatting cover image"></a><h2 title="Just Chatting">A different heading</h2></div>', url: "https://www.twitch.tv/directory", siteRules: { "www.twitch.tv": { enabled: true } } });
+    category.document.querySelector(".game-card [data-action='add']").click(); await wait(25);
+    check("adding a Twitch category card stores its category kind and preferred heading title", () => { const entry = category.store.addedItems["https://www.twitch.tv/directory/category/just-chatting"]; assert.equal(entry.kind, "category"); assert.equal(entry.title, "Just Chatting"); });
+    category.window.close();
+    const altCategory = await load({ html: '<div class="game-card"><a data-a-target="tw-box-art-card-link" href="/directory/game/just-chatting"><img alt="Just Chatting box art"></a></div>', url: "https://www.twitch.tv/directory", siteRules: { "www.twitch.tv": { enabled: true } } });
+    altCategory.document.querySelector(".game-card [data-action='add']").click(); await wait(25);
+    check("a category image title drops Twitch art suffixes", () => assert.equal(altCategory.store.addedItems["https://www.twitch.tv/directory/game/just-chatting"].title, "Just Chatting"));
+    altCategory.window.close();
+  }
+  {
+    const css = new JSDOM(`<!doctype html><style>${read("content.css")}</style><div class="hoa-actions"><button hidden>Hidden action</button></div>`, { pretendToBeVisual: true });
+    check("Xumo action buttons with hidden state are not displayed", () => assert.equal(css.window.getComputedStyle(css.window.document.querySelector(".hoa-actions button")).display, "none"));
+    css.window.close();
+  }
   console.log(`engine.test.js: ${passed} passed, 0 failed`);
 })().catch(error => {
   console.error(error);

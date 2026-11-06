@@ -418,6 +418,7 @@ var HOA = Object.freeze((() => {
     const host = url.hostname.toLowerCase().replace(/^www\./, "");
     const segments = url.pathname.split("/").filter(Boolean);
     const first = (segments[0] || "").toLowerCase();
+    if (isCategoryUrl(url.href)) return false;
     // Never let an otherwise plausible channel path turn a video into a channel.
     if (["shorts", "watch", "video", "videos"].includes(first)) return false;
     const hasSingleSegment = () => segments.length === 1 && Boolean(segments[0]);
@@ -432,6 +433,28 @@ var HOA = Object.freeze((() => {
     const videoTab = ["shorts", "watch", "video", "videos"].includes((segments[2] || "").toLowerCase());
     return !videoTab && (oneChannelPath(["@", "c", "channel", "channels", "user", "profile"])
       || (/^@[^/]+$/i.test(segments[0] || "") && segments.length <= 2));
+  }
+
+  function isCategoryUrl(value) {
+    let url;
+    try {
+      url = new URL(value, "https://www.youtube.com");
+    } catch (error) {
+      return false;
+    }
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const segments = url.pathname.split("/").filter(Boolean);
+    const first = (segments[0] || "").toLowerCase();
+    if (["shorts", "watch", "video", "videos"].includes(first)) return false;
+    const hasCategoryPath = (prefixes, start = 0) => prefixes.includes((segments[start] || "").toLowerCase())
+      && Boolean(segments[start + 1]) && segments.length >= start + 2 && segments.length <= start + 3;
+    if (host === "twitch.tv") {
+      if (hasCategoryPath(["category", "game", "event"], 1)
+        && (segments[0] || "").toLowerCase() === "directory") {
+        return true;
+      }
+    }
+    return hasCategoryPath(["category", "categories"]);
   }
 
   function isPlayerSurface(element, pageUrl) {
@@ -458,15 +481,24 @@ var HOA = Object.freeze((() => {
     });
   }
 
+  // Every card on every pass asks this, and each answer costs several URL parses.
+  const kindCache = new Map();
+
   function kindOf(url) {
+    const known = kindCache.get(url);
+    if (known) return known;
+    let kind = "video";
     try {
       const parsed = new URL(url);
-      if (isChannelUrl(parsed.href)) return "channel";
-      return YOUTUBE_HOSTS.has(parsed.hostname.toLowerCase())
-        && parsed.pathname.startsWith("/shorts/") ? "short" : "video";
+      if (isCategoryUrl(parsed.href)) kind = "category";
+      else if (isChannelUrl(parsed.href)) kind = "channel";
+      else if (YOUTUBE_HOSTS.has(parsed.hostname.toLowerCase()) && parsed.pathname.startsWith("/shorts/")) kind = "short";
     } catch (error) {
-      return "video";
+      kind = "video";
     }
+    if (kindCache.size >= 2000) kindCache.clear();
+    kindCache.set(url, kind);
+    return kind;
   }
 
   function typeOf(url) {
@@ -1536,12 +1568,12 @@ var HOA = Object.freeze((() => {
       if (site !== "__page" && siteCount >= 200) {
         continue;
       }
-      if ((!looksLikeHostname(site) && site !== "continue-watching" && site !== "__page") || !isObject(value[site])) {
+      if ((!looksLikeHostname(site) && !["continue-watching", "watch-later", "added-channels", "added-categories", "__page"].includes(site)) || !isObject(value[site])) {
         continue;
       }
       const raw = value[site];
       if (site === "__page") {
-        const selectedTab = typeof raw.selectedTab === "string" && (raw.selectedTab === "continue-watching" || looksLikeHostname(raw.selectedTab))
+        const selectedTab = typeof raw.selectedTab === "string" && (["continue-watching", "watch-later", "channels", "categories"].includes(raw.selectedTab) || looksLikeHostname(raw.selectedTab))
           ? raw.selectedTab : "";
         Object.defineProperty(result, site, { value: {
           grouping: raw.grouping === "tabs" ? "tabs" : "none",
@@ -1552,7 +1584,7 @@ var HOA = Object.freeze((() => {
         continue;
       }
       const pref = {
-        sort: SORT_KEYS.includes(raw.sort) ? raw.sort : "added",
+        sort: SORT_KEYS.includes(raw.sort) || raw.sort === "site" ? raw.sort : "added",
         dir: raw.dir === "asc" || raw.dir === "desc" ? raw.dir : raw.sort === "title" ? "asc" : "desc",
         group: ["type", "genre", "channel", "added-date", "decade", "rating", "site", "watched-date"].includes(raw.group) ? raw.group : "none",
         collapsed: typeof raw.collapsed === "boolean" ? raw.collapsed : false
@@ -1960,6 +1992,7 @@ var HOA = Object.freeze((() => {
     siteOf,
     kindOf,
     isChannelUrl,
+    isCategoryUrl,
     isPlayerSurface,
     typeOf,
     parseDuration,

@@ -185,5 +185,9 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   } });
   assert.match(mixedPopup.document.querySelector("#added-summary").textContent, /1 added video.*1.*website.*1 channel added/, "popup video-site summary excludes a channel-only site");
   mixedPopup.window.close();
-  console.log("popup.test.js: 44 passed, 0 failed");
+  const categoriesPopup = await loadPopup({ addedItems: { "https://www.twitch.tv/directory/category/just-chatting": { title: "Just Chatting", thumb: "", kind: "category", site: "twitch.tv", ts: 1 } } });
+  assert.match(categoriesPopup.document.querySelector("#added-summary").textContent, /1 category added/, "popup summarizes categories separately from videos");
+  assert.equal(categoriesPopup.document.querySelector("#open-added-button").disabled, false, "categories alone enable Added Videos");
+  categoriesPopup.window.close();
+  console.log("popup.test.js: 46 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

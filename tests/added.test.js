@@ -139,5 +139,30 @@ async function load(initial = {}) {
   assert.equal(Object.keys(channels.store.addedItems).length, 2, "channel card remove edits added items only");
   const channelClear = channels.document.querySelector(".added-channels .site-delete-all"); channelClear.click(); await wait(5); channels.document.querySelector(".added-channels .site-delete-all").click(); await wait(25);
   assert.equal(Object.values(channels.store.addedItems).filter(entry => entry.kind === "channel").length, 0, "channel delete-all uses the shared two-click control");
-  channels.window.close(); console.log("added.test.js: 42 passed, 0 failed");
+  channels.window.close();
+  const categoryOne = "https://www.twitch.tv/directory/category/just-chatting";
+  const categoryTwo = "https://example.com/categories/films";
+  const categories = await load({ addedItems: {
+    "https://www.youtube.com/@creator": { site: "youtube.com", title: "Creator", thumb: "", kind: "channel", ts: 30 },
+    [categoryOne]: { site: "twitch.tv", title: "Just Chatting", thumb: "https://example.com/chatting.jpg", kind: "category", ts: 20 },
+    [categoryTwo]: { site: "example.com", title: "Films", thumb: "", kind: "category", ts: 10 },
+    "https://www.youtube.com/watch?v=abcdefghijk": { site: "youtube.com", title: "Video", thumb: "", ts: 1 }
+  }, watchProgress: {}, watchLater: {} });
+  assert.deepEqual(Array.from(categories.document.querySelectorAll(".site-group")).map(section => section.dataset.site), ["added-channels", "added-categories", "youtube.com"], "Categories follows Channels and is excluded from website sections");
+  const categorySection = categories.document.querySelector(".added-categories");
+  assert.ok(categorySection.querySelector(".category-card"), "category cards use their own portrait card treatment");
+  assert.ok(categorySection.querySelector(".hoa-placeholder svg"), "categories without art use the four-square placeholder");
+  const categorySort = categorySection.querySelector("select"); assert.deepEqual(Array.from(categorySort.options).map(option => option.value), ["added", "title", "site"], "category controls offer Date added, Name, and Site sorting");
+  categorySort.value = "site"; categorySort.dispatchEvent(new categories.window.Event("change", { bubbles: true })); await wait(25);
+  assert.equal(categories.store.addedViewPrefs["added-categories"].sort, "site", "category sort persists separately");
+  const categoryGroup = categories.document.querySelector(".added-categories select[id^='added-group-']"); categoryGroup.value = "site"; categoryGroup.dispatchEvent(new categories.window.Event("change", { bubbles: true })); await wait(25);
+  assert.equal(categories.store.addedViewPrefs["added-categories"].group, "site", "category site grouping persists");
+  categories.document.querySelector(".added-categories .collapse-button").click(); await wait(25);
+  assert.equal(categories.document.querySelector(".added-categories .added-card-grid"), null, "category section collapses");
+  categories.document.querySelector(".added-categories .collapse-button").click(); await wait(25);
+  categories.document.querySelector(".added-categories .remove-button").click(); await wait(25);
+  assert.equal(Object.values(categories.store.addedItems).filter(entry => entry.kind === "category").length, 1, "category remove edits added items only");
+  const categoryClear = categories.document.querySelector(".added-categories .site-delete-all"); categoryClear.click(); await wait(5); categories.document.querySelector(".added-categories .site-delete-all").click(); await wait(25);
+  assert.equal(Object.values(categories.store.addedItems).filter(entry => entry.kind === "category").length, 0, "category delete-all uses the shared two-click control");
+  categories.window.close(); console.log("added.test.js: 51 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1028,6 +1028,21 @@ window.__hoaLoaded = true;
       && !looksLikeBadge(text) && !/^[\d\s\p{P}\p{S}]+$/u.test(text) ? text : "";
   }
 
+  function categoryTitle(card) {
+    let heading;
+    try {
+      heading = card.querySelector("h1, h2, h3, h4");
+    } catch (error) {
+      heading = null;
+    }
+    const headingTitle = plausiblePickedTitle(heading && heading.getAttribute("title"));
+    const headingText = plausiblePickedTitle(heading && heading.textContent);
+    if (headingTitle || headingText) return headingTitle || headingText;
+    const image = card.querySelector("img[alt]");
+    return plausiblePickedTitle(image && image.getAttribute("alt"))
+      .replace(/\s+(?:cover image|box art)$/i, "");
+  }
+
   function pickedTitle(card, link) {
     const linkLabel = plausiblePickedTitle(link.getAttribute("aria-label"))
       || plausiblePickedTitle(link.getAttribute("title"));
@@ -1109,17 +1124,21 @@ window.__hoaLoaded = true;
     if (!key) {
       return null;
     }
-    let title = "";
-    for (const selector of rule.titleCandidates || []) {
-      let candidate;
-      try {
-        candidate = card.matches(selector) ? card : card.querySelector(selector);
-      } catch (error) {
-        candidate = null;
-      }
-      title = textFrom(candidate);
-      if (title) {
-        break;
+    const kind = HOA.kindOf(key);
+    const category = kind === "category";
+    let title = category ? categoryTitle(card) : "";
+    if (!title) {
+      for (const selector of rule.titleCandidates || []) {
+        let candidate;
+        try {
+          candidate = card.matches(selector) ? card : card.querySelector(selector);
+        } catch (error) {
+          candidate = null;
+        }
+        title = textFrom(candidate);
+        if (title) {
+          break;
+        }
       }
     }
     if (rule.titleFromSlug && (!title || /\.(?:png|jpe?g|webp)$/i.test(title))) {
@@ -1133,11 +1152,11 @@ window.__hoaLoaded = true;
     title = title || textFrom(link);
     if (!title) {
       const image = card.querySelector("img[alt]");
-      title = image ? (image.getAttribute("alt") || "").trim() : "";
+      title = image ? (image.getAttribute("alt") || "").trim().replace(category ? /\s+(?:cover image|box art)$/i : /$^/, "") : "";
     }
     // A channel card should be named for the channel, not the adjacent video/title
     // text a feed happens to show.
-    if (HOA.kindOf(key) === "channel") {
+    if (kind === "channel") {
       const identity = channelIdentity(card, rule);
       if (identity && identity.name) title = identity.name;
     }
@@ -1150,7 +1169,7 @@ window.__hoaLoaded = true;
       thumb = typeof source === "string" && /^https?:\/\//i.test(source) && source.length <= HOA.MAX_URL ? source : "";
     }
     const pageData = pageDataForCard(card, rule, link);
-    return { key, title, thumb, kind: HOA.kindOf(key), site: HOA.siteOf(key), ts: Date.now(), ...(pageData ? { pageData } : {}) };
+    return { key, title, thumb, kind, site: HOA.siteOf(key), ts: Date.now(), ...(pageData ? { pageData } : {}) };
   }
 
   function elementText(element) {

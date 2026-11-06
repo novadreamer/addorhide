@@ -21,8 +21,8 @@ movie and streaming sites, and a card picker that teaches it any other video sit
 - **Watch Later:** hover over the player on a video's own page and choose Add to Watch Later. The list sits under Continue Watching, and a saved video moves there once you have played a few seconds.
 - **Continue Watching:** videos you start appear with a progress bar and time left, and resume where you stopped, with Start over.
 - **Hide by type, keyword and channel:** per-site categories such as Shorts, Playlists and Live, your own keywords, whole channels, and rows by name on streaming sites.
-- **Channels:** adding a card that leads to a channel saves the channel to its own list under Watch Later.
-- **Added Videos:** tabs for Continue Watching, Watch Later, Channels and each website, website sorting, and grouping by channel, date added, decade or rating.
+- **Channels and Categories:** adding a card that leads to a channel or a category saves it to its own list under Watch Later.
+- **Added Videos:** tabs for Continue Watching, Watch Later, Channels, Categories and each website, website sorting, and grouping by channel, date added, decade or rating.
 - **Hidden Videos:** the same sorting and grouping, a Show all button on every group, and channels and watched videos in their own groups.
 - **Popup:** a redrawn power button (green on, red off), new position arrows and an Auto-add switch.
 - **Privacy:** nothing is recorded in private windows or when the watch features are off, except videos you saved to Watch Later yourself, and Clear watch history wipes it in one click.
