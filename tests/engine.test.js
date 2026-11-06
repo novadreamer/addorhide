@@ -1336,6 +1336,26 @@ const CASES = [
       assert.equal(page.store.watchProgress[key].cw, "later");
     });
     page.window.close();
+    for (const [name, options] of [["a private window", { incognito: true }], ["Auto-add off", { watchSettings: { continueWatching: "off" } }], ["every watch feature off", { watchSettings: { continueWatching: "off", tagWatched: false } }]]) {
+      const chosen = await load({ html: "", url: key, ...options, watchLater: { [key]: { title: "Later", thumb: "", site: "youtube.com", url: key, duration: 100, ts: 1 } }, testSeam: true });
+      const played = fakeVideo(chosen, { currentTime: 9 }); played.fire("play");
+      [10, 11, 12, 13].forEach(position => { played.currentTime = position; played.fire("timeupdate"); });
+      await wait(30);
+      check(`a Watch Later video moves to Continue Watching in ${name}`, () => { assert.equal((chosen.store.watchLater || {})[key], undefined); assert.equal(chosen.store.watchProgress[key].cw, "later"); });
+      chosen.window.close();
+      const back = await load({ html: "", url: key, ...options, watchProgress: { [key]: { site: "youtube.com", title: "Later", url: key, duration: 100, position: 40, played: 40, buckets: "", cw: "later", ts: 1, updated: 1 } }, testSeam: true });
+      const again = fakeVideo(back, { currentTime: 0, duration: 100 }); again.fire("play"); await wait(20);
+      check(`that video resumes in ${name}`, () => assert.deepEqual(again.seeks, [35]));
+      back.window.close();
+    }
+    {
+      const other = "https://www.youtube.com/watch?v=notchosen00";
+      const skip = await load({ html: "", url: other, incognito: true, watchLater: { [key]: { title: "Later", thumb: "", site: "youtube.com", url: key, duration: 100, ts: 1 } }, testSeam: true });
+      const played = fakeVideo(skip, { currentTime: 9 }); played.fire("play");
+      [10, 11, 12, 13].forEach(position => { played.currentTime = position; played.fire("timeupdate"); }); played.fire("pause"); await wait(30);
+      check("a video that isn't saved still leaves no trace in a private window", () => assert.deepEqual(skip.store.watchProgress || {}, {}));
+      skip.window.close();
+    }
   }
   {
     const key = "https://www.youtube.com/watch?v=hoverwatch1";

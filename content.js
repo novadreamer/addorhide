@@ -583,8 +583,17 @@ window.__hoaLoaded = true;
     return categories.selected.some(category => category.id === "watched");
   }
 
-  function shouldRecordWatchProgress(rule = hostnameRule()) {
-    return !isIncognitoContext() && watchSettingsReady && siteRulesReady && (watchSettings.tagWatched || watchSettings.continueWatching !== "off"
+  // A video the user saved to Watch Later is their own choice: it keeps working in private windows and with
+  // Auto-add off, from saving it through resuming it. Everything else follows the settings below.
+  function chosenVideo(key) {
+    const entry = key && watchProgress[key];
+    return Boolean(key && (watchLater[key] || (entry && entry.cw === "later")));
+  }
+
+  function shouldRecordWatchProgress(rule = hostnameRule(), key = "") {
+    if (!watchSettingsReady || !siteRulesReady) return false;
+    if (chosenVideo(key)) return true;
+    return !isIncognitoContext() && (watchSettings.tagWatched || watchSettings.continueWatching !== "off"
       || childFrame || Boolean(rule && watchedEnabled(activeCategories(rule))));
   }
 
@@ -2154,10 +2163,9 @@ window.__hoaLoaded = true;
   }
 
   function frameEntry(progress) {
-    if (!shouldRecordWatchProgress()) return null;
     if (!progress || !Number.isFinite(progress.duration) || progress.duration < 20) return null;
     const key = watchKey(hostnameRule());
-    if (!key) return null;
+    if (!key || !shouldRecordWatchProgress(hostnameRule(), key)) return null;
     const old = watchProgress[key] || {};
     if (!frameProgressState || frameProgressState.key !== key || Math.abs(frameProgressState.duration - progress.duration) > progress.duration * .05) {
       frameProgressState = { key, duration: progress.duration, basePlayed: Number(old.played) || 0 };
@@ -2169,12 +2177,12 @@ window.__hoaLoaded = true;
   function saveTracker(force = false) {
     const tracker = playerTracker; if (!tracker || !tracker.video || !Number.isFinite(tracker.video.duration)) return;
     const rule = hostnameRule();
-    if (!shouldRecordWatchProgress(rule)) return;
+    if (!shouldRecordWatchProgress(rule, tracker.key)) return;
     // A user-picked video graduates to Continue Watching as soon as it is genuinely resumable.
     // Do not make that transition wait behind the regular ten-second storage throttle. Frame players
     // send the same eligible sample immediately; the top page owns the chosen-list decision.
     const position = Math.max(0, Number(tracker.video.currentTime) || 0);
-    const pendingLater = !childFrame && tracker.key && watchLater[tracker.key] && !isIncognitoContext() && watchSettings.continueWatching !== "off";
+    const pendingLater = !childFrame && tracker.key && watchLater[tracker.key];
     const eligibleLater = tracker.covered >= 3 && position >= HOA.MIN_RESUME_SECONDS && position < tracker.video.duration - 30
       && (childFrame || pendingLater);
     // Before that point there is nothing useful to persist for a chosen item: it remains on Watch Later.
@@ -2202,7 +2210,7 @@ window.__hoaLoaded = true;
     const nextLater = { ...watchLater };
     const chosen = nextLater[entry.url];
     if (entry.watched && chosen) delete nextLater[entry.url];
-    if (chosen && !entry.watched && !isIncognitoContext() && watchSettings.continueWatching !== "off"
+    if (chosen && !entry.watched
       && entry.position >= HOA.MIN_RESUME_SECONDS && entry.position < entry.duration - 30 && covered >= 3) {
       delete nextLater[entry.url];
       entry = { ...entry, cw: "later" };
@@ -2216,9 +2224,9 @@ window.__hoaLoaded = true;
   }
 
   function maybeResume(tracker) {
-    if (isIncognitoContext()) return;
+    if (isIncognitoContext() && !chosenVideo(tracker.key)) return;
     const entry = tracker.key && watchProgress[tracker.key];
-    if (watchSettings.continueWatching === "off" || !entry || !entry.cw || entry.position < HOA.MIN_RESUME_SECONDS || entry.position >= entry.duration - 30 || tracker.resumed || Math.abs(entry.duration - tracker.video.duration) > entry.duration * .05 || tracker.video.currentTime >= HOA.MIN_RESUME_SECONDS) return;
+    if (!entry || !entry.cw || (watchSettings.continueWatching === "off" && entry.cw !== "later") || entry.position < HOA.MIN_RESUME_SECONDS || entry.position >= entry.duration - 30 || tracker.resumed || Math.abs(entry.duration - tracker.video.duration) > entry.duration * .05 || tracker.video.currentTime >= HOA.MIN_RESUME_SECONDS) return;
     tracker.resumed = true; tracker.video.currentTime = Math.max(0, entry.position - 5);
     showToast(tracker.key, `Resumed at ${HOA.formatDuration(Math.floor(entry.position))}`, () => { tracker.video.currentTime = 0; }, "Start over");
   }
@@ -2238,11 +2246,12 @@ window.__hoaLoaded = true;
   }
 
   function attachTracker(video) {
-    if (isIncognitoContext()) return;
+    // Frames can't tell which video the page is on, so private windows don't measure inside them.
+    if (isIncognitoContext() && childFrame) return;
     if (!video || !Number.isFinite(video.duration) || video.duration < 20 || playerTracker && playerTracker.video === video) return;
     playerTracker = { video, key: childFrame ? "" : watchKey(hostnameRule()), last: video.currentTime || 0, bits: HOA.bitmapBuckets(""), basePlayed: 0, covered: 0, bucketSeconds: Array(100).fill(0), resumed: false };
     resetTracker(playerTracker, playerTracker.key);
-    const update = () => { const tracker = playerTracker; if (!tracker || tracker.video !== video) return; syncTrackerKey(tracker); const now = video.currentTime || 0; if (!shouldRecordWatchProgress()) { tracker.last = now; return; } if (video.paused || video.playbackRate > 2) return; const delta = now - tracker.last; tracker.last = now; if (delta <= 0 || delta > 2.5) return; const index = Math.min(99, Math.floor(now / video.duration * 100)); tracker.bucketSeconds[index] += delta; tracker.covered += delta; if (tracker.bucketSeconds[index] >= video.duration / 100 * .7) tracker.bits = setBit(tracker.bits, index); saveTracker(false); };
+    const update = () => { const tracker = playerTracker; if (!tracker || tracker.video !== video) return; syncTrackerKey(tracker); const now = video.currentTime || 0; if (!shouldRecordWatchProgress(undefined, tracker.key)) { tracker.last = now; return; } if (video.paused || video.playbackRate > 2) return; const delta = now - tracker.last; tracker.last = now; if (delta <= 0 || delta > 2.5) return; const index = Math.min(99, Math.floor(now / video.duration * 100)); tracker.bucketSeconds[index] += delta; tracker.covered += delta; if (tracker.bucketSeconds[index] >= video.duration / 100 * .7) tracker.bits = setBit(tracker.bits, index); saveTracker(false); };
     video.addEventListener("timeupdate", update); video.addEventListener("loadedmetadata", () => syncTrackerKey(playerTracker)); video.addEventListener("pause", () => saveTracker(true)); video.addEventListener("ended", () => saveTracker(true));
     video.addEventListener("play", () => { playerTracker.last = video.currentTime || 0; maybeResume(playerTracker); });
   }
@@ -2542,7 +2551,7 @@ window.__hoaLoaded = true;
         const entry = frameEntry(message.progress);
         const prior = entry && watchProgress[entry.url];
         if (entry) saveProgressEntry(entry, Math.max(0, Number(message.progress.covered) || 0));
-        if (!frameResumeSent && prior && watchSettings.continueWatching !== "off" && prior.cw && prior.position >= HOA.MIN_RESUME_SECONDS && prior.position < prior.duration - 30 && Math.abs(prior.duration - entry.duration) <= prior.duration * .05 && entry.position < HOA.MIN_RESUME_SECONDS) {
+        if (!frameResumeSent && prior && prior.cw && (prior.cw === "later" || watchSettings.continueWatching !== "off") && prior.position >= HOA.MIN_RESUME_SECONDS && prior.position < prior.duration - 30 && Math.abs(prior.duration - entry.duration) <= prior.duration * .05 && entry.position < HOA.MIN_RESUME_SECONDS) {
           const seekTo = Math.max(0, prior.position - 5);
           frameResumeSent = true;
           showToast(entry.url, `Resumed at ${HOA.formatDuration(Math.floor(prior.position))}`, () => chrome.runtime.sendMessage({ type: "hoa-frame-seek", seekTo: 0 }), "Start over");

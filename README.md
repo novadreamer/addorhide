@@ -24,7 +24,7 @@ movie and streaming sites, and a card picker that teaches it any other video sit
 - **Added Videos:** tabs for Continue Watching, Watch Later and each website, website sorting, and grouping by channel, date added, decade or rating.
 - **Hidden Videos:** the same sorting and grouping, a Show all button on every group, and channels and watched videos in their own groups.
 - **Popup:** a redrawn power button (green on, red off), new position arrows and an Auto-add switch.
-- **Privacy:** nothing is recorded in private windows, nothing at all when the watch features are off, and Clear watch history wipes it in one click.
+- **Privacy:** nothing is recorded in private windows or when the watch features are off, except videos you saved to Watch Later yourself, and Clear watch history wipes it in one click.
 
 ## Install
 

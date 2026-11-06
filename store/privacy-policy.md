@@ -13,7 +13,7 @@ AddOrHide does not collect your data. It has no servers, no accounts, no analyti
 The extension stores the following in your browser's local extension storage:
 
 - **Videos you add or hide.** When you click **Add** or **Hide** on a video, the extension saves that video's web address, title, thumbnail address and site name, along with any of these that the video's card shows on the page: duration, view count, publish date or year, rating, genres, and the site's icon address. It also saves the time you took the action and, if you choose to tag a video, the type and genres you enter.
-- **Watch history.** On sites where the extension is active, when you play a video it saves that video's address, title and thumbnail address, its length, how much of it you played, where you stopped and when. This powers the Watched tags, hiding watched videos, Continue Watching and resuming. Nothing is saved in private windows, or when Tag watched videos, Continue Watching and hiding Watched are all off.
+- **Watch history.** On sites where the extension is active, when you play a video it saves that video's address, title and thumbnail address, its length, how much of it you played, where you stopped and when. This powers the Watched tags, hiding watched videos, Continue Watching and resuming. Nothing is saved in private windows, or when Tag watched videos, Continue Watching and hiding Watched are all off, except for videos you saved to Watch Later yourself.
 - **Watch Later.** When you click **Add to Watch Later**, the extension saves that video's address, title, thumbnail address, site name, length and the time you added it.
 - **Row names.** The names of the rows a site shows, so you can pick rows to hide under Rows by name.
 - **Site settings.** The sites where you turned the extension on, the card pattern (a CSS selector) learned when you use the card picker, and your "hide the whole feed" switches.
@@ -42,7 +42,7 @@ You can delete your data at any time:
 
 ## Private windows
 
-If you allow the extension to run in private (incognito) windows, videos you add or hide there are saved in the same extension storage used by your normal windows. They remain after the private window is closed until you delete them as described above. If you do not want this, do not enable the extension in private windows. What you play in a private window is not recorded in your watch history.
+If you allow the extension to run in private (incognito) windows, videos you add or hide there are saved in the same extension storage used by your normal windows. They remain after the private window is closed until you delete them as described above. If you do not want this, do not enable the extension in private windows. What you play in a private window is not recorded in your watch history, unless you saved that video to Watch Later, in which case its progress is kept so it can move to Continue Watching and resume.
 
 ## Popup player
 

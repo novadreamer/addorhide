@@ -56,7 +56,7 @@ WORKS ON
 - Any other site you choose. Click one video tile to show the extension what a video looks like, and the buttons appear on every similar tile. The browser asks for permission one site at a time, and you can take it back whenever you like.
 
 PRIVATE BY DESIGN
-Everything stays on your device. AddOrHide has no accounts, no servers, no ads and no analytics, and it never sends your lists or your watch history to anyone. Nothing you play in a private window is recorded. Clear your watch history at any time in Options.
+Everything stays on your device. AddOrHide has no accounts, no servers, no ads and no analytics, and it never sends your lists or your watch history to anyone. Nothing you play in a private window is recorded unless you saved that video to Watch Later. Clear your watch history at any time in Options.
 
 BACKUPS
 Use Export my data and Import data in Options to move your lists, Watch Later, watch history, site settings and preferences between installations. Imports merge with existing data; permissions are never included.
@@ -108,7 +108,7 @@ AddOrHide is an independent project and is not affiliated with, endorsed by or s
 **Data usage disclosure** (tick what applies; this is my reading of the Chrome Web Store user data guidance, which says local-only handling still requires disclosure. Confirm against the wording in your dashboard.)
 
 - **Website content:** tick. The extension reads video links, titles and thumbnails from pages and stores those the user adds or hides, plus the title and thumbnail of videos the user plays.
-- **Web history:** tick. The extension stores the addresses of videos the user adds, hides or plays on the sites where it is active. It does not record browsing generally, and nothing is recorded in private windows.
+- **Web history:** tick. The extension stores the addresses of videos the user adds, hides or plays on the sites where it is active. It does not record browsing generally, and in private windows only videos the user saved to Watch Later are recorded.
 - **User activity:** tick conservatively. The extension stores how much of a video was played and where it stopped. It does not record clicks, keystrokes or mouse movement.
 - Leave unticked: personally identifiable information, health, financial, authentication, personal communications, location.
 
