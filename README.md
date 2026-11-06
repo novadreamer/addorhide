@@ -2,10 +2,29 @@
 
 [![Support me on Ko-fi](https://img.shields.io/badge/Support%20me%20on-Ko--fi-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/ashmustafa)
 
-AddOrHide is a Chrome/Brave extension that puts you in charge of video recommendations: point at any video
-thumbnail and choose **Add** (keep it on your own Added Videos page) or **Hide** (remove it from the feed for good).
-It has built-in rules for YouTube and Tubi (tubitv.com), one-click support for IMDb, TMDB, Dailymotion and Twitch,
-and a card picker that teaches it any other video site. Everything stays in your browser.
+AddOrHide is a Chrome/Brave extension that puts you in charge of the videos on the sites you use. Point at any
+thumbnail and choose **Add** (keep it on your own Added Videos page) or **Hide** (remove it from the feed for good),
+hide whole categories and channels, save videos for later, see at a glance what you have already watched, and resume
+any video where you left off. It has built-in rules for YouTube and Tubi (tubitv.com), one-click support for many
+movie and streaming sites, and a card picker that teaches it any other video site. Everything stays in your browser.
+
+![Add, Hide and Hide channel on thumbnails, Watched tags, and the popup](store/assets/screenshot-1-add-or-hide.png)
+
+| | |
+|---|---|
+| ![Add to Watch Later and Continue Watching](store/assets/screenshot-2-continue-watching.png) | ![Hide whole categories for each site](store/assets/screenshot-3-hide-by-type.png) |
+| ![Tabs, sorting and grouping on the Added Videos page](store/assets/screenshot-4-tabs-sort-group.png) | ![Hidden videos, channels and watched videos](store/assets/screenshot-5-hidden.png) |
+
+## What's new in 1.1.0
+
+- **Watched:** a video counts as watched after about 90% real playback, not by opening it or skipping to the end. Tag it on every thumbnail or hide it automatically, and untag any video.
+- **Watch Later:** hover over the player on a video's own page and choose Add to Watch Later. The list sits under Continue Watching, and a saved video moves there once you have played a few seconds.
+- **Continue Watching:** videos you start appear with a progress bar and time left, and resume where you stopped, with Start over.
+- **Hide by type, keyword and channel:** per-site categories such as Shorts, Playlists and Live, your own keywords, whole channels, and rows by name on streaming sites.
+- **Added Videos:** tabs for Continue Watching, Watch Later and each website, website sorting, and grouping by channel, date added, decade or rating.
+- **Hidden Videos:** the same sorting and grouping, a Show all button on every group, and channels and watched videos in their own groups.
+- **Popup:** a redrawn power button (green on, red off), new position arrows and an Auto-add switch.
+- **Privacy:** nothing is recorded in private windows, nothing at all when the watch features are off, and Clear watch history wipes it in one click.
 
 ## Install
 
@@ -100,11 +119,7 @@ Build the Chrome Web Store archive with `python tools/package.py .`. It writes t
 
 ## Status: 1.1.0
 
-1.1.0 (in development, not yet released) adds hiding by type and keyword per site (YouTube: Recommended, Watched,
-Shorts, Playlists, Mixes, Live, Music, Gaming, Podcasts, Movies & TV, Posts, Fundraisers, Comments; tailored sets for
-other sites), hidden channels, a Watched label on YouTube thumbnails, and a Page details window in the popup.
-
-1.0.13 is submitted to the Chrome Web Store (1.0.1 is live). Up to 1.0.13: YouTube search results, Shorts and new layouts everywhere, gap-free
+1.1.0 is ready for the Chrome Web Store (see *What's new in 1.1.0* above). Up to 1.0.13: YouTube search results, Shorts and new layouts everywhere, gap-free
 hiding of Shorts, Hide the whole feed on every YouTube page, two installed copies no longer fight (the newest runs
 the page and the other one's popup says so), a redesigned popup (Added Videos and Hidden Videos side by side, a round
 3D power button, arrowhead Position buttons, a GitHub link) and a per-website delete button on the Added page and in

@@ -44,7 +44,7 @@ window.__hoaLoaded = true;
     rootElement.dataset.hoaInstance = ownInstance;
     rootElement.dataset.hoaExtension = ownExtension;
     rootElement.dataset.hoaVersion = ownVersion;
-    document.querySelectorAll(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner").forEach(node => node.remove());
+    document.querySelectorAll(".hoa-actions, .hoa-watched-label, #hoa-toast, #hoa-banner, #hoa-watch-later").forEach(node => node.remove());
     document.querySelectorAll("[data-hoa-watched]").forEach(node => node.removeAttribute("data-hoa-watched"));
     document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-empty, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-empty", "hoa-show"));
   }
@@ -56,6 +56,7 @@ window.__hoaLoaded = true;
   let channels = {};
   let watchedShown = {};
   let watchProgress = {};
+  let watchLater = {};
   let hasWatchProgress = false;
   let watchSettings = { tagWatched: true, continueWatching: "auto" };
   let watchedWriteTimer = 0;
@@ -95,6 +96,10 @@ window.__hoaLoaded = true;
   let lastProgressWrite = 0;
   let frameProgressState = null;
   let frameResumeSent = false;
+  let watchLaterButton = null;
+  let watchLaterHideTimer = 0;
+  let watchLaterMoveFrame = 0;
+  let watchLaterPlayer = null;
   const healedChannels = new Set();
 
   function contextAlive() {
@@ -118,7 +123,7 @@ window.__hoaLoaded = true;
 
   function removeOwnUi() {
     clearCarouselCompensation();
-    document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"], .hoa-watched-label[data-hoa-owner="${ownInstance}"]`).forEach(node => node.remove());
+    document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"], .hoa-watched-label[data-hoa-owner="${ownInstance}"], #hoa-watch-later`).forEach(node => node.remove());
     document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-empty, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-empty", "hoa-show"));
     document.querySelectorAll(`[data-hoa-watched="${ownInstance}"]`).forEach(node => node.removeAttribute("data-hoa-watched"));
     ["hoa-toast", "hoa-banner"].forEach(id => {
@@ -2136,7 +2141,7 @@ window.__hoaLoaded = true;
     const entry = { ...merged, site: HOA.siteOf(key), title: generic(old.title) ? (meta.title || HOA.siteOf(key)) : old.title, url: key,
       thumbnail: old.thumbnail || meta.thumbnail, duration,
       position: Math.min(Math.max(0, Number(values.position) || 0), duration), watched, played,
-      ...(watched ? {} : automatic && watchSettings.continueWatching !== "off" ? { cw: old.cw || "auto" } : {}), ts: old.ts || Date.now(), updated: Date.now() };
+      ...(watched ? {} : old.cw === "later" ? { cw: "later" } : automatic && watchSettings.continueWatching !== "off" ? { cw: old.cw || "auto" } : {}), ts: old.ts || Date.now(), updated: Date.now() };
     if (watched) { delete entry.cw; delete entry.untagged; }
     return entry;
   }
@@ -2163,7 +2168,17 @@ window.__hoaLoaded = true;
     const tracker = playerTracker; if (!tracker || !tracker.video || !Number.isFinite(tracker.video.duration)) return;
     const rule = hostnameRule();
     if (!shouldRecordWatchProgress(rule)) return;
-    if (!force && Date.now() - lastProgressWrite < 10000) return;
+    // A user-picked video graduates to Continue Watching as soon as it is genuinely resumable.
+    // Do not make that transition wait behind the regular ten-second storage throttle. Frame players
+    // send the same eligible sample immediately; the top page owns the chosen-list decision.
+    const position = Math.max(0, Number(tracker.video.currentTime) || 0);
+    const pendingLater = !childFrame && tracker.key && watchLater[tracker.key] && !isIncognitoContext() && watchSettings.continueWatching !== "off";
+    const eligibleLater = tracker.covered >= 3 && position >= HOA.MIN_RESUME_SECONDS && position < tracker.video.duration - 30
+      && (childFrame || pendingLater);
+    // Before that point there is nothing useful to persist for a chosen item: it remains on Watch Later.
+    // Holding these short samples also prevents an older queued progress write from racing the atomic move.
+    if (!force && pendingLater && !eligibleLater) return;
+    if (!force && !eligibleLater && Date.now() - lastProgressWrite < 10000) return;
     lastProgressWrite = Date.now();
     if (childFrame) {
       const progress = { duration: tracker.video.duration, position: Math.min(tracker.video.currentTime || 0, tracker.video.duration), bits: tracker.bits, covered: tracker.covered, playing: !tracker.video.paused };
@@ -2176,15 +2191,32 @@ window.__hoaLoaded = true;
     }
     const entry = trackerEntry(tracker); if (!entry) return;
     if (entry.watched) delete entry.cw;
-    watchProgress = { ...watchProgress, [entry.url]: entry }; HOA.writeProgress(entry.url, entry);
+    saveProgressEntry(entry, tracker.covered);
     if (entry.watched && watchedEnabled(activeCategories(rule))) queueWatched({ key: entry.url, title: entry.title, thumb: entry.thumbnail, site: entry.site, kind: HOA.kindOf(entry.url), ts: Date.now() });
+  }
+
+  function saveProgressEntry(entry, covered = 0) {
+    if (!entry) return;
+    const nextLater = { ...watchLater };
+    const chosen = nextLater[entry.url];
+    if (entry.watched && chosen) delete nextLater[entry.url];
+    if (chosen && !entry.watched && !isIncognitoContext() && watchSettings.continueWatching !== "off"
+      && entry.position >= HOA.MIN_RESUME_SECONDS && entry.position < entry.duration - 30 && covered >= 3) {
+      delete nextLater[entry.url];
+      entry = { ...entry, cw: "later" };
+    }
+    watchProgress = { ...watchProgress, [entry.url]: entry };
+    watchLater = nextLater;
+    if (chosen && !nextLater[entry.url]) HOA.writeLists({ watchProgress, watchLater });
+    else HOA.writeProgress(entry.url, entry);
+    updateWatchLaterButton();
     scheduleApply();
   }
 
   function maybeResume(tracker) {
     if (isIncognitoContext()) return;
     const entry = tracker.key && watchProgress[tracker.key];
-    if (watchSettings.continueWatching === "off" || !entry || !entry.cw || entry.position < 30 || entry.position >= entry.duration - 30 || tracker.resumed || Math.abs(entry.duration - tracker.video.duration) > entry.duration * .05 || tracker.video.currentTime >= 10) return;
+    if (watchSettings.continueWatching === "off" || !entry || !entry.cw || entry.position < HOA.MIN_RESUME_SECONDS || entry.position >= entry.duration - 30 || tracker.resumed || Math.abs(entry.duration - tracker.video.duration) > entry.duration * .05 || tracker.video.currentTime >= HOA.MIN_RESUME_SECONDS) return;
     tracker.resumed = true; tracker.video.currentTime = Math.max(0, entry.position - 5);
     showToast(tracker.key, `Resumed at ${HOA.formatDuration(Math.floor(entry.position))}`, () => { tracker.video.currentTime = 0; }, "Start over");
   }
@@ -2192,6 +2224,7 @@ window.__hoaLoaded = true;
   function resetTracker(tracker, key) {
     const existing = key && watchProgress[key];
     tracker.key = key; tracker.last = tracker.video.currentTime || 0; tracker.bits = existing && existing.buckets || HOA.bitmapBuckets("");
+    if (existing && existing.watched && watchLater[key]) tracker.bits = HOA.bitmapBuckets("");
     tracker.basePlayed = Number(existing && existing.played) || 0; tracker.covered = 0; tracker.bucketSeconds = Array(100).fill(0); tracker.resumed = false;
   }
 
@@ -2232,16 +2265,102 @@ window.__hoaLoaded = true;
     return !box.width || box.width >= 480 || box.width >= window.innerWidth * .45;
   }
 
+  function watchLaterKey() {
+    return !childFrame && watchLaterPlayer && (watchLaterPlayer.tagName === "IFRAME" || trackableVideo(watchLaterPlayer, hostnameRule())) ? watchKey(hostnameRule()) : null;
+  }
+
+  function hideWatchLaterButton() {
+    if (watchLaterHideTimer) { clearTimeout(watchLaterHideTimer); watchLaterHideTimer = 0; }
+    if (watchLaterButton) watchLaterButton.hidden = true;
+  }
+
+  function updateWatchLaterButton() {
+    if (!watchLaterButton) return;
+    const key = watchLaterKey();
+    const inContinue = key && watchProgress[key] && watchProgress[key].cw && !watchProgress[key].watched;
+    const selected = key && watchLater[key];
+    watchLaterButton.hidden = !key || !buttonsEnabled || Boolean(inContinue);
+    watchLaterButton.textContent = selected ? "✓ In Watch Later" : "Add to Watch Later";
+    watchLaterButton.setAttribute("aria-pressed", String(Boolean(selected)));
+  }
+
+  function positionWatchLaterButton() {
+    if (!watchLaterButton || !watchLaterPlayer) return;
+    const box = watchLaterPlayer.getBoundingClientRect();
+    if (!box.width || !box.height) return hideWatchLaterButton();
+    const parent = watchLaterPlayer.parentElement || document.body;
+    if (watchLaterButton.parentElement !== parent) parent.appendChild(watchLaterButton);
+    if (getComputedStyle(parent).position === "static") parent.classList.add("hoa-watch-later-host");
+    Object.assign(watchLaterButton.style, { left: `${Math.max(0, watchLaterPlayer.offsetLeft + watchLaterPlayer.offsetWidth / 2)}px`,
+      top: buttonEdge === "bottom" ? `${Math.max(0, watchLaterPlayer.offsetTop + watchLaterPlayer.offsetHeight - 42)}px` : `${Math.max(0, watchLaterPlayer.offsetTop + 8)}px` });
+  }
+
+  function revealWatchLaterButton() {
+    if (!watchLaterButton || !buttonsEnabled) return;
+    if (watchLaterHideTimer) { clearTimeout(watchLaterHideTimer); watchLaterHideTimer = 0; }
+    positionWatchLaterButton(); updateWatchLaterButton();
+    if (!watchLaterButton.hidden) watchLaterButton.classList.add("hoa-watch-later-show");
+  }
+
+  function ensureWatchLaterButton() {
+    if (childFrame || !watchLaterPlayer || watchLaterButton) return;
+    const key = watchLaterKey(); if (!key) return;
+    watchLaterButton = document.createElement("button");
+    watchLaterButton.id = "hoa-watch-later"; watchLaterButton.type = "button";
+    watchLaterButton.addEventListener("click", event => {
+      event.preventDefault(); event.stopPropagation();
+      const currentKey = watchLaterKey(); if (!currentKey) return;
+      HOA.readLists(lists => {
+        const next = { ...lists.watchLater };
+        if (next[currentKey]) {
+          const removed = next[currentKey]; delete next[currentKey];
+          HOA.writeLists({ watchLater: next }, () => showToast(currentKey, "Removed from Watch Later", () => HOA.writeLists({ watchLater: { ...next, [currentKey]: removed } })));
+        } else {
+          const meta = pageMetaForKey(currentKey);
+          next[currentKey] = { title: meta.title || HOA.siteOf(currentKey), thumb: meta.thumbnail || HOA.youtubeThumb(currentKey), site: HOA.siteOf(currentKey), url: currentKey,
+            duration: Number.isFinite(watchLaterPlayer.duration) ? watchLaterPlayer.duration : undefined, ts: Date.now() };
+          HOA.writeLists({ watchLater: next }, () => showToast(currentKey, "Added to Watch Later", () => { const undo = { ...next }; delete undo[currentKey]; HOA.writeLists({ watchLater: undo }); }));
+        }
+      });
+    });
+    document.addEventListener("mousemove", event => {
+      if (!watchLaterPlayer || !buttonsEnabled || watchLaterMoveFrame) return;
+      watchLaterMoveFrame = requestAnimationFrame(() => { watchLaterMoveFrame = 0; const box = watchLaterPlayer.getBoundingClientRect();
+        const inside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+        if (inside) revealWatchLaterButton(); else if (watchLaterButton && !watchLaterButton.matches(":hover")) {
+          if (watchLaterHideTimer) clearTimeout(watchLaterHideTimer);
+          watchLaterHideTimer = setTimeout(() => { if (watchLaterButton) { watchLaterButton.classList.remove("hoa-watch-later-show"); watchLaterButton.hidden = true; } watchLaterHideTimer = 0; }, 2500);
+        }
+      });
+    }, { passive: true });
+    document.addEventListener("fullscreenchange", () => { if (!watchLaterButton) return; const full = document.fullscreenElement; if (full && watchLaterPlayer && full.contains(watchLaterPlayer)) full.appendChild(watchLaterButton); else positionWatchLaterButton(); });
+    if (watchLaterPlayer.tagName === "IFRAME") {
+      watchLaterPlayer.addEventListener("mouseenter", revealWatchLaterButton);
+      watchLaterPlayer.addEventListener("mouseleave", () => { if (watchLaterHideTimer) clearTimeout(watchLaterHideTimer); watchLaterHideTimer = setTimeout(hideWatchLaterButton, 2500); });
+    }
+    updateWatchLaterButton();
+  }
+
   function findPlayer() {
     const rule = hostnameRule();
     const videos = Array.from(document.querySelectorAll("video")).filter(video => Number.isFinite(video.duration) && video.duration >= 20 && trackableVideo(video, rule));
     const visible = videos.filter(video => { const box = video.getBoundingClientRect(); return box.width > 0 && box.height > 0 && getComputedStyle(video).visibility !== "hidden"; });
     if (visible.length) { videos.length = 0; videos.push(...visible); }
-    videos.sort((a, b) => b.duration - a.duration); if (videos[0]) attachTracker(videos[0]);
+    videos.sort((a, b) => (b.getBoundingClientRect().width * b.getBoundingClientRect().height) - (a.getBoundingClientRect().width * a.getBoundingClientRect().height));
+    if (videos[0]) { attachTracker(videos[0]); watchLaterPlayer = videos[0]; ensureWatchLaterButton(); return; }
+    // Some supported sites own playback inside a cross-origin frame. We cannot track its media here,
+    // but can still offer the page-level Watch Later action over its largest player frame.
+    // Only the site's own player hosts count: any other large iframe is an ad or an embed, not this page's video.
+    const playerHosts = rule && rule.playerHosts || [];
+    const frameHost = frame => { try { return new URL(frame.src).hostname; } catch (error) { return ""; } };
+    const frames = Array.from(document.querySelectorAll("iframe")).filter(frame => { const box = frame.getBoundingClientRect(); return playerHosts.includes(frameHost(frame)) && box.width >= 480 && box.height >= 270; })
+      .sort((a, b) => { const left = a.getBoundingClientRect(); const right = b.getBoundingClientRect(); return right.width * right.height - left.width * left.height; });
+    if (frames[0] && watchKey(rule)) { watchLaterPlayer = frames[0]; ensureWatchLaterButton(); }
   }
 
   function startPlaybackTracker() {
-    if (isIncognitoContext() || playbackTrackerStarted || !watchSettingsReady || !siteRulesReady) return;
+    // Private windows do not record progress, but the user can still curate Watch Later there.
+    if (playbackTrackerStarted || !watchSettingsReady || !siteRulesReady) return;
     playbackTrackerStarted = true;
     findPlayer(); document.addEventListener("loadedmetadata", findPlayer, true); document.addEventListener("durationchange", findPlayer, true);
     addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveTracker(true); }); addEventListener("pagehide", () => saveTracker(true));
@@ -2250,11 +2369,11 @@ window.__hoaLoaded = true;
   if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, applyAdded, compensateCarousels, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, keyForHref, attachTracker, findPlayer, activeCategories, keywordMatch: HOA.keywordMatch, saveTracker, watchedCard, frameEntry, watchedProgressMutation });
 
   function isOwnMutation(mutation) {
-    if (mutation.target.closest && mutation.target.closest(".hoa-actions, #hoa-toast, #hoa-banner")) return true;
+    if (mutation.target.closest && mutation.target.closest(".hoa-actions, #hoa-toast, #hoa-banner, #hoa-watch-later")) return true;
     const nodes = [...(mutation.addedNodes || []), ...(mutation.removedNodes || [])];
     return nodes.length > 0 && nodes.every(node => node.nodeType === 1
-      && (node.matches(".hoa-actions, #hoa-toast, #hoa-banner")
-        || node.querySelector(".hoa-actions, #hoa-toast, #hoa-banner")));
+      && (node.matches(".hoa-actions, #hoa-toast, #hoa-banner, #hoa-watch-later")
+        || node.querySelector(".hoa-actions, #hoa-toast, #hoa-banner, #hoa-watch-later")));
   }
 
   // A site that rewrites a card's class attribute (Tubi does this as its page finishes loading) wipes our
@@ -2292,6 +2411,7 @@ window.__hoaLoaded = true;
     channels = lists.channels;
     watchedShown = lists.watchedShown;
     watchProgress = lists.watchProgress;
+    watchLater = lists.watchLater;
     hasWatchProgress = Object.keys(watchProgress).length > 0;
     listsReady = true;
     scheduleApply();
@@ -2321,6 +2441,7 @@ window.__hoaLoaded = true;
       watchedShown = HOA.normalizeWatchedShown(changes[HOA.WATCHED_SHOWN_KEY].newValue);
     }
     if (changes[HOA.PROGRESS_KEY]) { watchProgress = HOA.normalizeProgress(changes[HOA.PROGRESS_KEY].newValue); hasWatchProgress = Object.keys(watchProgress).length > 0; }
+    if (changes[HOA.WATCH_LATER_KEY]) { watchLater = HOA.normalizeWatchLater(changes[HOA.WATCH_LATER_KEY].newValue); updateWatchLaterButton(); }
     if (changes[HOA.WATCH_SETTINGS_KEY]) watchSettings = HOA.normalizeWatchSettings(changes[HOA.WATCH_SETTINGS_KEY].newValue);
     if (changes[HOA.SITES_KEY]) {
       siteRules = changes[HOA.SITES_KEY].newValue && typeof changes[HOA.SITES_KEY].newValue === "object"
@@ -2387,8 +2508,8 @@ window.__hoaLoaded = true;
       if (message && message.type === "hoa-frame-progress" && !childFrame && !playerTracker && message.progress) {
         const entry = frameEntry(message.progress);
         const prior = entry && watchProgress[entry.url];
-        if (entry) { watchProgress = { ...watchProgress, [entry.url]: entry }; HOA.writeProgress(entry.url, entry); }
-        if (!frameResumeSent && prior && watchSettings.continueWatching !== "off" && prior.cw && prior.position >= 30 && prior.position < prior.duration - 30 && Math.abs(prior.duration - entry.duration) <= prior.duration * .05 && entry.position < 10) {
+        if (entry) saveProgressEntry(entry, Math.max(0, Number(message.progress.covered) || 0));
+        if (!frameResumeSent && prior && watchSettings.continueWatching !== "off" && prior.cw && prior.position >= HOA.MIN_RESUME_SECONDS && prior.position < prior.duration - 30 && Math.abs(prior.duration - entry.duration) <= prior.duration * .05 && entry.position < HOA.MIN_RESUME_SECONDS) {
           const seekTo = Math.max(0, prior.position - 5);
           frameResumeSent = true;
           showToast(entry.url, `Resumed at ${HOA.formatDuration(Math.floor(prior.position))}`, () => chrome.runtime.sendMessage({ type: "hoa-frame-seek", seekTo: 0 }), "Start over");

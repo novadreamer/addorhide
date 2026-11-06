@@ -16,7 +16,7 @@ const root = path.join(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, statusRows, nowPlaying, watchSettings, playerGranted = true } = {}) {
+async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, statusRows, nowPlaying, watchSettings, watchLater, playerGranted = true } = {}) {
   const dom = new JSDOM(read("popup.html"), { url: "https://extension.test/popup.html", runScripts: "outside-only", pretendToBeVisual: true });
   const { window } = dom;
   window.document.head.insertAdjacentHTML("beforeend", `<style>${read("pages.css")}</style>`);
@@ -24,6 +24,7 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   const store = { siteRules: siteRules || { [host]: { enabled: true } } };
   if (seenRows) store.seenRows = seenRows;
   if (watchSettings) store.watchSettings = watchSettings;
+  if (watchLater) store.watchLater = watchLater;
   const listeners = [];
   const requestedOrigins = [];
   const registeredScripts = [];
@@ -169,5 +170,9 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   assert.deepEqual(pbsMissingPlayer.requestedOrigins[0], ["https://player.pbs.org/*"], "player permission button requests only the player origin");
   assert.deepEqual(pbsMissingPlayer.registeredScripts.map(script => script.matches[0]), ["https://player.pbs.org/*"], "player permission registers the player-frame script");
   pbsMissingPlayer.window.close();
-  console.log("popup.test.js: 39 passed, 0 failed");
+  const laterPopup = await loadPopup({ watchLater: { "https://www.youtube.com/watch?v=popupwatch1": { title: "Later", thumb: "", site: "youtube.com", url: "https://www.youtube.com/watch?v=popupwatch1", ts: 1 } } });
+  assert.match(laterPopup.document.querySelector("#added-summary").textContent, /1 to watch later/, "popup includes Watch Later in its compact summary");
+  assert.equal(laterPopup.document.querySelector("#open-added-button").disabled, false, "Watch Later alone enables Added Videos");
+  laterPopup.window.close();
+  console.log("popup.test.js: 41 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

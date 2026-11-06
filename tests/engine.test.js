@@ -33,7 +33,7 @@ function check(name, fn) {
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings, watchProgress, noBody = false, testSeam = false, childFrame = false, incognito = false }) {
+async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings, watchProgress, watchLater, buttonsEnabled, buttonEdge, noBody = false, testSeam = false, childFrame = false, incognito = false }) {
   const html = suppliedHtml === undefined ? fs.readFileSync(path.join(__dirname, "fixtures", fixture), "utf8") : suppliedHtml;
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
     url, runScripts: "outside-only", pretendToBeVisual: true
@@ -42,7 +42,7 @@ async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings
   if (noBody) {
     window.document.body.remove();
   }
-  const store = { siteRules: siteRules || {}, watchSettings: watchSettings || undefined, watchProgress: watchProgress || undefined };
+  const store = { siteRules: siteRules || {}, watchSettings: watchSettings || undefined, watchProgress: watchProgress || undefined, watchLater: watchLater || undefined, buttonsEnabled, buttonEdge };
   Object.keys(store).forEach(key => { if (store[key] === undefined) delete store[key]; });
   const listeners = [];
   const messageListeners = [];
@@ -1321,6 +1321,35 @@ const CASES = [
     const page = await load({ html: '<div id="card" data-test-id="web-ui-content-tile"><a class="web-content-tile__poster-link" href="/movies/watched"><img></a><span class="web-content-tile__title">Watched</span></div>', url: "https://tubitv.com/", watchProgress: { [tubiKey]: { site: "tubitv.com", title: "Watched", url: tubiKey, duration: 100, position: 95, buckets: "fffffffffffffffffffffffff", watched: true, ts: 1, updated: 1 } }, testSeam: true });
     check("watched labels render on Tubi cards", () => assert.ok(page.document.querySelector("#card [data-hoa-watched]")));
     page.window.close();
+  }
+  {
+    const key = "https://www.youtube.com/watch?v=abc123def45";
+    const page = await load({ html: "", url: key, watchSettings: { continueWatching: "auto" },
+      watchLater: { [key]: { title: "Later", thumb: "", site: "youtube.com", url: key, duration: 100, ts: 1 } }, testSeam: true });
+    const video = fakeVideo(page, { currentTime: 9 });
+    video.fire("play");
+    [10, 11, 12, 13].forEach(position => { video.currentTime = position; video.fire("timeupdate"); });
+    await wait(30);
+    check("three real seconds at a resumable Watch Later position bypasses progress throttling", () => {
+      assert.equal(page.store.watchLater[key], undefined);
+      assert.ok(page.store.watchProgress[key], JSON.stringify(page.store));
+      assert.equal(page.store.watchProgress[key].cw, "later");
+    });
+    page.window.close();
+  }
+  {
+    const key = "https://www.youtube.com/watch?v=hoverwatch1";
+    const home = await load({ html: "", url: "https://www.youtube.com/", testSeam: true }); fakeVideo(home); home.test.findPlayer();
+    check("Watch Later never appears for a large home-page preview video", () => assert.equal(home.document.querySelector("#hoa-watch-later"), null)); home.window.close();
+    const page = await load({ html: "", url: key, testSeam: true, buttonEdge: "bottom" }); const video = fakeVideo(page); page.test.findPlayer();
+    page.document.dispatchEvent(new page.window.MouseEvent("mousemove", { clientX: 20, clientY: 20, bubbles: true })); await wait(25);
+    const button = page.document.querySelector("#hoa-watch-later");
+    check("Watch Later hover action appears only on a watch page and respects the edge", () => { assert.ok(button); assert.equal(button.hidden, false); assert.match(button.style.top, /-?\d+px/); });
+    button.click(); await wait(20); check("Watch Later click toggles its saved entry", () => assert.ok(page.store.watchLater[key]));
+    button.click(); await wait(20); check("Watch Later second click removes its saved entry", () => assert.equal(page.store.watchLater[key], undefined));
+    const off = await load({ html: "", url: key, testSeam: true, buttonsEnabled: false }); fakeVideo(off); off.test.findPlayer(); off.document.dispatchEvent(new off.window.MouseEvent("mousemove", { clientX: 20, clientY: 20, bubbles: true })); await wait(20);
+    check("Watch Later respects Buttons off", () => { const control = off.document.querySelector("#hoa-watch-later"); assert.ok(!control || control.hidden); });
+    page.window.close(); off.window.close();
   }
   console.log(`engine.test.js: ${passed} passed, 0 failed`);
 })().catch(error => {

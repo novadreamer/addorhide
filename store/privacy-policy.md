@@ -1,6 +1,6 @@
 # AddOrHide Privacy Policy
 
-**Effective date:** October 9, 2026 (updated November 4, 2026)
+**Effective date:** October 9, 2026 (updated November 5, 2026)
 **Developer:** Ashraf Mustafa
 **Contact:** mybrainnoor@gmail.com
 
@@ -14,6 +14,7 @@ The extension stores the following in your browser's local extension storage:
 
 - **Videos you add or hide.** When you click **Add** or **Hide** on a video, the extension saves that video's web address, title, thumbnail address and site name, along with any of these that the video's card shows on the page: duration, view count, publish date or year, rating, genres, and the site's icon address. It also saves the time you took the action and, if you choose to tag a video, the type and genres you enter.
 - **Watch history.** On sites where the extension is active, when you play a video it saves that video's address, title and thumbnail address, its length, how much of it you played, where you stopped and when. This powers the Watched tags, hiding watched videos, Continue Watching and resuming. Nothing is saved in private windows, or when Tag watched videos, Continue Watching and hiding Watched are all off.
+- **Watch Later.** When you click **Add to Watch Later**, the extension saves that video's address, title, thumbnail address, site name, length and the time you added it.
 - **Row names.** The names of the rows a site shows, so you can pick rows to hide under Rows by name.
 - **Site settings.** The sites where you turned the extension on, the card pattern (a CSS selector) learned when you use the card picker, and your "hide the whole feed" switches.
 - **Page preferences.** How you sorted, grouped or collapsed things on the Added Videos and Hidden Videos pages, and your Watching settings.
@@ -34,6 +35,7 @@ You can delete your data at any time:
 
 - **Hidden videos:** **Restore** in the Hidden Videos window (opened from the extension popup) deletes a video's record and brings the video back to the feed. **Unhide everything** in Options deletes all hidden-video records. (**Remove** in that window only takes a video off the list while keeping it hidden, so its record stays until you restore it or use Unhide everything.)
 - **Added videos:** **Remove** on a card deletes that video's record, and **Clear page** deletes all of them.
+- **Watch Later:** **Remove** on a card deletes that video's record, and its bin button deletes the whole list. Playing a saved video moves it to Continue Watching.
 - **Watch history:** **Clear watch history** in Options deletes all of it. Removing a video from Continue Watching takes it off that list.
 - **Site settings:** **Forget** in Options deletes a site's saved settings and row names. (**Disable** turns the extension off for the site but keeps the saved settings.)
 - **Everything:** removing the extension deletes all the data it stored.

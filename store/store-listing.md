@@ -1,6 +1,6 @@
 # AddOrHide: Chrome Web Store submission pack
 
-Release note: version 1.1.0 is the update to submit. Same permissions as 1.0.13, so users are not asked to approve anything new. Upload `dist/AddOrHide-1.1.0.zip`, replace all five screenshots and both promo tiles with the files in `store/assets/` (regenerated 2026-11-04), paste the detailed description below, and update the Privacy tab: the data disclosure and the policy changed because 1.1.0 tracks playback on the device. If 1.0.13 is still in review, cancel that review or wait for it to finish, because the dashboard takes one submission at a time.
+Release note: version 1.1.0 is the update to submit. Same permissions as 1.0.13, so users are not asked to approve anything new. Upload `dist/AddOrHide-1.1.0.zip`, replace all five screenshots and both promo tiles with the files in `store/assets/` (regenerated 2026-11-05), paste the detailed description below, and update the Privacy tab: the data disclosure and the policy changed because 1.1.0 tracks playback on the device. If 1.0.13 is still in review, cancel that review or wait for it to finish, because the dashboard takes one submission at a time.
 
 All the placeholders have been filled in. Field limits and required assets below come from the current Chrome Web Store documentation, except where marked "(dashboard limit)", which are limits the dashboard enforces that the docs page does not state.
 
@@ -25,7 +25,8 @@ AddOrHide puts you in charge of the videos on the sites you use. Keep what you l
 ADD OR HIDE, RIGHT ON THE THUMBNAIL
 Point at a video on a supported site and small buttons appear:
 - Add saves it to your Added Videos page.
-- Hide removes it from the feed, with Undo. Hide channel removes everything from that channel.
+- Hide removes it from the feed, with Undo.
+- Hide channel removes everything from that channel on sites that show one, and you can bring it back from Hidden Videos.
 - Hide the whole feed clears every recommendation on a page when you just want to search.
 
 HIDE WHOLE CATEGORIES
@@ -34,11 +35,12 @@ Hide on this site lists what that site offers, such as Watched, Shorts, Playlist
 KNOW WHAT YOU'VE WATCHED
 A video counts as watched only after you really play about 90% of it, not when you open it or skip to the end. Watched videos get a tag on every thumbnail, or you can hide them automatically. Remove a tag from any video with one click.
 
-CONTINUE WATCHING
-Videos you start appear in Continue Watching on your Added Videos page with a progress bar and the time left. Open one and it resumes where you stopped, with a Start over button. Turn it off with one switch.
+WATCH LATER AND CONTINUE WATCHING
+Hover over the player on a video's own page and choose Add to Watch Later to save it for another time. Your list sits right under Continue Watching on the Added Videos page.
+Once you play a saved video for a few seconds, it moves to Continue Watching on its own. Videos you start appear there with a progress bar and the time left. Open one and it resumes where you stopped, with a Start over button. Turn automatic adding off with one switch.
 
 YOUR ADDED VIDEOS PAGE
-- See everything on one page or give Continue Watching and each website its own tab.
+- See everything on one page, or give Continue Watching, Watch Later and each website its own tab.
 - Sort websites by name or by what you added last.
 - Sort each site's videos by date, views, duration, year, channel or A-Z.
 - Group them by channel, date added, decade, rating, type or genre. Options appear only when the site's videos can use them.
@@ -57,7 +59,7 @@ PRIVATE BY DESIGN
 Everything stays on your device. AddOrHide has no accounts, no servers, no ads and no analytics, and it never sends your lists or your watch history to anyone. Nothing you play in a private window is recorded. Clear your watch history at any time in Options.
 
 BACKUPS
-Use Export my data and Import data in Options to move your lists, watch history, site settings and preferences between installations. Imports merge with existing data; permissions are never included.
+Use Export my data and Import data in Options to move your lists, Watch Later, watch history, site settings and preferences between installations. Imports merge with existing data; permissions are never included.
 
 GOOD TO KNOW
 - AddOrHide never hides or changes ads and never downloads videos.
@@ -74,7 +76,7 @@ AddOrHide is an independent project and is not affiliated with, endorsed by or s
 - **Store icon (128x128):** `store/assets/store-icon-128.png` (96x96 artwork with 16px transparent padding, per Google's icon guidelines).
 - **Screenshots (1280x800):** done, in `store/assets/` (mock sites and drawn thumbnails only), upload in this order:
   1. `screenshot-1-add-or-hide.png`: *Add what you like. Hide what you don't.*
-  2. `screenshot-2-continue-watching.png`: *Pick up right where you left off*
+  2. `screenshot-2-continue-watching.png`: *Save it for later. Pick up where you left off.*
   3. `screenshot-3-hide-by-type.png`: *Hide whole categories in one click*
   4. `screenshot-4-tabs-sort-group.png`: *Your videos, organised your way*
   5. `screenshot-5-hidden.png`: *Changed your mind? Bring it back*
@@ -122,7 +124,8 @@ No account or login is needed.
 2. Click Add on a tile (it shows "Added"), then Hide on another tile (it disappears; an Undo message appears).
 3. Click the AddOrHide toolbar icon. Click "Hidden Videos": a window lists the hidden video under Tubi with Restore and Remove. Back in the popup, click "Added Videos" to see the added video, grouped under Tubi. Use the Sort by control and the Tag button there.
 4. Add a YouTube video (step 5), then on the Added Videos page click its thumbnail marked "Popup player". It opens the official YouTube player, with its normal ads, in one popup window; click another supported video to confirm the same window is reused. Twitch channels, videos and clips, and IMDb videos work the same way.
-5. Watch tracking, on Tubi or YouTube: play a video for over a minute and close it. Added Videos now shows it in Continue Watching; opening it resumes with a Start over button. Playing about 90% of a video puts a Watched tag on its thumbnails. Options, Watching has the switches and Clear watch history. All of this stays in local storage.
+5. Watch Later: on a video's own page, hover over the player and click Add to Watch Later. It appears on the Added Videos page under Continue Watching. Play it for about 15 seconds and it moves to Continue Watching.
+5a. Watch tracking, on Tubi or YouTube: play a video for over a minute and close it. Added Videos now shows it in Continue Watching; opening it resumes with a Start over button. Playing about 90% of a video puts a Watched tag on its thumbnails. Options, Watching has the switches and Clear watch history. All of this stays in local storage.
 6. YouTube is also supported: the home feed (shown only to signed-in users) and any creator's page (for example `https://www.youtube.com/@NASA`, Home, Videos, Shorts and Live tabs), which works signed out.
 7. Open https://www.imdb.com/chart/moviemeter/, open the popup and choose "Enable on this site". After the single-site permission prompt, Add and Hide buttons appear on the chart rows without using the picker.
 8. Any other site: open the popup on it and click "Enable on this site". The browser asks for permission for that single site, then a picker asks you to click one video tile.

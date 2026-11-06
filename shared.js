@@ -10,12 +10,16 @@ var HOA = Object.freeze((() => {
   const SITES_KEY = "siteRules";
   const SEEN_ROWS_KEY = "seenRows";
   const PROGRESS_KEY = "watchProgress";
+  const WATCH_LATER_KEY = "watchLater";
   const WATCH_SETTINGS_KEY = "watchSettings";
   const MAX_HIDDEN = 1000;
   const MAX_CHANNELS = 500;
   const MAX_WATCHED_SHOWN = 1000;
   const MAX_ADDED = 500;
   const MAX_PROGRESS = 1500;
+  const MAX_WATCH_LATER = 1500;
+  // A resume is meaningful once it can land five seconds back from a real later point.
+  const MIN_RESUME_SECONDS = 10;
   const MAX_TITLE = 200;
   const MAX_URL = 2048;
   const HOSTED_ADDED_URL = "https://www.youtube.com/robots.txt#addorhide-added";
@@ -66,13 +70,7 @@ var HOA = Object.freeze((() => {
       // because its home page can host real <video> preview players.
       let parsed;
       try { parsed = new URL(canonical); } catch (error) { return; }
-      if (parsed.pathname === "/") return;
-      if (YOUTUBE_HOSTS.has(parsed.hostname)) {
-        const isWatch = parsed.pathname === "/watch" && Boolean(parsed.searchParams.get("v"));
-        const isShort = /^\/shorts\/[^/]+/.test(parsed.pathname);
-        const isLive = /^\/live\/[^/]+/.test(parsed.pathname);
-        if (!isWatch && !isShort && !isLive) return;
-      }
+      if (!videoKey(parsed)) return;
       const raw = value[key];
       const duration = Number(raw.duration);
       const position = Number(raw.position);
@@ -84,7 +82,7 @@ var HOA = Object.freeze((() => {
       const entry = { site: siteOf(canonical), title: title || fallbackTitle(canonical), url: canonical, thumbnail: thumb, duration, position: Math.min(position, duration), buckets: bitmapBuckets(raw.buckets), watched: raw.watched === true, ts: Number.isFinite(raw.ts) ? raw.ts : updated, updated };
       if (Number.isFinite(Number(raw.played)) && Number(raw.played) >= 0) entry.played = Number(raw.played);
       if (raw.untagged === true) entry.untagged = true;
-      if (raw.cw === "auto" || raw.cw === "manual") entry.cw = "auto";
+      if (raw.cw === "auto" || raw.cw === "manual" || raw.cw === "later") entry.cw = raw.cw === "later" ? "later" : "auto";
       const old = normalized[canonical];
       if (!old) normalized[canonical] = entry;
       else {
@@ -93,7 +91,7 @@ var HOA = Object.freeze((() => {
         normalized[canonical] = { ...latest, ...merged, title: latest.title || old.title, thumbnail: latest.thumbnail || old.thumbnail,
           position: Math.max(old.position || 0, entry.position || 0), played: Math.max(old.played || 0, entry.played || 0),
           watched: old.watched || entry.watched, updated: Math.max(old.updated, entry.updated) };
-        if (old.cw || entry.cw) normalized[canonical].cw = "auto";
+        if (old.cw || entry.cw) normalized[canonical].cw = old.cw === "later" || entry.cw === "later" ? "later" : "auto";
       }
     });
     const keys = Object.keys(normalized);
@@ -104,6 +102,38 @@ var HOA = Object.freeze((() => {
       const continuing = oldestFirst(keys.filter(key => normalized[key].cw));
       nonContinuing.concat(continuing).slice(0, excess).forEach(key => delete normalized[key]);
     }
+    return normalized;
+  }
+
+  function videoKey(parsed) {
+    if (!parsed || parsed.pathname === "/") return false;
+    if (!YOUTUBE_HOSTS.has(parsed.hostname)) return true;
+    return (parsed.pathname === "/watch" && Boolean(parsed.searchParams.get("v")))
+      || /^\/shorts\/[^/]+/.test(parsed.pathname) || /^\/live\/[^/]+/.test(parsed.pathname);
+  }
+
+  function normalizeWatchLater(value) {
+    const normalized = {};
+    if (!isObject(value)) return normalized;
+    Object.keys(value).forEach(key => {
+      const url = canonicalUrl(key);
+      let parsed;
+      try { parsed = url && new URL(url); } catch (error) { return; }
+      if (!videoKey(parsed) || !isObject(value[key])) return;
+      const raw = value[key];
+      const ts = Number(raw.ts);
+      if (!Number.isFinite(ts)) return;
+      const title = typeof raw.title === "string" ? raw.title.trim().slice(0, MAX_TITLE) : "";
+      const thumb = typeof raw.thumb === "string" && raw.thumb.length <= MAX_URL && (!raw.thumb || validHttpUrl(raw.thumb)) ? raw.thumb : "";
+      const duration = Number(raw.duration);
+      const entry = { title: title || fallbackTitle(url), thumb, site: siteOf(url), url, ts };
+      if (Number.isFinite(duration) && duration >= 0 && duration <= 1000000) entry.duration = duration;
+      const old = normalized[url];
+      if (!old || entry.ts >= old.ts) normalized[url] = entry;
+    });
+    const keys = Object.keys(normalized);
+    if (keys.length > MAX_WATCH_LATER) keys.sort((a, b) => normalized[a].ts - normalized[b].ts || a.localeCompare(b))
+      .slice(0, keys.length - MAX_WATCH_LATER).forEach(key => delete normalized[key]);
     return normalized;
   }
 
@@ -1597,7 +1627,8 @@ var HOA = Object.freeze((() => {
     const source = isObject(lists) ? lists : {};
     const hidden = normalizeItems(source.hidden, { max: MAX_HIDDEN, withListed: true });
     Object.keys(hidden).forEach(key => { if (hidden[key].reason === "watched") delete hidden[key]; });
-    return { hidden, watchedShown: {}, watchProgress: {} };
+    // Watch Later is deliberately user-curated, not watch history.
+    return { hidden, watchedShown: {}, watchProgress: {}, watchLater: normalizeWatchLater(source.watchLater) };
   }
 
   function buildBackup(data, version, nowMs) {
@@ -1612,6 +1643,7 @@ var HOA = Object.freeze((() => {
       hiddenChannels: normalizeChannels(source.channels),
       watchedShown: normalizeWatchedShown(source.watchedShown),
       watchProgress: normalizeProgress(source.watchProgress),
+      watchLater: normalizeWatchLater(source.watchLater),
       seenRows: sanitizeBackupSeenRows(source.seenRows),
       hiddenViewPrefs: sanitizeBackupHiddenPrefs(source.hiddenViewPrefs),
       watchSettings: normalizeWatchSettings(source.watchSettings),
@@ -1649,6 +1681,7 @@ var HOA = Object.freeze((() => {
         hiddenChannels: normalizeChannels(value.hiddenChannels),
         watchedShown: normalizeWatchedShown(value.watchedShown),
         watchProgress: normalizeProgress(value.watchProgress),
+        watchLater: normalizeWatchLater(value.watchLater),
         seenRows: sanitizeBackupSeenRows(value.seenRows),
         hiddenViewPrefs: sanitizeBackupHiddenPrefs(value.hiddenViewPrefs),
         watchSettings: isObject(value.watchSettings) ? normalizeWatchSettings(value.watchSettings) : null,
@@ -1680,6 +1713,18 @@ var HOA = Object.freeze((() => {
     return { items: normalizeItems(merged, options), count };
   }
 
+  function mergeBackupWatchLater(current, imported) {
+    const merged = { ...normalizeWatchLater(current) };
+    let count = 0;
+    Object.entries(normalizeWatchLater(imported)).forEach(([key, entry]) => {
+      if (!merged[key] || entry.ts > merged[key].ts) {
+        if (!merged[key] || !sameBackupValue(merged[key], entry)) count += 1;
+        merged[key] = entry;
+      }
+    });
+    return { items: normalizeWatchLater(merged), count };
+  }
+
   function mergeBackupChannels(current, imported) {
     const merged = { ...normalizeChannels(current) };
     Object.entries(normalizeChannels(imported)).forEach(([key, entry]) => {
@@ -1699,6 +1744,7 @@ var HOA = Object.freeze((() => {
     const channels = mergeBackupChannels(source.channels, imported.hiddenChannels);
     const watchedShown = normalizeWatchedShown({ ...normalizeWatchedShown(source.watchedShown), ...normalizeWatchedShown(imported.watchedShown) });
     const watchProgress = normalizeProgress({ ...normalizeProgress(source.watchProgress), ...normalizeProgress(imported.watchProgress) });
+    const watchLaterResult = mergeBackupWatchLater(source.watchLater, imported.watchLater);
     const seenRows = sanitizeBackupSeenRows(source.seenRows);
     Object.entries(sanitizeBackupSeenRows(imported.seenRows)).forEach(([host, rows]) => {
       seenRows[host] = normalizeSectionTitles([...(seenRows[host] || []), ...rows]).slice(-150);
@@ -1740,12 +1786,13 @@ var HOA = Object.freeze((() => {
       channels: normalizeChannels(channels),
       watchedShown,
       watchProgress,
+      watchLater: watchLaterResult.items,
       seenRows,
       hiddenViewPrefs,
       watchSettings,
       siteRules,
       prefs,
-      counts: { added: addedResult.count, hidden: hiddenResult.count, sites: siteCount }
+      counts: { added: addedResult.count, hidden: hiddenResult.count, ...(watchLaterResult.count ? { watchLater: watchLaterResult.count } : {}), sites: siteCount }
     };
   }
 
@@ -1756,16 +1803,17 @@ var HOA = Object.freeze((() => {
   function readLists(callback) {
     const cb = typeof callback === "function" ? callback : () => {};
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
-      cb({ hidden: {}, added: {}, channels: {}, watchedShown: {}, watchProgress: {} });
+      cb({ hidden: {}, added: {}, channels: {}, watchedShown: {}, watchProgress: {}, watchLater: {} });
       return;
     }
-    chrome.storage.local.get({ [HIDDEN_KEY]: {}, [ADDED_KEY]: {}, [CHANNELS_KEY]: {}, [WATCHED_SHOWN_KEY]: {}, [PROGRESS_KEY]: {} }, result => {
+    chrome.storage.local.get({ [HIDDEN_KEY]: {}, [ADDED_KEY]: {}, [CHANNELS_KEY]: {}, [WATCHED_SHOWN_KEY]: {}, [PROGRESS_KEY]: {}, [WATCH_LATER_KEY]: {} }, result => {
       cb({
         hidden: normalizeItems(result[HIDDEN_KEY], { max: MAX_HIDDEN, withListed: true }),
         added: normalizeItems(result[ADDED_KEY], { max: MAX_ADDED, withListed: false }),
         channels: normalizeChannels(result[CHANNELS_KEY]),
         watchedShown: normalizeWatchedShown(result[WATCHED_SHOWN_KEY]),
-        watchProgress: normalizeProgress(result[PROGRESS_KEY])
+        watchProgress: normalizeProgress(result[PROGRESS_KEY]),
+        watchLater: normalizeWatchLater(result[WATCH_LATER_KEY])
       });
     });
   }
@@ -1786,6 +1834,7 @@ var HOA = Object.freeze((() => {
     if (lists && Object.prototype.hasOwnProperty.call(lists, "channels")) payload[CHANNELS_KEY] = normalizeChannels(lists.channels);
     if (lists && Object.prototype.hasOwnProperty.call(lists, "watchedShown")) payload[WATCHED_SHOWN_KEY] = normalizeWatchedShown(lists.watchedShown);
     if (lists && Object.prototype.hasOwnProperty.call(lists, "watchProgress")) payload[PROGRESS_KEY] = normalizeProgress(lists.watchProgress);
+    if (lists && Object.prototype.hasOwnProperty.call(lists, "watchLater")) payload[WATCH_LATER_KEY] = normalizeWatchLater(lists.watchLater);
     chrome.storage.local.set(payload, cb);
   }
 
@@ -1827,11 +1876,13 @@ var HOA = Object.freeze((() => {
     SITES_KEY,
     SEEN_ROWS_KEY,
     PROGRESS_KEY,
+    WATCH_LATER_KEY,
     WATCH_SETTINGS_KEY,
     PREFS_KEY,
     THEME_KEY,
     BUTTON_EDGE_KEY,
     BUTTONS_ENABLED_KEY,
+    MIN_RESUME_SECONDS,
     buttonsEnabledOf,
     buttonEdgeOf,
     themeOf,
@@ -1885,6 +1936,7 @@ var HOA = Object.freeze((() => {
     youtubeThumb,
     normalizeItems,
     normalizeProgress,
+    normalizeWatchLater,
     normalizeWatchSettings,
     bitmapBuckets,
     bucketCount,

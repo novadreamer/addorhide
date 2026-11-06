@@ -559,5 +559,27 @@ check("backup round trip retains rows, hidden view settings and watch settings",
   assert.deepEqual(merged.hiddenViewPrefs["example.com"], { dir: "asc", sort: "title", collapsed: true });
   assert.deepEqual(merged.watchSettings, { tagWatched: false, continueWatching: "off" });
 });
+check("watch later normalizes video pages, caps entries, and survives backup merging", () => {
+  const key = "https://www.youtube.com/watch?v=laterwatch1";
+  const source = { [key]: { title: "Later", thumb: "https://i.example/later.jpg", ts: 5 }, "https://www.youtube.com/": { title: "Home", ts: 8 } };
+  const normalized = HOA.normalizeWatchLater(source);
+  assert.deepEqual(Object.keys(normalized), [key]);
+  assert.equal(normalized[key].site, "youtube.com");
+  const backup = HOA.buildBackup({ watchLater: normalized }, "1.1.0", now);
+  const parsed = HOA.parseBackup(JSON.stringify(backup));
+  assert.ok(parsed.backup.watchLater[key]);
+  assert.ok(HOA.mergeBackup({ watchLater: {} }, parsed.backup).watchLater[key]);
+});
+check("watch later preserves its explicit continue-watching marker", () => {
+  const key = "https://www.youtube.com/watch?v=latertag001";
+  const progress = HOA.normalizeProgress({ [key]: { title: "Later", duration: 100, position: 12, updated: 1, buckets: "0".repeat(25), cw: "later" } });
+  assert.equal(progress[key].cw, "later");
+});
+check("watch later evicts the oldest entries at its storage cap", () => {
+  const entries = {}; for (let index = 0; index < 1501; index += 1) entries[`https://example.com/watch/${index}`] = { title: String(index), ts: index };
+  const normalized = HOA.normalizeWatchLater(entries);
+  assert.equal(Object.keys(normalized).length, 1500); assert.equal(normalized["https://example.com/watch/0"], undefined);
+  assert.ok(normalized["https://example.com/watch/1500"]);
+});
 
 console.log(`shared.test.js: ${passed} passed, 0 failed`);

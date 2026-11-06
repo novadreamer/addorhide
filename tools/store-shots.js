@@ -76,7 +76,7 @@ function feedHtml() {
     const channel = ["Wanderframe", "Kitchen Notes", "Brush & Water", "Night Lens", "Fretboard Basics", "Timber Works", "Ocean Atlas", "Calm Studio", "Neon Tape", "Food Lanes", "Matchday", "Late Show"][n];
     return `<div class="card"><a class="thumb" href="/watch/${slug(title)}"><img src="${THUMB(i)}" alt=""><span class="dur">${dur(d)}</span></a>
       <div class="info"><div class="avatar" style="background:hsl(${n * 31},60%,55%)">${channel[0]}</div><div><a class="title" href="/watch/${slug(title)}">${title}</a>
-      <div class="meta">${channel}<br>${views(v || 120000)} views · ${n + 2} days ago</div></div></div></div>`;
+      <div class="meta"><a class="channel" href="/@${slug(channel)}">${channel}</a><br>${views(v || 120000)} views · ${n + 2} days ago</div></div></div></div>`;
   }).join("");
   return `<!doctype html><html><head><meta charset="utf-8"><title>LumaClips</title><style>
   *{box-sizing:border-box} body{margin:0;background:#0f0f14;color:#f1f1f5;font:14px/1.35 "Segoe UI",system-ui,sans-serif}
@@ -89,9 +89,20 @@ function feedHtml() {
   .thumb img{width:100%;height:100%;object-fit:cover;display:block}.dur{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.8);color:#fff;padding:1px 6px;border-radius:5px;font-size:12px;font-weight:600}
   .info{display:flex;gap:10px;margin-top:10px}.avatar{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff}
   .title{color:#f1f1f5;text-decoration:none;font-weight:600;font-size:15px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .meta{color:#9a9aab;font-size:13px;margin-top:3px}
+  .meta{color:#9a9aab;font-size:13px;margin-top:3px}.channel{color:inherit;text-decoration:none}
   </style></head><body><header><div class="logo">Luma<b>Clips</b></div><div class="search">Search</div></header>
   <div class="chips"><span>All</span><span>Travel</span><span>Cooking</span><span>Music</span><span>Science</span><span>DIY</span></div><main>${cards}</main></body></html>`;
+}
+
+function watchHtml() {
+  const [title, , d, v] = VIDEOS[2];
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>
+  *{box-sizing:border-box} body{margin:0;background:#0f0f14;color:#f1f1f5;font:14px/1.35 "Segoe UI",system-ui,sans-serif}
+  header{display:flex;align-items:center;height:56px;padding:0 24px;border-bottom:1px solid #23232d;background:#121219}.logo{font-weight:800;font-size:20px}.logo b{color:#ff7a59}
+  main{padding:20px 24px}video{display:block;width:100%;aspect-ratio:16/9;border-radius:14px;background:#000 center/cover no-repeat;object-fit:cover}
+  h1{font-size:21px;margin:14px 0 4px}.meta{color:#9a9aab}</style></head><body><header><div class="logo">Luma<b>Clips</b></div></header>
+  <main><video id="player" poster="${THUMB(2)}"></video><h1>${title}</h1><div class="meta">Brush &amp; Water · ${views(v)} views</div></main>
+  <script>setTimeout(() => document.getElementById("player").dispatchEvent(new Event("loadedmetadata", { bubbles: true })), 900);</script></body></html>`;
 }
 
 // ---------- composite frame ----------
@@ -120,8 +131,15 @@ function frameHtml({ title, sub, shots }) {
 (async () => {
   const ext = fs.mkdtempSync(path.join(os.tmpdir(), "aoh-ext-"));
   for (const f of fs.readdirSync(SRC).filter(f => /\.(js|css|html|json)$/.test(f) || f === "icons")) fs.cpSync(path.join(SRC, f), path.join(ext, f), { recursive: true });
+  // The mock player has no media, so this throwaway copy reports a length for it (page scripts can't reach the content script's world).
+  fs.writeFileSync(path.join(ext, "content.js"), `Object.defineProperty(HTMLMediaElement.prototype, "duration", { get() { return 754; } });
+` + fs.readFileSync(path.join(ext, "content.js"), "utf8"));
   const m = JSON.parse(fs.readFileSync(path.join(ext, "manifest.json"), "utf8"));
   m.host_permissions.push(`https://${FEED}/*`); fs.writeFileSync(path.join(ext, "manifest.json"), JSON.stringify(m));
+  // Teach this throwaway copy the mock site, so its cards offer Hide channel as the real sites do.
+  const catalogFile = path.join(ext, "catalog.js");
+  fs.writeFileSync(catalogFile, fs.readFileSync(catalogFile, "utf8").replace("const rules = Object.freeze([", `const rules = Object.freeze([
+    Object.freeze({ id: "lumaclips", name: "LumaClips", hosts: Object.freeze(["${FEED}"]), subdomains: false, cardSelector: ".card", linkSelector: "a.title", titleCandidates: Object.freeze(["a.title"]), channelLinkSelector: "a.channel", channelNameSelector: "a.channel", watchPath: "^/watch/" }),`));
   const ctx = await chromium.launchPersistentContext(fs.mkdtempSync(path.join(os.tmpdir(), "p-")), {
     executablePath: process.env.BROWSER_EXE || "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe", headless: true, deviceScaleFactor: 2, colorScheme: "dark",
     args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`, "--disable-features=DisableLoadExtensionCommandLineSwitch"] });
@@ -130,6 +148,7 @@ function frameHtml({ title, sub, shots }) {
     if (u.protocol === "chrome-extension:" || u.protocol === "data:") return route.continue();
     if (u.hostname === "thumbs.mock.test") return route.fulfill({ contentType: "image/svg+xml", body: thumbSvg(Number(u.pathname.replace(/\D/g, ""))) });
     if (u.hostname === FEED && (u.pathname === "/" || u.pathname === "/index.html")) return route.fulfill({ contentType: "text/html", body: feedHtml() });
+    if (u.hostname === FEED && u.pathname.startsWith("/watch/")) return route.fulfill({ contentType: "text/html", body: watchHtml() });
     if (u.hostname === "www.youtube.com" && u.pathname === "/") return route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Mock</title><body></body>" });
     return route.abort();
   });
@@ -140,12 +159,13 @@ function frameHtml({ title, sub, shots }) {
   const progress = (i, part, extra) => { const key = keyOf(VIDEOS[i][0], VIDEOS[i][1]); const duration = VIDEOS[i][2]; return [key, { site: VIDEOS[i][1], title: VIDEOS[i][0], url: key, thumbnail: THUMB(i), duration, position: Math.round(duration * part), played: Math.round(duration * part), buckets: "", ts: now - 864e5, updated: now - i * 18e5, ...extra }]; };
   const FULL = "f".repeat(25);
   const watchProgress = Object.fromEntries([progress(0, .97, { watched: true, buckets: FULL }), progress(6, .96, { watched: true, buckets: FULL }), progress(13, .98, { watched: true, buckets: FULL }),
-    progress(3, .62, { cw: "auto" }), progress(7, .24, { cw: "auto" }), progress(9, .41, { cw: "auto" }), progress(10, .78, { cw: "auto" }), progress(12, .35, { cw: "auto" }), progress(14, .55, { cw: "auto" })]);
+    progress(3, .62, { cw: "auto" }), progress(7, .24, { cw: "auto" }), progress(9, .41, { cw: "auto" }), progress(10, .78, { cw: "auto" })]);
+  const watchLater = Object.fromEntries([2, 11, 4, 15].map((i, n) => { const key = keyOf(VIDEOS[i][0], VIDEOS[i][1]); return [key, { title: VIDEOS[i][0], thumb: THUMB(i), site: VIDEOS[i][1], url: key, duration: VIDEOS[i][2], ts: now - n * 36e5 }]; }));
   // The feed shows card 1 (pasta) unhidden for the first shot; hidden list is set after that shot.
-  await sw.evaluate(async ({ feed, added, watchProgress }) => {
-    await chrome.storage.local.set({ siteRules: { [feed]: { enabled: true, scheme: "https", pickedSelectors: [".card"] } }, addedItems: added, hiddenItems: {}, watchProgress, buttonEdge: "top", buttonsEnabled: true });
+  await sw.evaluate(async ({ feed, added, watchProgress, watchLater }) => {
+    await chrome.storage.local.set({ siteRules: { [feed]: { enabled: true, scheme: "https", } }, addedItems: added, hiddenItems: {}, watchProgress, watchLater, buttonEdge: "top", buttonsEnabled: true });
     await new Promise(res => HOA_SITES.reconcile(res));
-  }, { feed: FEED, added, watchProgress });
+  }, { feed: FEED, added, watchProgress, watchLater });
   await new Promise(r => setTimeout(r, 800));
 
   // 1. Feed with the buttons on a hovered card.
@@ -156,6 +176,8 @@ function frameHtml({ title, sub, shots }) {
   await feed.mouse.move(b.x + b.width / 2, b.y + b.height / 3, { steps: 4 }); await feed.waitForTimeout(500);
   const addBtn = card.locator('.hoa-actions button[data-action="add"]');
   const ab = await addBtn.boundingBox(); await feed.mouse.move(ab.x + ab.width / 2, ab.y + ab.height / 2, { steps: 3 }); await feed.waitForTimeout(600);
+  const channelBtn = card.locator('.hoa-actions button[data-action="channel"]');
+  if (await channelBtn.count()) { const cb = await channelBtn.boundingBox(); await feed.mouse.move(cb.x + cb.width / 2, cb.y + cb.height / 2, { steps: 3 }); await feed.waitForTimeout(600); }
   await feed.screenshot({ path: path.join(RAW, "feed.png") });
   // second card (already Added) hovered, for the Added state
   const c0 = feed.locator(".card").nth(0); const b0 = await c0.boundingBox();
@@ -195,11 +217,22 @@ function frameHtml({ title, sub, shots }) {
   await filters.screenshot({ path: path.join(RAW, "filters.png") });
   await sw.evaluate(() => chrome.storage.local.remove("siteHideKinds")).catch(() => {});
 
-  // Added page: tabs, Continue Watching first, then one website organised by channel.
+  // The video's own page, with Add to Watch Later showing on the hovered player.
+  const watch = await ctx.newPage(); await watch.setViewportSize({ width: 640, height: 500 });
+  await watch.goto(keyOf(VIDEOS[0][0], VIDEOS[0][1])); await watch.waitForTimeout(1800);
+  await watch.mouse.move(200, 160, { steps: 3 }); await watch.mouse.move(320, 220, { steps: 3 }); await watch.waitForTimeout(500);
+  console.log("watch later button", await watch.locator("#hoa-watch-later").count(), await watch.locator("#hoa-watch-later").isVisible().catch(() => false));
+  await watch.screenshot({ path: path.join(RAW, "watch-page.png") });
+
+  // Added page, stacked: Continue Watching with Watch Later right under it.
+  const stacked = await ctx.newPage(); await stacked.setViewportSize({ width: 1200, height: 1040 });
+  await sw.evaluate(() => chrome.storage.local.set({ addedViewPrefs: {} }));
+  await stacked.goto(`chrome-extension://${id}/added.html`); await stacked.waitForTimeout(1500);
+  await stacked.screenshot({ path: path.join(RAW, "added-continue.png") });
+
+  // Added page: tabs, then one website organised by type.
   const page = await ctx.newPage(); await page.setViewportSize({ width: 1280, height: 720 });
-  await sw.evaluate(() => chrome.storage.local.set({ addedViewPrefs: { __page: { grouping: "tabs", selectedTab: "continue-watching" } } }));
-  await page.goto(`chrome-extension://${id}/added.html`); await page.waitForTimeout(1500);
-  await page.screenshot({ path: path.join(RAW, "added-continue.png") });
+  await page.goto(`chrome-extension://${id}/added.html`); await page.waitForTimeout(800);
   await sw.evaluate(feed => chrome.storage.local.set({ addedViewPrefs: { __page: { grouping: "tabs", selectedTab: feed }, [feed]: { sort: "views", dir: "desc", group: "type" } } }), FEED);
   await page.reload(); await page.waitForTimeout(1500);
   await page.screenshot({ path: path.join(RAW, "added-tabs.png") });
@@ -215,11 +248,11 @@ function frameHtml({ title, sub, shots }) {
   const comp = await ctx.newPage(); await comp.setViewportSize({ width: 1280, height: 800 });
   const shoot = async (name, spec) => { await comp.setContent(frameHtml(spec)); await comp.waitForTimeout(300); await comp.screenshot({ path: path.join(OUT, name), scale: "css" }); };
   const pw = Math.round(400 * 575 / global.POPUP_H);
-  await shoot("screenshot-1-add-or-hide.png", { title: "Add what you like. Hide what you don't.", sub: "Buttons on every thumbnail you point at, with Watched tags on what you've already seen.", shots: [{ file: path.join(RAW, "feed.png"), w: 1100 - pw, label: "lumaclips.tv" }, { file: path.join(RAW, "popup.png"), w: pw, label: "AddOrHide" }] });
-  await shoot("screenshot-2-continue-watching.png", { title: "Pick up right where you left off", sub: "Videos you start wait in Continue Watching with a progress bar, and resume on their own.", shots: [{ file: path.join(RAW, "added-continue.png"), w: 1100, label: "Added Videos" }] });
+  await shoot("screenshot-1-add-or-hide.png", { title: "Add what you like. Hide what you don't.", sub: "Add, Hide or Hide channel on every thumbnail, with Watched tags on what you've already seen.", shots: [{ file: path.join(RAW, "feed.png"), w: 1100 - pw, label: "lumaclips.tv" }, { file: path.join(RAW, "popup.png"), w: pw, label: "AddOrHide" }] });
+  await shoot("screenshot-2-continue-watching.png", { title: "Save it for later. Pick up where you left off.", sub: "Add to Watch Later from any video's page. Once you start it, it moves to Continue Watching.", shots: [{ file: path.join(RAW, "watch-page.png"), w: 500, label: "lumaclips.tv" }, { file: path.join(RAW, "added-continue.png"), w: 640, label: "Added Videos" }] });
   await shoot("screenshot-3-hide-by-type.png", { title: "Hide whole categories in one click", sub: "Watched, Shorts, Playlists, Live and more, plus your own keywords, for each site.", shots: [{ file: path.join(RAW, "feed.png"), w: 760, label: "lumaclips.tv" }, { file: path.join(RAW, "filters.png"), w: 372, label: "Hide on this site" }] });
   await shoot("screenshot-4-tabs-sort-group.png", { title: "Your videos, organised your way", sub: "A tab for each website. Sort and group by channel, date, type, decade or rating.", shots: [{ file: path.join(RAW, "added-tabs.png"), w: 1100, label: "Added Videos" }] });
-  await shoot("screenshot-5-hidden.png", { title: "Changed your mind? Bring it back", sub: "Hidden videos, channels and watched videos, sorted your way and one click from returning.", shots: [{ file: path.join(RAW, "hidden.png"), w: 1100, label: "Hidden Videos" }] });
+  await shoot("screenshot-5-hidden.png", { title: "Changed your mind? Bring it back", sub: "Hidden videos, hidden channels and watched videos, sorted your way and one click from returning.", shots: [{ file: path.join(RAW, "hidden.png"), w: 1100, label: "Hidden Videos" }] });
 
   // Promo tile and marquee.
   const promo = (w, h, big) => `<!doctype html><html><head><meta charset="utf-8"><style>

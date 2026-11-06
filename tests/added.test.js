@@ -108,5 +108,20 @@ async function load(initial = {}) {
   assert.equal(remountRoot.querySelector("[role='tab'][aria-selected='true']").textContent.includes("YouTube"), true, "selected tab persists after a remount");
   tabs.window.chrome.storage.local.set({ addedItems: { "https://www.dailymotion.com/video/xbd3ori": videos["https://www.dailymotion.com/video/xbd3ori"] } }); await wait(40);
   assert.equal(tabs.document.querySelector("[role='tab'][aria-selected='true']").textContent.includes("Continue Watching"), true, "a removed selected site falls back to the first remaining tab");
-  tabs.window.close(); console.log("added.test.js: 32 passed, 0 failed");
+  tabs.window.close();
+  const laterKey = "https://www.youtube.com/watch?v=watchlater1";
+  const later = await load({ addedItems: {}, watchProgress: {}, watchLater: {
+    [laterKey]: { title: "Watch next", thumb: "", site: "youtube.com", url: laterKey, duration: 754, ts: 20 },
+    "https://tubitv.com/movies/later": { title: "Other", thumb: "", site: "tubitv.com", url: "https://tubitv.com/movies/later", ts: 10 }
+  } });
+  const laterSection = later.document.querySelector(".watch-later");
+  assert.equal(later.document.querySelectorAll(".site-group")[0], laterSection, "Watch Later follows Continue Watching in stacked mode");
+  assert.match(laterSection.textContent, /12:34.*YouTube/, "Watch Later renders duration and site without progress");
+  later.document.querySelector(".watch-later select").value = "title"; later.document.querySelector(".watch-later select").dispatchEvent(new later.window.Event("change", { bubbles: true })); await wait(25);
+  assert.equal(later.store.addedViewPrefs["watch-later"].sort, "title", "Watch Later stores independent sort preferences");
+  later.document.querySelector(".watch-later .remove-button").click(); await wait(25);
+  assert.equal(Object.keys(later.store.watchLater).length, 1, "Watch Later cards remove only themselves");
+  const laterClear = later.document.querySelector(".watch-later .site-delete-all"); laterClear.click(); await wait(10); later.document.querySelector(".watch-later .site-delete-all").click(); await wait(25);
+  assert.equal(Object.keys(later.store.watchLater).length, 0, "Watch Later delete-all uses the same two-click confirmation");
+  later.window.close(); console.log("added.test.js: 36 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });
