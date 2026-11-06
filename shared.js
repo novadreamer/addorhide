@@ -445,6 +445,7 @@ var HOA = Object.freeze((() => {
     const host = url.hostname.toLowerCase().replace(/^www\./, "");
     const segments = url.pathname.split("/").filter(Boolean);
     const first = (segments[0] || "").toLowerCase();
+    if (segments.some(segment => segment.toLowerCase() === "details")) return false;
     if (["shorts", "watch", "video", "videos"].includes(first)) return false;
     const hasCategoryPath = (prefixes, start = 0) => prefixes.includes((segments[start] || "").toLowerCase())
       && Boolean(segments[start + 1]) && segments.length >= start + 2 && segments.length <= start + 3;
@@ -454,7 +455,7 @@ var HOA = Object.freeze((() => {
         return true;
       }
     }
-    return hasCategoryPath(["category", "categories"]);
+    return hasCategoryPath(["category", "categories", "browse", "genre", "genres", "tag", "tags", "topic", "topics", "collection", "collections"]);
   }
 
   function isPlayerSurface(element, pageUrl) {
@@ -483,6 +484,11 @@ var HOA = Object.freeze((() => {
 
   // Every card on every pass asks this, and each answer costs several URL parses.
   const kindCache = new Map();
+  const VIDEO_PATHS = new Set(["watch", "play", "player", "embed", "v", "video", "videos", "clip", "clips", "live"]);
+  const TITLE_PATHS = new Set(["details", "detail", "title", "titles", "movie", "movies", "film", "films", "series", "show", "shows", "tv", "tv-shows", "free-movies"]);
+  const CARD_LINK_WORDS = new Set(["shorts", ...VIDEO_PATHS, ...TITLE_PATHS,
+    "category", "categories", "browse", "genre", "genres", "tag", "tags", "topic", "topics", "collection", "collections",
+    "channel", "channels", "user", "profile"]);
 
   function kindOf(url) {
     const known = kindCache.get(url);
@@ -493,12 +499,63 @@ var HOA = Object.freeze((() => {
       if (isCategoryUrl(parsed.href)) kind = "category";
       else if (isChannelUrl(parsed.href)) kind = "channel";
       else if (YOUTUBE_HOSTS.has(parsed.hostname.toLowerCase()) && parsed.pathname.startsWith("/shorts/")) kind = "short";
+      else {
+        const segments = parsed.pathname.split("/").filter(Boolean).map(segment => segment.toLowerCase());
+        if (!VIDEO_PATHS.has(segments[0]) && !segments.some(segment => segment === "watch")
+          && (TITLE_PATHS.has(segments[0]) || segments.some(segment => segment === "details"))) kind = "title";
+      }
     } catch (error) {
       kind = "video";
     }
     if (kindCache.size >= 2000) kindCache.clear();
     kindCache.set(url, kind);
     return kind;
+  }
+
+  function chooseCardLink(card, preferred) {
+    if (!card || !card.querySelectorAll) return preferred || null;
+    const excluded = link => Boolean(link && link.closest && link.closest(".hoa-actions, #hoa-toast, #hoa-banner"));
+    if (!preferred) {
+      const candidates = [
+        ...(card.matches && card.matches("a[href]") ? [card] : []),
+        ...Array.from(card.querySelectorAll("a[href]"))
+      ].filter(link => !excluded(link));
+      const picture = card.querySelector("img, picture, video");
+      return (picture && candidates.find(link => (link.contains && link.contains(picture)) || (picture.contains && picture.contains(link))))
+        || candidates[0] || null;
+    }
+    if (kindOf(preferred.href || preferred.getAttribute("href") || "") !== "title") return preferred;
+    const candidates = [
+      ...(card.matches && card.matches("a[href]") ? [card] : []),
+      ...Array.from(card.querySelectorAll("a[href]"))
+    ].filter(link => !excluded(link));
+    const idsFor = link => {
+      try {
+        const url = new URL(link.href || link.getAttribute("href") || "", typeof location === "undefined" ? "https://www.youtube.com" : location.href);
+        return [...url.pathname.split("/").filter(Boolean), ...url.searchParams.values()]
+          .map(value => value.toLowerCase()).filter(value => value.length >= 6 && !CARD_LINK_WORDS.has(value));
+      } catch (error) {
+        return [];
+      }
+    };
+    const preferredIds = new Set(idsFor(preferred));
+    const sharesContent = link => idsFor(link).some(id => preferredIds.has(id));
+    const textFor = link => `${link.getAttribute("href") || ""} ${link.getAttribute("aria-label") || ""} ${link.getAttribute("title") || ""} ${link.textContent || ""}`;
+    const hasPlayEvidence = link => {
+      for (let node = link; node && card.contains(node); node = node.parentElement) {
+        const itemtype = node.getAttribute && node.getAttribute("itemtype") || "";
+        const itemprop = node.getAttribute && node.getAttribute("itemprop") || "";
+        const label = `${node.getAttribute && node.getAttribute("class") || ""} ${node.getAttribute && node.getAttribute("title") || ""} ${node.getAttribute && node.getAttribute("aria-label") || ""}`;
+        if (/WatchAction$/i.test(itemtype) || /(^|\s)potentialAction(\s|$)/i.test(itemprop) || /play/i.test(label)) return true;
+        if (node === card) break;
+      }
+      return false;
+    };
+    const isSameDoor = link => link !== preferred && sharesContent(link) && !/trailer|preview/i.test(textFor(link));
+    // Invalid nested anchors can make a cloned details link appear inside the play
+    // overlay. Prefer an actual player URL before falling back to visual play evidence.
+    return candidates.find(link => isSameDoor(link) && kindOf(link.href || link.getAttribute("href") || "") === "video")
+      || candidates.find(link => isSameDoor(link) && hasPlayEvidence(link)) || preferred;
   }
 
   function typeOf(url) {
@@ -1991,6 +2048,7 @@ var HOA = Object.freeze((() => {
     playerSiteName,
     siteOf,
     kindOf,
+    chooseCardLink,
     isChannelUrl,
     isCategoryUrl,
     isPlayerSurface,

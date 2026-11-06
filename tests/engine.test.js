@@ -33,7 +33,7 @@ function check(name, fn) {
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings, watchProgress, watchLater, buttonsEnabled, buttonEdge, noBody = false, testSeam = false, childFrame = false, incognito = false, setup }) {
+async function load({ fixture, html: suppliedHtml, url, siteRules, hiddenItems, addedItems, watchedShown, watchSettings, watchProgress, watchLater, buttonsEnabled, buttonEdge, noBody = false, testSeam = false, childFrame = false, incognito = false, setup }) {
   const html = suppliedHtml === undefined ? fs.readFileSync(path.join(__dirname, "fixtures", fixture), "utf8") : suppliedHtml;
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
     url, runScripts: "outside-only", pretendToBeVisual: true
@@ -42,8 +42,9 @@ async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings
   if (noBody) {
     window.document.body.remove();
   }
-  const store = { siteRules: siteRules || {}, watchSettings: watchSettings || undefined, watchProgress: watchProgress || undefined, watchLater: watchLater || undefined, buttonsEnabled, buttonEdge };
+  const store = { siteRules: siteRules || {}, hiddenItems, addedItems, watchedShown, watchSettings: watchSettings || undefined, watchProgress: watchProgress || undefined, watchLater: watchLater || undefined, buttonsEnabled, buttonEdge };
   Object.keys(store).forEach(key => { if (store[key] === undefined) delete store[key]; });
+  const writes = [];
   const listeners = [];
   const messageListeners = [];
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -59,6 +60,7 @@ async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings
           setTimeout(() => callback(result), 0);
         },
         set(values, callback) {
+          writes.push(clone(values));
           const changes = {};
           Object.entries(values).forEach(([key, value]) => {
             changes[key] = { oldValue: store[key], newValue: clone(value) };
@@ -92,7 +94,7 @@ async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings
     if (!messageListeners.length) resolve(undefined);
     setTimeout(() => { if (!answered) resolve(undefined); }, 30);
   });
-  return { window, document: window.document, store, status, deliver, test: window.__hoaTest };
+  return { window, document: window.document, store, writes, status, deliver, test: window.__hoaTest };
 }
 
 function fakeVideo(page, { duration = 100, currentTime = 0, paused = false, width = 640, height = 360 } = {}) {
@@ -824,6 +826,40 @@ const CASES = [
     page.window.close();
   }
   {
+    const page = await load({ fixture: "sites/roku.html", url: "https://therokuchannel.roku.com/",
+      siteRules: { "therokuchannel.roku.com": { enabled: true } } });
+    const movie = page.document.querySelector('li.movie[aria-label="Coraline"]');
+    const series = page.document.querySelector('li.series[aria-label="Bewitched"]');
+    buttons(movie, "add").click(); await wait(25);
+    buttons(series, "add").click(); await wait(25);
+    check("Roku Add follows a movie's WatchAction door but leaves a series on details", () => {
+      assert.ok(page.store.addedItems["https://therokuchannel.roku.com/watch/c0734dbe498259cf87ec6f049b015eed"]);
+      assert.strictEqual(page.store.addedItems["https://therokuchannel.roku.com/watch/c0734dbe498259cf87ec6f049b015eed"].title, "Coraline");
+      assert.ok(page.store.addedItems["https://therokuchannel.roku.com/details/f0cbab7bd40e550eb7181f772ae798a6/bewitched"]);
+    });
+    page.window.close();
+  }
+  {
+    const former = "https://therokuchannel.roku.com/details/c0734dbe498259cf87ec6f049b015eed/coraline";
+    const current = "https://therokuchannel.roku.com/watch/c0734dbe498259cf87ec6f049b015eed";
+    const page = await load({ fixture: "sites/roku.html", url: "https://therokuchannel.roku.com/",
+      siteRules: { "therokuchannel.roku.com": { enabled: true } }, testSeam: true,
+      hiddenItems: { [former]: { title: "Coraline", thumb: "", ts: 1, listed: true } },
+      addedItems: { [former]: { title: "Coraline", thumb: "", ts: 1 } }, watchedShown: { [former]: 1 } });
+    const writes = page.writes.length;
+    check("Roku player-link migration keeps hidden, added and watched state under the watch key", () => {
+      assert.ok(page.document.querySelector('li.movie[aria-label="Coraline"]').classList.contains("hoa-removed"));
+      ["hiddenItems", "addedItems", "watchedShown"].forEach(name => {
+        assert.equal(page.store[name][former], undefined, name);
+        assert.ok(page.store[name][current], name);
+      });
+      assert.equal(writes, 1, "one batched migration write");
+    });
+    page.test.apply(); await wait(25);
+    check("Roku player-link migration does not write again on later passes", () => assert.equal(page.writes.length, writes));
+    page.window.close();
+  }
+  {
     const page = await load({ fixture: "sites/pluto.html", url: "https://pluto.tv/us/movies/",
       siteRules: { "pluto.tv": { enabled: true, hideKeywords: ["Ice Cube"] } } });
     check("filters: Pluto page-data cast names are keyword searchable", () => assert.ok(
@@ -1417,6 +1453,9 @@ const CASES = [
     page.document.dispatchEvent(new page.window.MouseEvent("mousemove", { clientX: 20, clientY: 20, bubbles: true })); await wait(25);
     const button = page.document.querySelector("#hoa-watch-later");
     check("Watch Later hover action appears only on a watch page and respects the edge", () => { assert.ok(button); assert.equal(button.hidden, false); assert.match(button.style.top, /-?\d+px/); });
+    const bottomTop = button.style.top;
+    page.window.chrome.storage.local.set({ buttonEdge: "top" }); await wait(20);
+    check("a visible Watch Later button moves immediately when its edge changes", () => assert.notEqual(button.style.top, bottomTop));
     button.click(); await wait(20); check("Watch Later click toggles its saved entry", () => assert.ok(page.store.watchLater[key]));
     button.click(); await wait(20); check("Watch Later second click removes its saved entry", () => assert.equal(page.store.watchLater[key], undefined));
     {

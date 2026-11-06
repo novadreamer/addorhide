@@ -41,7 +41,7 @@ Once you play a saved video for a few seconds, it moves to Continue Watching on 
 
 YOUR ADDED VIDEOS PAGE
 - See everything on one page, or give Continue Watching, Watch Later, Channels, Categories and each website its own tab.
-- Add a channel from a card that leads to one and it goes to your Channels list, right under Watch Later. A category, such as one on Twitch's Browse page, goes to Categories.
+- Add a channel from a card that leads to one and it goes to your Channels list, right under Watch Later. A category, such as one on Twitch's Browse page, goes to Categories, and a card that plays a video saves the video, not its info page.
 - Sort websites by name or by what you added last.
 - Sort each site's videos by date, views, duration, year, channel or A-Z.
 - Group them by channel, date added, decade, rating, type or genre. Options appear only when the site's videos can use them.

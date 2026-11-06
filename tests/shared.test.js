@@ -82,6 +82,59 @@ check("player site names", () => assert.deepEqual([
 ], ["IMDb", "Dailymotion", "Tubi", "TMDB", "Twitch", "YouTube"]));
 check("kind short", () => assert.equal(HOA.kindOf(short), "short"));
 check("kind video", () => assert.equal(HOA.kindOf(watch), "video"));
+check("kind table keeps unknown slugs playable and recognizes title, category and channel paths", () => {
+  assert.equal(HOA.kindOf("https://therokuchannel.roku.com/watch/aabbccddeeff"), "video");
+  assert.equal(HOA.kindOf("https://therokuchannel.roku.com/details/aabbccddeeff/a-movie"), "title");
+  assert.equal(HOA.kindOf("https://therokuchannel.roku.com/browse/w.xxxxx/the-cw"), "category");
+  assert.equal(HOA.kindOf("https://example.com/a-perfectly-normal-slug"), "video");
+  assert.equal(HOA.kindOf("https://www.youtube.com/@creator"), "channel");
+});
+
+function fakeCardLink(href, attributes = {}, parent = null) {
+  return {
+    href,
+    textContent: attributes.text || "",
+    parentElement: parent,
+    children: attributes.children || [],
+    getAttribute(name) { return name === "href" ? href : attributes[name] || null; },
+    contains(node) { return this.children.includes(node); },
+    closest() { return null; }
+  };
+}
+
+function fakeCard(links, picture = null, nodes = []) {
+  const card = {
+    parentElement: null,
+    matches() { return false; },
+    querySelectorAll(selector) { return selector === "a[href]" ? links : []; },
+    querySelector(selector) { return selector === "img, picture, video" ? picture : null; },
+    contains(node) { return node === card || links.includes(node) || nodes.includes(node); }
+  };
+  links.forEach(link => { if (!link.parentElement) link.parentElement = card; });
+  return card;
+}
+
+check("chooseCardLink follows the thumbnail and only swaps a title for its same-content play door", () => {
+  const movieId = "c0734dbe498259cf87ec6f049b015eed";
+  const door = fakeCardLink(`https://therokuchannel.roku.com/watch/${movieId}`);
+  const action = { parentElement: null, getAttribute: name => name === "itemtype" ? "http://schema.org/WatchAction" : null };
+  door.parentElement = action;
+  const details = fakeCardLink(`https://therokuchannel.roku.com/details/${movieId}/coraline`);
+  const movie = fakeCard([details, door], null, [action]); action.parentElement = movie;
+  assert.equal(HOA.chooseCardLink(movie, details), door, "Roku movie door");
+  const series = fakeCardLink("https://therokuchannel.roku.com/details/76c556224ae757e6b2a81bcb1aade466/forensic-files");
+  assert.equal(HOA.chooseCardLink(fakeCard([series]), series), series, "Roku series stays details");
+  const title = fakeCardLink("https://www.imdb.com/title/tt1234567");
+  const trailer = fakeCardLink("https://www.imdb.com/video/vi1234567", { title: "Official trailer" });
+  assert.equal(HOA.chooseCardLink(fakeCard([title, trailer]), title), title, "trailer is refused");
+  const other = fakeCardLink("https://www.imdb.com/video/vi7654321", { "aria-label": "Play" });
+  assert.equal(HOA.chooseCardLink(fakeCard([title, other]), title), title, "different ids stay put");
+  const avatar = fakeCardLink("https://example.com/channel/creator");
+  const image = {};
+  const thumbnail = fakeCardLink("https://example.com/watch/episode-one", { children: [image] });
+  assert.equal(HOA.chooseCardLink(fakeCard([avatar, thumbnail], image), null), thumbnail, "thumbnail beats channel avatar");
+  assert.equal(HOA.chooseCardLink(fakeCard([avatar], image), null), avatar, "only channel link stays channel");
+});
 
 const raw = {
   [watch]: {

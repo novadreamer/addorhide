@@ -60,6 +60,7 @@ window.__hoaLoaded = true;
   let hasWatchProgress = false;
   let watchSettings = { tagWatched: true, continueWatching: "auto" };
   let watchedWriteTimer = 0;
+  let keyMigrationTimer = 0;
   let siteRules = {};
   let scheduled = 0;
   let toastTimer = 0;
@@ -104,6 +105,10 @@ window.__hoaLoaded = true;
   const liveVideos = new WeakSet();
   let watchLaterHref = "";
   let watchLaterLookup = 0;
+  let watchLaterPointerListening = false;
+  const watchLaterFrames = new Set();
+  const migratedFormerKeys = new Set();
+  const pendingKeyMigrations = { hidden: false, added: false, watchedShown: false };
   const healedChannels = new Set();
 
   function contextAlive() {
@@ -129,7 +134,8 @@ window.__hoaLoaded = true;
     document.querySelectorAll("[data-hoa-player-watched]").forEach(node => node.removeAttribute("data-hoa-player-watched"));
     document.querySelectorAll("[data-hoa-static]").forEach(node => node.removeAttribute("data-hoa-static"));
     clearCarouselCompensation();
-    document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"], .hoa-watched-label[data-hoa-owner="${ownInstance}"], #hoa-watch-later`).forEach(node => node.remove());
+    removeOwnWatchLater();
+    document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"], .hoa-watched-label[data-hoa-owner="${ownInstance}"]`).forEach(node => node.remove());
     document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-empty, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-empty", "hoa-show"));
     document.querySelectorAll(`[data-hoa-watched="${ownInstance}"]`).forEach(node => node.removeAttribute("data-hoa-watched"));
     ["hoa-toast", "hoa-banner"].forEach(id => {
@@ -174,6 +180,7 @@ window.__hoaLoaded = true;
 
   function ensureContext(fromClick = false) {
     if (!contextAlive() || !ownContext()) {
+      removeOwnWatchLater();
       retire(fromClick);
       return false;
     }
@@ -372,7 +379,9 @@ window.__hoaLoaded = true;
       try { results.push(card.matches(test.is)); } catch (error) { results.push(false); }
     }
     if (test.href) {
-      const link = getLink(card, rule);
+      // Filtering rules describe the site's own card URL, not an optional play door
+      // nested inside it. Keep their existing href input while card storage follows it.
+      const link = getLinkInfo(card, rule).categoryLink;
       results.push(Boolean(link && safePattern(test.href, (rule.linkAttribute && link.getAttribute(rule.linkAttribute)) || link.getAttribute("href") || link.href || "")));
     }
     let categoryText = null;
@@ -991,7 +1000,7 @@ window.__hoaLoaded = true;
     return target;
   }
 
-  function getLink(card, rule) {
+  function getLinkInfo(card, rule) {
     let link = null;
     if (rule.linkSelector) {
       try {
@@ -1003,18 +1012,23 @@ window.__hoaLoaded = true;
     if (link && link.closest(".hoa-actions, #hoa-toast, #hoa-banner")) {
       link = null;
     }
+    if (link) {
+      return { link: HOA.chooseCardLink(card, link), preferred: link, categoryLink: link };
+    }
     if (!link && card.matches("a[href]")) {
       // Picked cards can be the link itself (a.poster-card).
-      link = card;
+      return { link: card, preferred: null, categoryLink: card };
     }
     if (!link && rule.linkAttribute && card.getAttribute(rule.linkAttribute)) {
-      link = card;
+      return { link: card, preferred: null, categoryLink: card };
     }
-    if (!link) {
-      link = Array.from(card.querySelectorAll("a[href]"))
-        .find(candidate => !candidate.closest(".hoa-actions, #hoa-toast, #hoa-banner"));
-    }
-    return link;
+    const categoryLink = Array.from(card.querySelectorAll("a[href]"))
+      .find(candidate => !candidate.closest(".hoa-actions, #hoa-toast, #hoa-banner")) || null;
+    return { link: HOA.chooseCardLink(card, null), preferred: null, categoryLink };
+  }
+
+  function getLink(card, rule) {
+    return getLinkInfo(card, rule).link;
   }
 
   // Thumbnail links carry only a duration badge ("2:13", "1:02:03") or "LIVE"; never use that as a title.
@@ -1115,7 +1129,8 @@ window.__hoaLoaded = true;
   }
 
   function cardData(card, rule) {
-    const link = getLink(card, rule);
+    const linkInfo = getLinkInfo(card, rule);
+    const link = linkInfo.link;
     if (!link) {
       return null;
     }
@@ -1169,7 +1184,12 @@ window.__hoaLoaded = true;
       thumb = typeof source === "string" && /^https?:\/\//i.test(source) && source.length <= HOA.MAX_URL ? source : "";
     }
     const pageData = pageDataForCard(card, rule, link);
-    return { key, title, thumb, kind, site: HOA.siteOf(key), ts: Date.now(), ...(pageData ? { pageData } : {}) };
+    // The link this card used to be saved under. A channel link is shared by many cards, so it is never moved onto one of them.
+    const former = linkInfo.categoryLink;
+    const formerHref = former && former !== link && ((rule.linkAttribute && former.getAttribute(rule.linkAttribute)) || former.href || former.getAttribute("href"));
+    const candidateKey = formerHref && keyForHref(formerHref, rule);
+    const formerKey = candidateKey && HOA.kindOf(candidateKey) !== "channel" ? candidateKey : "";
+    return { key, title, thumb, kind, site: HOA.siteOf(key), ts: Date.now(), ...(formerKey && formerKey !== key ? { formerKey } : {}), ...(pageData ? { pageData } : {}) };
   }
 
   function elementText(element) {
@@ -1837,6 +1857,31 @@ window.__hoaLoaded = true;
     }))];
   }
 
+  function migrateFormerKey(data) {
+    if (!data || !data.formerKey || data.formerKey === data.key || migratedFormerKeys.has(data.formerKey)) return;
+    migratedFormerKeys.add(data.formerKey);
+    // Copy first so this pass immediately sees the saved state under the player URL,
+    // then omit the old key without waiting for storage's asynchronous change event.
+    const move = (items, name) => {
+      if (!items[data.formerKey] || items[data.key]) return items;
+      const next = { ...items, [data.key]: items[data.formerKey] };
+      delete next[data.formerKey];
+      pendingKeyMigrations[name] = true;
+      return next;
+    };
+    hidden = move(hidden, "hidden");
+    added = move(added, "added");
+    watchedShown = move(watchedShown, "watchedShown");
+    if (!keyMigrationTimer && (pendingKeyMigrations.hidden || pendingKeyMigrations.added || pendingKeyMigrations.watchedShown)) {
+      keyMigrationTimer = window.setTimeout(() => {
+        keyMigrationTimer = 0;
+        const changes = { ...pendingKeyMigrations };
+        pendingKeyMigrations.hidden = false; pendingKeyMigrations.added = false; pendingKeyMigrations.watchedShown = false;
+        HOA.writeLists({ ...(changes.hidden ? { hidden } : {}), ...(changes.added ? { added } : {}), ...(changes.watchedShown ? { watchedShown } : {}) });
+      }, 0);
+    }
+  }
+
   function processCard(card, variant, state) {
     const { categories, filtered, handled, cards } = state;
     if (cards) cards.add(card);
@@ -1897,6 +1942,7 @@ window.__hoaLoaded = true;
       handled.add(card);
       return;
     }
+    migrateFormerKey(data);
     if (Object.keys(channels).length) healChannelName(channelIdentity(card, variant));
     const isWatched = watchedCard(card, variant, data);
     const cardCategories = isWatched && watchedShown[data.key]
@@ -2357,6 +2403,23 @@ window.__hoaLoaded = true;
     return !childFrame && watchLaterPlayer && (watchLaterPlayer.tagName !== "VIDEO" || trackableVideo(watchLaterPlayer, hostnameRule())) ? watchKey(hostnameRule()) : null;
   }
 
+  function removeOwnWatchLater() {
+    if (watchLaterHideTimer) { clearTimeout(watchLaterHideTimer); watchLaterHideTimer = 0; }
+    if (watchLaterMoveFrame) { cancelAnimationFrame(watchLaterMoveFrame); watchLaterMoveFrame = 0; }
+    if (watchLaterPointerListening) {
+      document.removeEventListener("mousemove", watchLaterPointer);
+      watchLaterPointerListening = false;
+    }
+    watchLaterFrames.forEach(frame => {
+      frame.removeEventListener("mouseenter", watchLaterFrameEnter);
+      frame.removeEventListener("mouseleave", watchLaterFrameLeave);
+    });
+    watchLaterFrames.clear();
+    if (watchLaterButton) watchLaterButton.remove();
+    watchLaterButton = null;
+    watchLaterPlayer = null;
+  }
+
   function hideWatchLaterButton() {
     if (watchLaterHideTimer) { clearTimeout(watchLaterHideTimer); watchLaterHideTimer = 0; }
     if (watchLaterButton) { watchLaterButton.classList.remove("hoa-watch-later-show"); watchLaterButton.hidden = true; }
@@ -2405,11 +2468,13 @@ window.__hoaLoaded = true;
   }
 
   function positionWatchLaterButton() {
+    if (!ensureContext()) return;
     if (!watchLaterButton || !watchLaterPlayer) return;
     const box = watchLaterPlayer.getBoundingClientRect();
     if (!box.width || !box.height) return hideWatchLaterButton();
     const full = document.fullscreenElement;
     const parent = full && full.tagName !== "VIDEO" ? full : document.body;
+    if (!ensureContext()) return;
     if (watchLaterButton.parentElement !== parent) parent.appendChild(watchLaterButton);
     // Bottom sits above the player's own control bar.
     const top = buttonEdge === "bottom" ? box.bottom - 84 : box.top + 12;
@@ -2418,6 +2483,7 @@ window.__hoaLoaded = true;
   }
 
   function revealWatchLaterButton() {
+    if (!ensureContext()) return;
     if (!buttonsEnabled) return;
     ensureWatchLaterButton();
     if (!watchLaterButton) return;
@@ -2444,10 +2510,12 @@ window.__hoaLoaded = true;
   }
 
   function watchLaterPointer(event) {
+    if (!ensureContext()) return;
     if (watchLaterMoveFrame) return;
     const { clientX: x, clientY: y } = event;
     watchLaterMoveFrame = requestAnimationFrame(() => {
       watchLaterMoveFrame = 0;
+      if (!ensureContext()) return;
       if (!buttonsEnabled) return;
       const usable = watchLaterPlayer && watchLaterPlayer.isConnected && watchLaterHref === location.href && watchLaterPlayer.getBoundingClientRect().width > 0;
       if (!usable) {
@@ -2455,14 +2523,25 @@ window.__hoaLoaded = true;
         watchLaterHref = location.href; watchLaterLookup = now;
         const previous = watchLaterPlayer; watchLaterPlayer = findWatchLaterPlayer(hostnameRule());
         if (watchLaterPlayer && watchLaterPlayer !== previous && watchLaterPlayer.tagName === "IFRAME") {
-          watchLaterPlayer.addEventListener("mouseenter", revealWatchLaterButton);
-          watchLaterPlayer.addEventListener("mouseleave", scheduleWatchLaterHide);
+          watchLaterFrames.add(watchLaterPlayer);
+          watchLaterPlayer.addEventListener("mouseenter", watchLaterFrameEnter);
+          watchLaterPlayer.addEventListener("mouseleave", watchLaterFrameLeave);
         }
         if (!watchLaterPlayer) return hideWatchLaterButton();
       }
       const box = watchLaterPlayer.getBoundingClientRect();
       if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) revealWatchLaterButton();
     });
+  }
+
+  function watchLaterFrameEnter() {
+    if (!ensureContext()) return;
+    revealWatchLaterButton();
+  }
+
+  function watchLaterFrameLeave() {
+    if (!ensureContext()) return;
+    scheduleWatchLaterHide();
   }
 
   function ensureWatchLaterButton() {
@@ -2503,11 +2582,12 @@ window.__hoaLoaded = true;
 
   function startPlaybackTracker() {
     // Private windows do not record progress, but the user can still curate Watch Later there.
-    if (playbackTrackerStarted || !watchSettingsReady || !siteRulesReady) return;
+    if (!ensureContext() || playbackTrackerStarted || !watchSettingsReady || !siteRulesReady) return;
     playbackTrackerStarted = true;
     findPlayer(); ["loadedmetadata", "durationchange", "canplay", "play"].forEach(type => document.addEventListener(type, findPlayer, true));
     if (!childFrame) {
       document.addEventListener("mousemove", watchLaterPointer, { passive: true });
+      watchLaterPointerListening = true;
       addEventListener("scroll", () => { if (watchLaterButton && watchLaterButton.classList.contains("hoa-watch-later-show")) positionWatchLaterButton(); }, { passive: true, capture: true });
       document.addEventListener("fullscreenchange", () => { if (watchLaterButton) positionWatchLaterButton(); });
     }
@@ -2628,6 +2708,7 @@ window.__hoaLoaded = true;
         placeActions(actions.hoaCard, actions, actions.hoaRule || {});
       }
     });
+    if (watchLaterButton && !watchLaterButton.hidden) positionWatchLaterButton();
   }
   chrome.storage.local.get({ [HOA.BUTTON_EDGE_KEY]: "top" }, result => setButtonEdge(result[HOA.BUTTON_EDGE_KEY]));
 
