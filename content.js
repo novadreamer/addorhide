@@ -100,6 +100,7 @@ window.__hoaLoaded = true;
   let watchLaterHideTimer = 0;
   let watchLaterMoveFrame = 0;
   let watchLaterPlayer = null;
+  let playerTagHost = null;
   let watchLaterHref = "";
   let watchLaterLookup = 0;
   const healedChannels = new Set();
@@ -124,6 +125,7 @@ window.__hoaLoaded = true;
   }
 
   function removeOwnUi() {
+    document.querySelectorAll("[data-hoa-player-watched]").forEach(node => node.removeAttribute("data-hoa-player-watched"));
     clearCarouselCompensation();
     document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"], .hoa-watched-label[data-hoa-owner="${ownInstance}"], #hoa-watch-later`).forEach(node => node.remove());
     document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-empty, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-empty", "hoa-show"));
@@ -1986,6 +1988,7 @@ window.__hoaLoaded = true;
     }
     scheduled = 0;
     if (!listsReady || !siteRulesReady) return;
+    syncPlayerWatchedTag();
     if (!document.body) {
       if (!waitingForBody) {
         waitingForBody = true;
@@ -2209,17 +2212,22 @@ window.__hoaLoaded = true;
     if (!entry) return;
     const nextLater = { ...watchLater };
     const chosen = nextLater[entry.url];
+    let moved = entry.watched && !(watchProgress[entry.url] && watchProgress[entry.url].watched);
     if (entry.watched && chosen) delete nextLater[entry.url];
     if (chosen && !entry.watched
       && entry.position >= HOA.MIN_RESUME_SECONDS && entry.position < entry.duration - 30 && covered >= 3) {
       delete nextLater[entry.url];
       entry = { ...entry, cw: "later" };
+      moved = true;
     }
     watchProgress = { ...watchProgress, [entry.url]: entry };
     watchLater = nextLater;
     if (chosen && !nextLater[entry.url]) HOA.writeLists({ watchProgress, watchLater });
     else HOA.writeProgress(entry.url, entry);
     updateWatchLaterButton();
+    // Show the new label for a moment even if the pointer is elsewhere: this is the user's sign that it moved.
+    if (moved) revealWatchLaterButton();
+    syncPlayerWatchedTag();
     scheduleApply();
   }
 
@@ -2293,11 +2301,38 @@ window.__hoaLoaded = true;
   function updateWatchLaterButton() {
     if (!watchLaterButton) return;
     const key = watchLaterKey();
-    const inContinue = key && watchProgress[key] && watchProgress[key].cw && !watchProgress[key].watched;
+    const progress = key && watchProgress[key];
+    const inContinue = progress && progress.cw && !progress.watched;
     const selected = key && watchLater[key];
-    watchLaterButton.hidden = !key || !buttonsEnabled || Boolean(inContinue);
-    watchLaterButton.textContent = selected ? "✓ In Watch Later" : "Add to Watch Later";
+    const rule = hostnameRule();
+    // Watched ticked for this site: the video now belongs to the Watched list, so the button says so.
+    // Not ticked: the tag on the player says it (syncPlayerWatchedTag) and the video can still be saved.
+    const inWatched = !selected && progress && progress.watched && !progress.untagged && rule && watchedEnabled(activeCategories(rule));
+    watchLaterButton.hidden = !key || !buttonsEnabled;
+    watchLaterButton.textContent = inWatched ? "✓ In Watched" : inContinue ? "✓ In Continue Watching" : selected ? "✓ In Watch Later" : "Add to Watch Later";
     watchLaterButton.setAttribute("aria-pressed", String(Boolean(selected)));
+    // Once it is in Continue Watching or Watched the button is a status, not an action.
+    watchLaterButton.setAttribute("aria-disabled", String(Boolean(inContinue || inWatched)));
+  }
+
+  // The Watched tag on the video's own page. An attribute on the player's box, drawn by CSS, so it moves with the
+  // player, works in fullscreen and survives the player's re-rendering, like the tag on thumbnails.
+  function syncPlayerWatchedTag() {
+    if (childFrame || (!hasWatchProgress && !playerTagHost)) return;
+    const rule = hostnameRule();
+    const key = rule ? watchKey(rule) : null;
+    const entry = key && watchProgress[key];
+    let host = null;
+    if (entry && entry.watched && !entry.untagged && watchSettings.tagWatched && !watchedEnabled(activeCategories(rule))) {
+      const player = findWatchLaterPlayer(rule);
+      host = player && (player.tagName === "VIDEO" || player.tagName === "IFRAME" ? player.parentElement : player);
+    }
+    if (playerTagHost && playerTagHost !== host) playerTagHost.removeAttribute("data-hoa-player-watched");
+    playerTagHost = host;
+    if (host && !host.hasAttribute("data-hoa-player-watched")) {
+      if (getComputedStyle(host).position === "static") host.style.position = "relative";
+      host.setAttribute("data-hoa-player-watched", "");
+    }
   }
 
   function positionWatchLaterButton() {
@@ -2368,6 +2403,7 @@ window.__hoaLoaded = true;
     watchLaterButton.id = "hoa-watch-later"; watchLaterButton.type = "button";
     watchLaterButton.addEventListener("click", event => {
       event.preventDefault(); event.stopPropagation();
+      if (watchLaterButton.getAttribute("aria-disabled") === "true") return;
       const currentKey = watchLaterKey(); if (!currentKey) return;
       HOA.readLists(lists => {
         const next = { ...lists.watchLater };

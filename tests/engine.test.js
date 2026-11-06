@@ -1326,7 +1326,7 @@ const CASES = [
     const key = "https://www.youtube.com/watch?v=abc123def45";
     const page = await load({ html: "", url: key, watchSettings: { continueWatching: "auto" },
       watchLater: { [key]: { title: "Later", thumb: "", site: "youtube.com", url: key, duration: 100, ts: 1 } }, testSeam: true });
-    const video = fakeVideo(page, { currentTime: 9 });
+    const video = fakeVideo(page, { currentTime: 9 }); page.test.findPlayer();
     video.fire("play");
     [10, 11, 12, 13].forEach(position => { video.currentTime = position; video.fire("timeupdate"); });
     await wait(30);
@@ -1335,6 +1335,31 @@ const CASES = [
       assert.ok(page.store.watchProgress[key], JSON.stringify(page.store));
       assert.equal(page.store.watchProgress[key].cw, "later");
     });
+    check("the button changes to In Continue Watching when the video moves, and is a status, not an action", () => {
+      const button = page.document.querySelector("#hoa-watch-later");
+      assert.ok(button); assert.equal(button.textContent, "✓ In Continue Watching"); assert.equal(button.hidden, false);
+      assert.equal(button.getAttribute("aria-disabled"), "true");
+      button.click();
+    });
+    await wait(20);
+    {
+      const url = "https://www.youtube.com/watch?v=watchedpage";
+      const done = { [url]: { site: "youtube.com", title: "Done", url, duration: 100, position: 98, played: 98, buckets: "f".repeat(25), watched: true, ts: 1, updated: 1 } };
+      const box = { left: 16, top: 68, right: 903, bottom: 567, width: 887, height: 499, x: 16, y: 68 };
+      const open = async options => { const opened = await load({ html: '<div id="movie_player"></div>', url, watchProgress: done, testSeam: true, ...options }); opened.document.getElementById("movie_player").getBoundingClientRect = () => box; opened.test.apply(); opened.document.dispatchEvent(new opened.window.MouseEvent("mousemove", { clientX: 400, clientY: 300, bubbles: true })); await wait(30); return opened; };
+      const ticked = await open({ siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
+      check("Watched ticked: the button says In Watched and the player has no tag", () => { const control = ticked.document.querySelector("#hoa-watch-later"); assert.equal(control.textContent, "✓ In Watched"); assert.equal(control.getAttribute("aria-disabled"), "true"); assert.equal(ticked.document.querySelector("[data-hoa-player-watched]"), null); });
+      ticked.window.close();
+      const plain = await open({});
+      check("Watched not ticked: the player carries the Watched tag and the video can still be saved", () => { assert.ok(plain.document.getElementById("movie_player").hasAttribute("data-hoa-player-watched")); assert.equal(plain.document.querySelector("#hoa-watch-later").textContent, "Add to Watch Later"); });
+      plain.window.history.pushState({}, "", "/watch?v=anotherone1"); plain.test.apply();
+      check("the player's Watched tag goes when the next video opens", () => assert.equal(plain.document.querySelector("[data-hoa-player-watched]"), null));
+      plain.window.close();
+      const off = await open({ watchSettings: { tagWatched: false } });
+      check("Tag watched videos off: no tag on the player", () => assert.equal(off.document.querySelector("[data-hoa-player-watched]"), null));
+      off.window.close();
+    }
+    check("clicking In Continue Watching changes nothing", () => { assert.equal(page.store.watchProgress[key].cw, "later"); assert.equal(page.store.watchLater[key], undefined); });
     page.window.close();
     for (const [name, options] of [["a private window", { incognito: true }], ["Auto-add off", { watchSettings: { continueWatching: "off" } }], ["every watch feature off", { watchSettings: { continueWatching: "off", tagWatched: false } }]]) {
       const chosen = await load({ html: "", url: key, ...options, watchLater: { [key]: { title: "Later", thumb: "", site: "youtube.com", url: key, duration: 100, ts: 1 } }, testSeam: true });

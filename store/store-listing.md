@@ -33,7 +33,7 @@ HIDE WHOLE CATEGORIES
 Hide on this site lists what that site offers, such as Watched, Shorts, Playlists, Live or Movies & TV, and you can switch each one off. Add your own keywords, and hide whole rows by name on streaming sites.
 
 KNOW WHAT YOU'VE WATCHED
-A video counts as watched only after you really play about 90% of it, not when you open it or skip to the end. Watched videos get a tag on every thumbnail, or you can hide them automatically. Remove a tag from any video with one click.
+A video counts as watched only after you really play about 90% of it, not when you open it or skip to the end. Watched videos get a tag on every thumbnail and on their own page, or you can hide them automatically. Remove a tag from any video with one click.
 
 WATCH LATER AND CONTINUE WATCHING
 Hover over the player on a video's own page and choose Add to Watch Later to save it for another time. Your list sits right under Continue Watching on the Added Videos page.

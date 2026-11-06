@@ -17,7 +17,7 @@ movie and streaming sites, and a card picker that teaches it any other video sit
 
 ## What's new in 1.1.0
 
-- **Watched:** a video counts as watched after about 90% real playback, not by opening it or skipping to the end. Tag it on every thumbnail or hide it automatically, and untag any video.
+- **Watched:** a video counts as watched after about 90% real playback, not by opening it or skipping to the end. Tag it on every thumbnail and on its own page, or hide it automatically, and untag any video.
 - **Watch Later:** hover over the player on a video's own page and choose Add to Watch Later. The list sits under Continue Watching, and a saved video moves there once you have played a few seconds.
 - **Continue Watching:** videos you start appear with a progress bar and time left, and resume where you stopped, with Start over.
 - **Hide by type, keyword and channel:** per-site categories such as Shorts, Playlists and Live, your own keywords, whole channels, and rows by name on streaming sites.
