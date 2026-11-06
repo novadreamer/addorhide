@@ -1359,6 +1359,32 @@ const CASES = [
       check("Tag watched videos off: no tag on the player", () => assert.equal(off.document.querySelector("[data-hoa-player-watched]"), null));
       off.window.close();
     }
+    {
+      const url = "https://www.twitch.tv/somechannel";
+      const stream = await load({ html: "", url, siteRules: { "www.twitch.tv": { enabled: true } }, watchLater: { [url]: { title: "Live", thumb: "", site: "twitch.tv", url, ts: 1 } }, testSeam: true });
+      const live = fakeVideo(stream, { duration: Infinity, currentTime: 100 }); stream.test.findPlayer();
+      const play = async seconds => { for (let step = 0; step <= seconds; step += 1) { live.currentTime += 1; live.fire("timeupdate"); } await wait(30); };
+      await play(4);
+      check("a saved live channel stays in Watch Later for its first seconds", () => assert.ok(stream.store.watchLater[url]));
+      await play(9);
+      check("a saved live channel moves to Continue Watching after real watching", () => { assert.equal(stream.store.watchLater[url], undefined); assert.equal(stream.store.watchProgress[url].cw, "later"); assert.equal(stream.store.watchProgress[url].live, true); });
+      stream.window.close();
+      const plain = await load({ html: "", url, siteRules: { "www.twitch.tv": { enabled: true } }, testSeam: true });
+      const unsaved = fakeVideo(plain, { duration: Infinity, currentTime: 100 }); plain.test.findPlayer();
+      for (let step = 0; step < 30; step += 1) { unsaved.currentTime += 1; unsaved.fire("timeupdate"); } await wait(30);
+      check("a live stream nobody saved records nothing", () => assert.deepEqual(plain.store.watchProgress || {}, {}));
+      plain.window.close();
+    }
+    {
+      const url = "https://rumble.com/shorts/vabc123";
+      const html = '<div class="outer"><a href="/shorts/vabc123">Short</a><div class="inner"></div></div>';
+      const taught = await load({ html, url: "https://rumble.com/shorts/", siteRules: { "rumble.com": { enabled: true, pickedSelectors: ["div.outer", "div.inner"] } }, testSeam: true });
+      check("two taught selectors on one video give it one button bar, on the outer card", () => { assert.equal(taught.document.querySelectorAll(".hoa-actions").length, 1); assert.ok(taught.document.querySelector(".outer > .hoa-actions")); });
+      taught.window.close();
+      const fixed = await load({ html: '<style>.outer { position: absolute; }</style>' + html, url: "https://rumble.com/shorts/", siteRules: { "rumble.com": { enabled: true, pickedSelectors: ["div.outer"] } }, testSeam: true });
+      check("a card the site positions itself is left alone", () => { const card = fixed.document.querySelector(".outer"); assert.ok(card.classList.contains("hoa-host")); assert.equal(card.hasAttribute("data-hoa-static"), false); });
+      fixed.window.close();
+    }
     check("clicking In Continue Watching changes nothing", () => { assert.equal(page.store.watchProgress[key].cw, "later"); assert.equal(page.store.watchLater[key], undefined); });
     page.window.close();
     for (const [name, options] of [["a private window", { incognito: true }], ["Auto-add off", { watchSettings: { continueWatching: "off" } }], ["every watch feature off", { watchSettings: { continueWatching: "off", tagWatched: false } }]]) {

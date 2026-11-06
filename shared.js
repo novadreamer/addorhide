@@ -74,7 +74,9 @@ var HOA = Object.freeze((() => {
       const raw = value[key];
       const duration = Number(raw.duration);
       const position = Number(raw.position);
-      if (!Number.isFinite(duration) || duration < 20 || duration > 1000000 || !Number.isFinite(position) || position < 0) return;
+      // A saved live stream has no length (see watchLiveVideo in content.js).
+      const live = raw.live === true && duration === 0;
+      if (!Number.isFinite(duration) || (duration < 20 && !live) || duration > 1000000 || !Number.isFinite(position) || position < 0) return;
       const updated = Number(raw.updated);
       if (!Number.isFinite(updated)) return;
       const title = typeof raw.title === "string" ? raw.title.trim().slice(0, MAX_TITLE) : fallbackTitle(key);
@@ -82,6 +84,7 @@ var HOA = Object.freeze((() => {
       const entry = { site: siteOf(canonical), title: title || fallbackTitle(canonical), url: canonical, thumbnail: thumb, duration, position: Math.min(position, duration), buckets: bitmapBuckets(raw.buckets), watched: raw.watched === true, ts: Number.isFinite(raw.ts) ? raw.ts : updated, updated };
       if (Number.isFinite(Number(raw.played)) && Number(raw.played) >= 0) entry.played = Number(raw.played);
       if (raw.untagged === true) entry.untagged = true;
+      if (live) entry.live = true;
       if (raw.cw === "auto" || raw.cw === "manual" || raw.cw === "later") entry.cw = raw.cw === "later" ? "later" : "auto";
       const old = normalized[canonical];
       if (!old) normalized[canonical] = entry;

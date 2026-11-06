@@ -101,6 +101,7 @@ window.__hoaLoaded = true;
   let watchLaterMoveFrame = 0;
   let watchLaterPlayer = null;
   let playerTagHost = null;
+  const liveVideos = new WeakSet();
   let watchLaterHref = "";
   let watchLaterLookup = 0;
   const healedChannels = new Set();
@@ -126,6 +127,7 @@ window.__hoaLoaded = true;
 
   function removeOwnUi() {
     document.querySelectorAll("[data-hoa-player-watched]").forEach(node => node.removeAttribute("data-hoa-player-watched"));
+    document.querySelectorAll("[data-hoa-static]").forEach(node => node.removeAttribute("data-hoa-static"));
     clearCarouselCompensation();
     document.querySelectorAll(`.hoa-actions[data-hoa-owner="${ownInstance}"], .hoa-watched-label[data-hoa-owner="${ownInstance}"], #hoa-watch-later`).forEach(node => node.remove());
     document.querySelectorAll(".hoa-host, .hoa-removed, .hoa-filtered, .hoa-empty, .hoa-show").forEach(node => node.classList.remove("hoa-host", "hoa-removed", "hoa-filtered", "hoa-empty", "hoa-show"));
@@ -245,7 +247,7 @@ window.__hoaLoaded = true;
     }
     merged.pickedSelectors = validPicks;
     merged.variants = [...(Array.isArray(base.variants) ? base.variants : []), ...validPicks.map(cardSelector => ({
-      cardSelector, linkSelector: "", titleCandidates: [], meta: { texts: ["*"] }
+      cardSelector, linkSelector: "", titleCandidates: [], meta: { texts: ["*"] }, pickedCards: validPicks.join(",")
     }))];
     if (!catalogRule && validPicks.length) {
       merged.cardSelector = validPicks[0];
@@ -1583,7 +1585,11 @@ window.__hoaLoaded = true;
         }
       });
     }
-    if (!card.classList.contains("hoa-host")) card.classList.add("hoa-host");
+    if (!card.classList.contains("hoa-host")) {
+      const position = getComputedStyle(card).position;
+      if ((!position || position === "static") && !card.hasAttribute("data-hoa-static")) card.setAttribute("data-hoa-static", "");
+      card.classList.add("hoa-host");
+    }
     placeActions(card, actions, actions.hoaRule || {});
     const add = actions.querySelector('[data-action="add"]');
     if (add) {
@@ -1813,6 +1819,12 @@ window.__hoaLoaded = true;
     while (parent && parent !== document.body) {
       if (handled.has(parent)) return;
       parent = parent.parentElement;
+    }
+    // Two taught selectors can match nested parts of one video: the outer card gets the single button bar.
+    if (variant.pickedCards && card.parentElement && card.parentElement.closest(variant.pickedCards)) {
+      removeActions(card);
+      handled.add(card);
+      return;
     }
     if (handled.has(card) || isAd(card, variant)) {
       if (isAd(card, variant)) removeActions(card);
@@ -2253,6 +2265,30 @@ window.__hoaLoaded = true;
     if (key && key !== tracker.key) { saveTracker(true); resetTracker(tracker, key); }
   }
 
+  // A live stream has no length and no point to resume from, so it gets no tracker. A channel the user saved
+  // still moves to Continue Watching once they have really watched it, as a video does at the resume point.
+  function watchLiveVideo(video) {
+    if (childFrame || liveVideos.has(video)) return;
+    liveVideos.add(video);
+    let seen = 0; let last = 0; let seenKey = "";
+    video.addEventListener("timeupdate", () => {
+      if (Number.isFinite(video.duration)) return;
+      const now = video.currentTime || 0; const delta = now - last; last = now;
+      const rule = hostnameRule(); const key = rule ? watchKey(rule) : null; const saved = key && watchLater[key];
+      if (key !== seenKey) { seenKey = key; seen = 0; return; }
+      if (!saved || video.paused || delta <= 0 || delta > 2.5) return;
+      seen += delta;
+      if (seen < HOA.MIN_RESUME_SECONDS) return;
+      const meta = pageMetaForKey(key); const stamp = Date.now();
+      const nextLater = { ...watchLater }; delete nextLater[key];
+      watchLater = nextLater;
+      watchProgress = { ...watchProgress, [key]: { site: HOA.siteOf(key), title: saved.title || meta.title || HOA.siteOf(key), url: key, thumbnail: saved.thumb || meta.thumbnail || "",
+        duration: 0, position: 0, played: seen, buckets: HOA.bitmapBuckets(""), watched: false, cw: "later", live: true, ts: stamp, updated: stamp } };
+      HOA.writeLists({ watchProgress, watchLater });
+      revealWatchLaterButton();
+    });
+  }
+
   function attachTracker(video) {
     // Frames can't tell which video the page is on, so private windows don't measure inside them.
     if (isIncognitoContext() && childFrame) return;
@@ -2424,6 +2460,7 @@ window.__hoaLoaded = true;
 
   function findPlayer() {
     const rule = hostnameRule();
+    document.querySelectorAll("video").forEach(video => { if (video.duration === Infinity && trackableVideo(video, rule)) watchLiveVideo(video); });
     const videos = Array.from(document.querySelectorAll("video")).filter(video => Number.isFinite(video.duration) && video.duration >= 20 && trackableVideo(video, rule));
     const visible = videos.filter(video => { const box = video.getBoundingClientRect(); return box.width > 0 && box.height > 0 && getComputedStyle(video).visibility !== "hidden"; });
     if (visible.length) { videos.length = 0; videos.push(...visible); }

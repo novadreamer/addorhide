@@ -1,7 +1,8 @@
 .hoa-removed { display: none !important; }
 .hoa-filtered { display: none !important; }
 .hoa-empty { display: none !important; }
-.hoa-host { position: relative !important; }
+/* Only a card with no positioning of its own: forcing this on one the site positions collapses it (Rumble Shorts went black). */
+[data-hoa-static] { position: relative !important; }
 /* Site stylesheets target card children (IMDb sets position: relative on poster-card divs, which drops our
    bar into the card's flex flow at the bottom), so the layout-critical properties are !important. */
 .hoa-actions {
