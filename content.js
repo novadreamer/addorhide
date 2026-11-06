@@ -100,6 +100,8 @@ window.__hoaLoaded = true;
   let watchLaterHideTimer = 0;
   let watchLaterMoveFrame = 0;
   let watchLaterPlayer = null;
+  let watchLaterHref = "";
+  let watchLaterLookup = 0;
   const healedChannels = new Set();
 
   function contextAlive() {
@@ -2266,12 +2268,17 @@ window.__hoaLoaded = true;
   }
 
   function watchLaterKey() {
-    return !childFrame && watchLaterPlayer && (watchLaterPlayer.tagName === "IFRAME" || trackableVideo(watchLaterPlayer, hostnameRule())) ? watchKey(hostnameRule()) : null;
+    return !childFrame && watchLaterPlayer && (watchLaterPlayer.tagName !== "VIDEO" || trackableVideo(watchLaterPlayer, hostnameRule())) ? watchKey(hostnameRule()) : null;
   }
 
   function hideWatchLaterButton() {
     if (watchLaterHideTimer) { clearTimeout(watchLaterHideTimer); watchLaterHideTimer = 0; }
-    if (watchLaterButton) watchLaterButton.hidden = true;
+    if (watchLaterButton) { watchLaterButton.classList.remove("hoa-watch-later-show"); watchLaterButton.hidden = true; }
+  }
+
+  function scheduleWatchLaterHide() {
+    if (watchLaterHideTimer) clearTimeout(watchLaterHideTimer);
+    watchLaterHideTimer = setTimeout(() => { watchLaterHideTimer = 0; if (watchLaterButton && watchLaterButton.matches(":hover")) scheduleWatchLaterHide(); else hideWatchLaterButton(); }, 2500);
   }
 
   function updateWatchLaterButton() {
@@ -2288,18 +2295,61 @@ window.__hoaLoaded = true;
     if (!watchLaterButton || !watchLaterPlayer) return;
     const box = watchLaterPlayer.getBoundingClientRect();
     if (!box.width || !box.height) return hideWatchLaterButton();
-    const parent = watchLaterPlayer.parentElement || document.body;
+    const full = document.fullscreenElement;
+    const parent = full && full.tagName !== "VIDEO" ? full : document.body;
     if (watchLaterButton.parentElement !== parent) parent.appendChild(watchLaterButton);
-    if (getComputedStyle(parent).position === "static") parent.classList.add("hoa-watch-later-host");
-    Object.assign(watchLaterButton.style, { left: `${Math.max(0, watchLaterPlayer.offsetLeft + watchLaterPlayer.offsetWidth / 2)}px`,
-      top: buttonEdge === "bottom" ? `${Math.max(0, watchLaterPlayer.offsetTop + watchLaterPlayer.offsetHeight - 42)}px` : `${Math.max(0, watchLaterPlayer.offsetTop + 8)}px` });
+    // Bottom sits above the player's own control bar.
+    const top = buttonEdge === "bottom" ? box.bottom - 84 : box.top + 12;
+    watchLaterButton.style.left = `${box.left + box.width / 2}px`;
+    watchLaterButton.style.top = `${Math.max(8, Math.min(top, window.innerHeight - 48))}px`;
   }
 
   function revealWatchLaterButton() {
-    if (!watchLaterButton || !buttonsEnabled) return;
-    if (watchLaterHideTimer) { clearTimeout(watchLaterHideTimer); watchLaterHideTimer = 0; }
+    if (!buttonsEnabled) return;
+    ensureWatchLaterButton();
+    if (!watchLaterButton) return;
     positionWatchLaterButton(); updateWatchLaterButton();
-    if (!watchLaterButton.hidden) watchLaterButton.classList.add("hoa-watch-later-show");
+    if (!watchLaterButton.hidden) { watchLaterButton.classList.add("hoa-watch-later-show"); scheduleWatchLaterHide(); }
+  }
+
+  // The player box, looked for on every hover so a player that had no size or no media yet still gets the button:
+  // nothing has to be playing, or even loaded.
+  function findWatchLaterPlayer(rule) {
+    if (childFrame || !rule || !watchKey(rule)) return null;
+    const sized = node => { const box = node.getBoundingClientRect(); return box.width >= 240 && box.height >= 135; };
+    const largest = nodes => nodes.sort((a, b) => { const left = a.getBoundingClientRect(); const right = b.getBoundingClientRect(); return right.width * right.height - left.width * left.height; })[0] || null;
+    // The player box first: before playback starts YouTube parks its <video> above the visible player.
+    let box = null;
+    try { box = rule.playerSelector && document.querySelector(rule.playerSelector); } catch (error) { box = null; }
+    if (box && sized(box)) return box;
+    const video = largest(Array.from(document.querySelectorAll("video")).filter(node => sized(node) && trackableVideo(node, rule)));
+    if (video) return video;
+    // Only the site's own player hosts count: any other large iframe is an ad or an embed, not this page's video.
+    const playerHosts = rule.playerHosts || [];
+    const frameHost = frame => { try { return new URL(frame.src).hostname; } catch (error) { return ""; } };
+    return largest(Array.from(document.querySelectorAll("iframe")).filter(frame => { const size = frame.getBoundingClientRect(); return playerHosts.includes(frameHost(frame)) && size.width >= 480 && size.height >= 270; }));
+  }
+
+  function watchLaterPointer(event) {
+    if (watchLaterMoveFrame) return;
+    const { clientX: x, clientY: y } = event;
+    watchLaterMoveFrame = requestAnimationFrame(() => {
+      watchLaterMoveFrame = 0;
+      if (!buttonsEnabled) return;
+      const usable = watchLaterPlayer && watchLaterPlayer.isConnected && watchLaterHref === location.href && watchLaterPlayer.getBoundingClientRect().width > 0;
+      if (!usable) {
+        const now = Date.now(); if (watchLaterHref === location.href && now - watchLaterLookup < 400) return;
+        watchLaterHref = location.href; watchLaterLookup = now;
+        const previous = watchLaterPlayer; watchLaterPlayer = findWatchLaterPlayer(hostnameRule());
+        if (watchLaterPlayer && watchLaterPlayer !== previous && watchLaterPlayer.tagName === "IFRAME") {
+          watchLaterPlayer.addEventListener("mouseenter", revealWatchLaterButton);
+          watchLaterPlayer.addEventListener("mouseleave", scheduleWatchLaterHide);
+        }
+        if (!watchLaterPlayer) return hideWatchLaterButton();
+      }
+      const box = watchLaterPlayer.getBoundingClientRect();
+      if (x >= box.left && x <= box.right && y >= box.top && y <= box.bottom) revealWatchLaterButton();
+    });
   }
 
   function ensureWatchLaterButton() {
@@ -2318,26 +2368,12 @@ window.__hoaLoaded = true;
         } else {
           const meta = pageMetaForKey(currentKey);
           next[currentKey] = { title: meta.title || HOA.siteOf(currentKey), thumb: meta.thumbnail || HOA.youtubeThumb(currentKey), site: HOA.siteOf(currentKey), url: currentKey,
-            duration: Number.isFinite(watchLaterPlayer.duration) ? watchLaterPlayer.duration : undefined, ts: Date.now() };
+            duration: [watchLaterPlayer.duration, playerTracker && playerTracker.video && playerTracker.video.duration].find(Number.isFinite), ts: Date.now() };
           HOA.writeLists({ watchLater: next }, () => showToast(currentKey, "Added to Watch Later", () => { const undo = { ...next }; delete undo[currentKey]; HOA.writeLists({ watchLater: undo }); }));
         }
       });
     });
-    document.addEventListener("mousemove", event => {
-      if (!watchLaterPlayer || !buttonsEnabled || watchLaterMoveFrame) return;
-      watchLaterMoveFrame = requestAnimationFrame(() => { watchLaterMoveFrame = 0; const box = watchLaterPlayer.getBoundingClientRect();
-        const inside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
-        if (inside) revealWatchLaterButton(); else if (watchLaterButton && !watchLaterButton.matches(":hover")) {
-          if (watchLaterHideTimer) clearTimeout(watchLaterHideTimer);
-          watchLaterHideTimer = setTimeout(() => { if (watchLaterButton) { watchLaterButton.classList.remove("hoa-watch-later-show"); watchLaterButton.hidden = true; } watchLaterHideTimer = 0; }, 2500);
-        }
-      });
-    }, { passive: true });
-    document.addEventListener("fullscreenchange", () => { if (!watchLaterButton) return; const full = document.fullscreenElement; if (full && watchLaterPlayer && full.contains(watchLaterPlayer)) full.appendChild(watchLaterButton); else positionWatchLaterButton(); });
-    if (watchLaterPlayer.tagName === "IFRAME") {
-      watchLaterPlayer.addEventListener("mouseenter", revealWatchLaterButton);
-      watchLaterPlayer.addEventListener("mouseleave", () => { if (watchLaterHideTimer) clearTimeout(watchLaterHideTimer); watchLaterHideTimer = setTimeout(hideWatchLaterButton, 2500); });
-    }
+    ["pointerdown", "pointerup", "mousedown", "mouseup", "dblclick"].forEach(type => watchLaterButton.addEventListener(type, event => event.stopPropagation()));
     updateWatchLaterButton();
   }
 
@@ -2347,22 +2383,19 @@ window.__hoaLoaded = true;
     const visible = videos.filter(video => { const box = video.getBoundingClientRect(); return box.width > 0 && box.height > 0 && getComputedStyle(video).visibility !== "hidden"; });
     if (visible.length) { videos.length = 0; videos.push(...visible); }
     videos.sort((a, b) => (b.getBoundingClientRect().width * b.getBoundingClientRect().height) - (a.getBoundingClientRect().width * a.getBoundingClientRect().height));
-    if (videos[0]) { attachTracker(videos[0]); watchLaterPlayer = videos[0]; ensureWatchLaterButton(); return; }
-    // Some supported sites own playback inside a cross-origin frame. We cannot track its media here,
-    // but can still offer the page-level Watch Later action over its largest player frame.
-    // Only the site's own player hosts count: any other large iframe is an ad or an embed, not this page's video.
-    const playerHosts = rule && rule.playerHosts || [];
-    const frameHost = frame => { try { return new URL(frame.src).hostname; } catch (error) { return ""; } };
-    const frames = Array.from(document.querySelectorAll("iframe")).filter(frame => { const box = frame.getBoundingClientRect(); return playerHosts.includes(frameHost(frame)) && box.width >= 480 && box.height >= 270; })
-      .sort((a, b) => { const left = a.getBoundingClientRect(); const right = b.getBoundingClientRect(); return right.width * right.height - left.width * left.height; });
-    if (frames[0] && watchKey(rule)) { watchLaterPlayer = frames[0]; ensureWatchLaterButton(); }
+    if (videos[0]) { attachTracker(videos[0]); watchLaterPlayer = findWatchLaterPlayer(rule) || videos[0]; watchLaterHref = location.href; ensureWatchLaterButton(); }
   }
 
   function startPlaybackTracker() {
     // Private windows do not record progress, but the user can still curate Watch Later there.
     if (playbackTrackerStarted || !watchSettingsReady || !siteRulesReady) return;
     playbackTrackerStarted = true;
-    findPlayer(); document.addEventListener("loadedmetadata", findPlayer, true); document.addEventListener("durationchange", findPlayer, true);
+    findPlayer(); ["loadedmetadata", "durationchange", "canplay", "play"].forEach(type => document.addEventListener(type, findPlayer, true));
+    if (!childFrame) {
+      document.addEventListener("mousemove", watchLaterPointer, { passive: true });
+      addEventListener("scroll", () => { if (watchLaterButton && watchLaterButton.classList.contains("hoa-watch-later-show")) positionWatchLaterButton(); }, { passive: true, capture: true });
+      document.addEventListener("fullscreenchange", () => { if (watchLaterButton) positionWatchLaterButton(); });
+    }
     addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveTracker(true); }); addEventListener("pagehide", () => saveTracker(true));
   }
   // Narrow test seam: production pages never create __hoaTest.

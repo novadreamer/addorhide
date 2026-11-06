@@ -29,6 +29,7 @@ var HOA_CATALOG = Object.freeze((() => {
       id: "youtube",
       name: "YouTube",
       watchPath: "^/(watch$|shorts/|live/)",
+      playerSelector: "#movie_player",
       builtIn: true,
       hosts: Object.freeze(["youtube.com"]),
       subdomains: true,

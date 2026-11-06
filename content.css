@@ -35,14 +35,20 @@
 /* Copy of the bar drawn above a site layer that covers the card (see syncFloatBar in content.js). */
 .hoa-actions.hoa-float { position: fixed !important; right: auto; opacity: 1; pointer-events: auto; z-index: 2147483647 !important; }
 .hoa-actions.hoa-float[hidden] { display: none !important; }
+/* Fixed in the top layer of the page rather than inside the player, so no player overlay can sit over it or take its clicks. */
 #hoa-watch-later {
-  box-sizing: border-box !important; position: absolute !important; z-index: 2147483647 !important;
-  transform: translateX(-50%); opacity: 0; pointer-events: none; min-height: 28px; padding: 0 10px;
-  color: #fff; background: rgba(20, 20, 28, .78); border: 1px solid rgba(255, 255, 255, .25); border-radius: 999px;
-  box-shadow: 0 2px 6px rgba(0,0,0,.3); font: 600 12px/26px "Segoe UI", sans-serif; cursor: pointer;
+  box-sizing: border-box !important; position: fixed !important; z-index: 2147483000 !important; appearance: none;
+  transform: translateX(-50%); opacity: 0; pointer-events: none; min-height: 34px; padding: 0 16px; margin: 0;
+  color: #fff; background: rgba(20, 20, 28, .9); border: 1px solid rgba(255, 255, 255, .35); border-radius: 999px;
+  box-shadow: 0 3px 10px rgba(0,0,0,.45); font: 700 13px/32px "Segoe UI", Arial, sans-serif; white-space: nowrap; user-select: none; cursor: pointer !important;
+  transition: background-color 120ms ease-out, transform 120ms ease-out, box-shadow 120ms ease-out;
 }
-.hoa-watch-later-host { position: relative !important; }
 #hoa-watch-later.hoa-watch-later-show, #hoa-watch-later:hover, #hoa-watch-later:focus-visible { opacity: 1; pointer-events: auto; }
+#hoa-watch-later:hover, #hoa-watch-later:focus-visible { background: #1f9d55; border-color: rgba(255, 255, 255, .7); box-shadow: 0 5px 14px rgba(0,0,0,.5); transform: translateX(-50%) translateY(-1px); }
+#hoa-watch-later:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+#hoa-watch-later:active { transform: translateX(-50%) translateY(1px) scale(.97); }
+#hoa-watch-later[aria-pressed="true"] { background: #5b5bf0; }
+#hoa-watch-later[aria-pressed="true"]:hover, #hoa-watch-later[aria-pressed="true"]:focus-visible { background: #d93a49; }
 #hoa-watch-later[hidden] { display: none !important; }
 .hoa-actions button, #hoa-banner button, #hoa-toast button {
   box-sizing: border-box;

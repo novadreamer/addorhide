@@ -1347,6 +1347,20 @@ const CASES = [
     check("Watch Later hover action appears only on a watch page and respects the edge", () => { assert.ok(button); assert.equal(button.hidden, false); assert.match(button.style.top, /-?\d+px/); });
     button.click(); await wait(20); check("Watch Later click toggles its saved entry", () => assert.ok(page.store.watchLater[key]));
     button.click(); await wait(20); check("Watch Later second click removes its saved entry", () => assert.equal(page.store.watchLater[key], undefined));
+    {
+      // Not started: YouTube's <video> is parked above the player and has no media yet, and only the player box is under the pointer.
+      const box = { left: 16, top: 68, right: 903, bottom: 567, width: 887, height: 499, x: 16, y: 68 };
+      const cued = await load({ html: '<div id="movie_player"></div>', url: key, testSeam: true });
+      cued.document.getElementById("movie_player").getBoundingClientRect = () => box;
+      cued.document.dispatchEvent(new cued.window.MouseEvent("mousemove", { clientX: 400, clientY: 300, bubbles: true })); await wait(25);
+      const control = cued.document.querySelector("#hoa-watch-later");
+      check("Watch Later shows over a player that has not started", () => { assert.ok(control); assert.equal(control.hidden, false); assert.equal(control.parentElement, cued.document.body); assert.equal(control.style.top, "80px"); });
+      let reached = 0; cued.document.addEventListener("mousedown", () => { reached += 1; });
+      control.dispatchEvent(new cued.window.MouseEvent("mousedown", { bubbles: true })); control.click(); await wait(20);
+      check("Watch Later click works before play and the player never sees the press", () => { assert.ok(cued.store.watchLater[key]); assert.equal(reached, 0); });
+      cued.document.dispatchEvent(new cued.window.MouseEvent("mousemove", { clientX: 2, clientY: 2, bubbles: true })); await wait(25);
+      cued.window.close();
+    }
     const off = await load({ html: "", url: key, testSeam: true, buttonsEnabled: false }); fakeVideo(off); off.test.findPlayer(); off.document.dispatchEvent(new off.window.MouseEvent("mousemove", { clientX: 20, clientY: 20, bubbles: true })); await wait(20);
     check("Watch Later respects Buttons off", () => { const control = off.document.querySelector("#hoa-watch-later"); assert.ok(!control || control.hidden); });
     page.window.close(); off.window.close();
