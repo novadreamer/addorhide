@@ -56,6 +56,8 @@ body.hoa-added-view main {
 .hoa-added-page .added-page-tab .site-logo { width: 28px; height: 28px; border-radius: 7px; }
 .hoa-added-page .added-page-tab .site-monogram { border-radius: 4px; }
 .hoa-added-page .continue-tab-icon { color: var(--accent); font-size: 12px; }
+.hoa-added-page .continue-tab-icon svg, .hoa-added-page .hoa-placeholder svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.hoa-added-page .hoa-placeholder svg { width: 44px; height: 44px; color: var(--muted); }
 .hoa-added-page .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hoa-added-page .added-groups { display: grid; gap: 28px; }
 .hoa-added-page .site-group { min-width: 0; }
