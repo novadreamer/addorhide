@@ -3,7 +3,7 @@
 // Rule fields: id, name, builtIn, hosts, subdomains, cardSelector, linkSelector,
 // titleCandidates, adMarkers, pathEquals, bulkHidePattern, bulkExtraSelector, gridSelector, removeClosest, removeClimb,
 // variants[{cardSelector, pathPattern, linkSelector, titleCandidates,
-// meta, typeByPath, typeByText, typeFixed, removeClosest, removeClimb}], and
+// meta, typeByCard, typeByPath, typeByText, typeFixed, removeClosest, removeClimb}], and
 // meta{duration, texts, year, rating, genres, score, votes, date, metaTexts}, channelCandidates,
 // categories[{id,label,hint,card,containers,shelfTitle,pathPattern,fallback}].
 // var, not const: the popup re-injects this file (picker, Enable) into pages that already have it,
@@ -262,6 +262,7 @@ var HOA_CATALOG = Object.freeze((() => {
     Object.freeze({
       id: "roku", carousels: true, name: "The Roku Channel", builtIn: false, hosts: Object.freeze(["therokuchannel.roku.com"]), subdomains: false,
       cardSelector: "li.movie, li.series, li.featured, li[data-row][data-col]", removeClosest: "li.movie, li.series, li.featured, li[data-row][data-col]", featuredSelector: "li.featured", linkSelector: 'a[itemprop="url"]', titleCandidates: Object.freeze(['meta[itemprop="name"]', "[aria-label]"]),
+      typeByCard: Object.freeze([["li.movie", "movie"], ["li.series", "tv"]]),
       meta: Object.freeze({ texts: Object.freeze([".title-label", '[data-test-id="content-indicator-container"]']) }),
       sections: Object.freeze([{ container: "div.roku-collection-row", title: ".roku-collection-row__title", titleAttribute: "data-row-title" }]),
       categories: Object.freeze([

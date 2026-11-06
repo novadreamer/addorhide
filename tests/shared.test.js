@@ -348,6 +348,16 @@ check("none group without shorts has blank label", () => assert.deepEqual(HOA.gr
 check("type groups in label order", () => assert.deepEqual(HOA.groupEntries(groupedPairs, "type").map(group => group.id), ["video", "short", "movie"]));
 check("genre groups alphabetically", () => assert.deepEqual(HOA.groupEntries(groupedPairs, "genre").map(group => group.label), ["Comedy", "Drama", "No genre"]));
 check("available groups", () => assert.deepEqual(HOA.availableGroups(groupedPairs), ["none", "type", "genre"]));
+check("Roku: a movie link and a series link are told apart and By type is offered", () => {
+  const items = HOA.normalizeItems({
+    "https://therokuchannel.roku.com/watch/6a6b665450b55647b90e9838ab92be22": { title: "Movie", thumb: "", kind: "video", site: "therokuchannel.roku.com", ts: 1, type: "video" },
+    "https://therokuchannel.roku.com/details/101d8e417eb75d8f819ab9d6753fa4c9/a-series": { title: "Series", thumb: "", kind: "video", site: "therokuchannel.roku.com", ts: 2 }
+  });
+  const pairs = Object.entries(items);
+  assert.deepEqual(pairs.map(pair => pair[1].type).sort(), ["movie", "tv"]);
+  assert.ok(HOA.availableGroups(pairs).includes("type"));
+  assert.deepEqual(HOA.groupEntries(pairs, "type").map(group => group.label), ["Movies", "TV shows"]);
+});
 check("videos and shorts only: By type adds nothing", () => assert.deepEqual(
   HOA.availableGroups(groupedPairs.slice(0, 2).map(([key, entry]) => [key, { ...entry, genres: ["Drama"] }])), ["none"]));
 check("one shared genre: By genre adds nothing", () => assert.deepEqual(

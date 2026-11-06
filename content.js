@@ -1316,6 +1316,10 @@ window.__hoaLoaded = true;
       const rating = texts.find(text => /^(G|PG|PG-13|R|NC-17|TV-(Y7?|G|PG|14|MA)|NR|UR)$/i.test(text));
       meta.rating = meta.rating ?? rating ?? null;
     }
+    if (Array.isArray(rule.typeByCard)) {
+      const match = rule.typeByCard.find(entry => card.matches(entry[0]));
+      if (match) meta.type = match[1];
+    }
     if (rule.typeFixed) {
       meta.type = rule.typeFixed;
     } else if (Array.isArray(rule.typeByPath)) {

@@ -835,6 +835,7 @@ const CASES = [
     check("Roku Add follows a movie's WatchAction door but leaves a series on details", () => {
       assert.ok(page.store.addedItems["https://therokuchannel.roku.com/watch/c0734dbe498259cf87ec6f049b015eed"]);
       assert.strictEqual(page.store.addedItems["https://therokuchannel.roku.com/watch/c0734dbe498259cf87ec6f049b015eed"].title, "Coraline");
+      assert.strictEqual(page.store.addedItems["https://therokuchannel.roku.com/watch/c0734dbe498259cf87ec6f049b015eed"].type, "movie");
       assert.ok(page.store.addedItems["https://therokuchannel.roku.com/details/f0cbab7bd40e550eb7181f772ae798a6/bewitched"]);
     });
     page.window.close();

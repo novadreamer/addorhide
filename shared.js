@@ -562,12 +562,17 @@ var HOA = Object.freeze((() => {
     try {
       const parsed = new URL(url);
       const path = parsed.pathname.toLowerCase();
+      // The Roku Channel plays a movie at /watch; a series opens a page of seasons and episodes at /details.
+      if (parsed.hostname.toLowerCase() === "therokuchannel.roku.com") {
+        if (path.startsWith("/watch/")) return "movie";
+        if (path.startsWith("/details/")) return "tv";
+      }
       const youtube = YOUTUBE_HOSTS.has(parsed.hostname.toLowerCase())
         || parsed.hostname.toLowerCase().endsWith(".youtube.com");
       if (youtube && /(^|\/)shorts(?:\/|$)/.test(path)) {
         return "short";
       }
-      if (/(^|\/)movies?(?:\/|$)/.test(path)) {
+      if (/(^|\/)(?:free-)?movies?(?:\/|$)/.test(path)) {
         return "movie";
       }
       if (/(^|\/)(?:series|tv-shows?|shows?|tv)(?:\/|$)/.test(path)) {
@@ -1149,6 +1154,11 @@ var HOA = Object.freeze((() => {
         ts: raw.ts
       };
       addOptionalFields(normalized[key], raw);
+      // Items saved before their site's types were known say "video"; the link can tell better.
+      if (!normalized[key].type || normalized[key].type === "video") {
+        const linkType = typeOf(key);
+        if (linkType !== "video") normalized[key].type = linkType;
+      }
       if (withListed) {
         normalized[key].listed = raw.listed === undefined ? true : Boolean(raw.listed);
         if (raw.reason === "watched") {
@@ -1426,7 +1436,7 @@ var HOA = Object.freeze((() => {
     if (mode === "type") {
       return TYPES.map(type => ({
         id: type,
-        label: typeLabel(type),
+        label: { movie: "Movies", tv: "TV shows" }[type] || typeLabel(type),
         entries: pairs.filter(pair => entryType(pair) === type)
       })).filter(group => group.entries.length);
     }
