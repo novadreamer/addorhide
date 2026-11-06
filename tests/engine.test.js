@@ -33,7 +33,7 @@ function check(name, fn) {
 }
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings, watchProgress, watchLater, buttonsEnabled, buttonEdge, noBody = false, testSeam = false, childFrame = false, incognito = false }) {
+async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings, watchProgress, watchLater, buttonsEnabled, buttonEdge, noBody = false, testSeam = false, childFrame = false, incognito = false, setup }) {
   const html = suppliedHtml === undefined ? fs.readFileSync(path.join(__dirname, "fixtures", fixture), "utf8") : suppliedHtml;
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
     url, runScripts: "outside-only", pretendToBeVisual: true
@@ -73,6 +73,7 @@ async function load({ fixture, html: suppliedHtml, url, siteRules, watchSettings
   window.__hoaSentMessages = [];
   if (childFrame) window.__hoaTestChildFrame = true;
   if (testSeam) window.__hoaTest = {};
+  if (typeof setup === "function") setup(window);
   window.eval(bundle);
   await wait(120);
   const status = () => new Promise(resolve => {
@@ -1435,6 +1436,19 @@ const CASES = [
     const off = await load({ html: "", url: key, testSeam: true, buttonsEnabled: false }); fakeVideo(off); off.test.findPlayer(); off.document.dispatchEvent(new off.window.MouseEvent("mousemove", { clientX: 20, clientY: 20, bubbles: true })); await wait(20);
     check("Watch Later respects Buttons off", () => { const control = off.document.querySelector("#hoa-watch-later"); assert.ok(!control || control.hidden); });
     page.window.close(); off.window.close();
+  }
+  {
+    const box = () => ({ left: 0, top: 0, width: 200, height: 120, right: 200, bottom: 120 });
+    const page = await load({ html: '<div class="taught player"><video></video><a href="/c/creator/shorts">Creator</a></div><div class="taught thumb"><a href="/shorts/next"><img alt="Next short"></a></div><div class="taught channel"><a href="/c/channel-name"><h3>Channel Name</h3></a></div>', url: "https://rumble.com/shorts/live", siteRules: { "rumble.com": { enabled: true, pickedSelectors: [".taught"] } }, setup(window) { window.document.querySelector(".player").getBoundingClientRect = box; window.document.querySelector("video").getBoundingClientRect = box; } });
+    check("a taught Rumble player has no hover bar while a thumbnail still has one", () => { assert.equal(page.document.querySelector(".player .hoa-actions"), null); assert.ok(page.document.querySelector(".thumb .hoa-actions")); });
+    page.document.querySelector(".channel [data-action='add']").click(); await wait(25);
+    check("adding a channel card stores its channel kind and visible channel name", () => { const entry = page.store.addedItems["https://rumble.com/c/channel-name"]; assert.equal(entry.kind, "channel"); assert.equal(entry.title, "Channel Name"); });
+    page.window.close();
+    const arriving = await load({ html: '<div class="taught surface"><a href="/c/creator/shorts">Creator</a></div><div class="taught thumb"><a href="/shorts/next"><img></a></div>', url: "https://rumble.com/shorts/live", siteRules: { "rumble.com": { enabled: true, pickedSelectors: [".taught"] } }, setup(window) { window.document.querySelector(".surface").getBoundingClientRect = box; } });
+    check("a taught surface without media initially behaves as a card", () => assert.ok(arriving.document.querySelector(".surface .hoa-actions")));
+    const video = arriving.document.createElement("video"); video.getBoundingClientRect = box; arriving.document.querySelector(".surface").appendChild(video); await wait(150);
+    check("a video arriving later removes only that player surface bar", () => { assert.equal(arriving.document.querySelector(".surface .hoa-actions"), null); assert.ok(arriving.document.querySelector(".thumb .hoa-actions")); });
+    arriving.window.close();
   }
   console.log(`engine.test.js: ${passed} passed, 0 failed`);
 })().catch(error => {

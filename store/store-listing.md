@@ -40,7 +40,8 @@ Hover over the player on a video's own page and choose Add to Watch Later to sav
 Once you play a saved video for a few seconds, it moves to Continue Watching on its own. Videos you start appear there with a progress bar and the time left. Open one and it resumes where you stopped, with a Start over button. Turn automatic adding off with one switch.
 
 YOUR ADDED VIDEOS PAGE
-- See everything on one page, or give Continue Watching, Watch Later and each website its own tab.
+- See everything on one page, or give Continue Watching, Watch Later, Channels and each website its own tab.
+- Add a channel from a card that leads to one and it goes to your Channels list, right under Watch Later.
 - Sort websites by name or by what you added last.
 - Sort each site's videos by date, views, duration, year, channel or A-Z.
 - Group them by channel, date added, decade, rating, type or genre. Options appear only when the site's videos can use them.
@@ -53,7 +54,7 @@ Hidden videos, hidden channels and watched videos are listed with the same sorti
 WORKS ON
 - YouTube, built in, with no setup.
 - Popular movie and streaming sites with one click: open the popup there and choose Enable on this site.
-- Any other site you choose. Click one video tile to show the extension what a video looks like, and the buttons appear on every similar tile. The browser asks for permission one site at a time, and you can take it back whenever you like.
+- Any other site you choose. Click one thumbnail to show the extension what a video looks like, and the buttons appear on every similar one. The browser asks for permission one site at a time, and you can take it back whenever you like.
 
 PRIVATE BY DESIGN
 Everything stays on your device. AddOrHide has no accounts, no servers, no ads and no analytics, and it never sends your lists or your watch history to anyone. Nothing you play in a private window is recorded unless you saved that video to Watch Later. Clear your watch history at any time in Options.

@@ -123,5 +123,21 @@ async function load(initial = {}) {
   assert.equal(Object.keys(later.store.watchLater).length, 1, "Watch Later cards remove only themselves");
   const laterClear = later.document.querySelector(".watch-later .site-delete-all"); laterClear.click(); await wait(10); later.document.querySelector(".watch-later .site-delete-all").click(); await wait(25);
   assert.equal(Object.keys(later.store.watchLater).length, 0, "Watch Later delete-all uses the same two-click confirmation");
-  later.window.close(); console.log("added.test.js: 36 passed, 0 failed");
+  later.window.close();
+  const channels = await load({ addedItems: {
+    "https://www.youtube.com/@alpha": { site: "youtube.com", title: "Alpha", thumb: "", kind: "channel", ts: 20 },
+    "https://rumble.com/c/beta": { site: "rumble.com", title: "Beta", thumb: "", kind: "channel", ts: 10 },
+    "https://www.youtube.com/watch?v=abcdefghijk": { site: "youtube.com", title: "Video", thumb: "", ts: 1 }
+  }, watchProgress: {}, watchLater: { [laterKey]: { title: "Later", thumb: "", site: "youtube.com", ts: 1 } } });
+  assert.deepEqual(Array.from(channels.document.querySelectorAll(".site-group")).map(section => section.dataset.site), ["watch-later", "added-channels", "youtube.com"], "Channels follows Watch Later and is excluded from website sections");
+  const channelSection = channels.document.querySelector(".added-channels");
+  assert.match(channelSection.textContent, /Alpha.*YouTube/, "channel cards use their channel name and site");
+  assert.ok(channelSection.querySelector(".hoa-placeholder svg"), "channels without art use the person placeholder");
+  const channelSort = channelSection.querySelector("select"); channelSort.value = "title"; channelSort.dispatchEvent(new channels.window.Event("change", { bubbles: true })); await wait(25);
+  assert.equal(channels.store.addedViewPrefs["added-channels"].sort, "title", "channel controls keep independent preferences");
+  channelSection.querySelector(".remove-button").click(); await wait(25);
+  assert.equal(Object.keys(channels.store.addedItems).length, 2, "channel card remove edits added items only");
+  const channelClear = channels.document.querySelector(".added-channels .site-delete-all"); channelClear.click(); await wait(5); channels.document.querySelector(".added-channels .site-delete-all").click(); await wait(25);
+  assert.equal(Object.values(channels.store.addedItems).filter(entry => entry.kind === "channel").length, 0, "channel delete-all uses the shared two-click control");
+  channels.window.close(); console.log("added.test.js: 42 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

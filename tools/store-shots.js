@@ -155,6 +155,7 @@ function frameHtml({ title, sub, shots }) {
   const sw = ctx.serviceWorkers()[0] || await ctx.waitForEvent("serviceworker"); const id = new URL(sw.url()).host;
   const added = {}, hidden = {};
   [0, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 5].forEach(i => { added[keyOf(VIDEOS[i][0], VIDEOS[i][1])] = entry(i); });
+  [["Wanderframe", "@wanderframe"], ["Kitchen Notes", "@kitchen-notes"], ["Neon Tape", "@neon-tape"]].forEach(([name, handle], n) => { added[`https://${FEED}/${handle}`] = { title: name, thumb: "", kind: "channel", site: FEED, ts: now - n * 3600e3 }; });
   [1, 10, 14, 13, 8].forEach((i, n) => { hidden[keyOf(VIDEOS[i][0], VIDEOS[i][1])] = { ...entry(i), ts: now - n * 600e3, listed: true }; });
   const progress = (i, part, extra) => { const key = keyOf(VIDEOS[i][0], VIDEOS[i][1]); const duration = VIDEOS[i][2]; return [key, { site: VIDEOS[i][1], title: VIDEOS[i][0], url: key, thumbnail: THUMB(i), duration, position: Math.round(duration * part), played: Math.round(duration * part), buckets: "", ts: now - 864e5, updated: now - i * 18e5, ...extra }]; };
   const FULL = "f".repeat(25);

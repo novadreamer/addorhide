@@ -581,5 +581,47 @@ check("watch later evicts the oldest entries at its storage cap", () => {
   assert.equal(Object.keys(normalized).length, 1500); assert.equal(normalized["https://example.com/watch/0"], undefined);
   assert.ok(normalized["https://example.com/watch/1500"]);
 });
+check("YouTube channel URL variants allow one tab and reject video/deep paths", () => {
+  ["https://www.youtube.com/@creator", "https://youtube.com/channel/UC123", "https://youtube.com/c/creator/featured", "https://youtube.com/user/creator/about"].forEach(url => assert.equal(HOA.isChannelUrl(url), true, url));
+  ["https://youtube.com/shorts/x", "https://youtube.com/watch?v=x", "https://youtube.com/channel/UC123/videos/extra"].forEach(url => assert.equal(HOA.isChannelUrl(url), false, url));
+});
+check("Twitch and Kick accept creator roots but reject every documented reserved route", () => {
+  ["https://twitch.tv/streamer", "https://kick.com/creator"].forEach(url => assert.equal(HOA.isChannelUrl(url), true, url));
+  ["directory", "videos", "downloads", "settings", "subscriptions", "inventory", "wallet", "drops", "p", "jobs", "turbo", "search", "friends", "following", "prime"].forEach(path => assert.equal(HOA.isChannelUrl(`https://twitch.tv/${path}`), false, path));
+  ["browse", "categories", "following", "search", "category", "video"].forEach(path => assert.equal(HOA.isChannelUrl(`https://kick.com/${path}`), false, path));
+});
+check("Rumble recognizes c/user channels and rejects video routes", () => {
+  ["https://rumble.com/c/creator", "https://rumble.com/c/creator/shorts", "https://rumble.com/user/creator/videos"].forEach(url => assert.equal(HOA.isChannelUrl(url), true, url));
+  ["https://rumble.com/shorts/x", "https://rumble.com/video/x"].forEach(url => assert.equal(HOA.isChannelUrl(url), false, url));
+  assert.equal(HOA.kindOf("https://rumble.com/c/creator"), "channel");
+});
+check("Odysee and Dailymotion channel classifications reject their non-channel paths", () => {
+  assert.equal(HOA.isChannelUrl("https://odysee.com/@creator"), true);
+  assert.equal(HOA.isChannelUrl("https://odysee.com/channel/creator"), false);
+  assert.equal(HOA.isChannelUrl("https://dailymotion.com/creator"), true);
+  ["video", "playlist", "search", "us", "library", "following"].forEach(path => assert.equal(HOA.isChannelUrl(`https://dailymotion.com/${path}`), false, path));
+});
+check("generic channel paths permit one optional tab but not deep/video paths", () => {
+  ["https://example.com/@creator", "https://example.com/c/creator/about", "https://example.com/channel/creator", "https://example.com/channels/creator/about", "https://example.com/user/creator", "https://example.com/profile/creator/tab"].forEach(url => assert.equal(HOA.isChannelUrl(url), true, url));
+  ["https://example.com/channel/creator/about/extra", "https://example.com/videos/creator", "https://example.com/profile/creator/video"].forEach(url => assert.equal(HOA.isChannelUrl(url), false, url));
+});
+check("normalizing existing added items derives channel kind without overwriting explicit shorts", () => {
+  const channel = "https://www.youtube.com/@creator";
+  const short = "https://www.youtube.com/shorts/abc123def45";
+  const items = HOA.normalizeItems({ [channel]: { title: "Creator", thumb: "", ts: 1 }, [short]: { title: "Short", thumb: "", ts: 2, kind: "short" } });
+  assert.equal(items[channel].kind, "channel"); assert.equal(items[short].kind, "short");
+});
+check("player surface distinguishes real players from thumbnail and hover-preview cards", () => {
+  const rect = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height });
+  const video = { closest: () => null, getBoundingClientRect: () => rect(0, 0, 100, 100) };
+  const player = { matches: () => false, closest: () => null, querySelectorAll: selector => selector === "video" ? [video] : [], getBoundingClientRect: () => rect(0, 0, 100, 100) };
+  assert.equal(HOA.isPlayerSurface(player, "https://rumble.com/shorts/one"), true);
+  const videoLink = { ...player, querySelectorAll: selector => selector === "video" ? [video] : [{ href: "https://rumble.com/shorts/two" }] };
+  assert.equal(HOA.isPlayerSurface(videoLink, "https://rumble.com/shorts/one"), false);
+  const channelOnly = { ...player, querySelectorAll: selector => selector === "video" ? [video] : [{ href: "https://rumble.com/c/creator/shorts" }] };
+  assert.equal(HOA.isPlayerSurface(channelOnly, "https://rumble.com/shorts/one"), true);
+  const small = { ...player, querySelectorAll: selector => selector === "video" ? [{ ...video, getBoundingClientRect: () => rect(0, 0, 20, 20) }] : [] };
+  assert.equal(HOA.isPlayerSurface(small, "https://rumble.com/shorts/one"), false);
+});
 
 console.log(`shared.test.js: ${passed} passed, 0 failed`);

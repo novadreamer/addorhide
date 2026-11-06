@@ -307,6 +307,22 @@ if (typeof window !== "undefined") {
     return elements.filter(element => !ownNodes.some(node => node === element || node.contains(element)));
   }
 
+  function playerSurfaceFor(element) {
+    for (let node = element, level = 0; node && node !== document.documentElement && level < 12; node = node.parentElement, level += 1) {
+      if (HOA.isPlayerSurface(node, location.href)) return node;
+    }
+    return null;
+  }
+
+  function onlyPlayerSurfaces(matches) {
+    return Boolean(matches && matches.length && matches.every(match => HOA.isPlayerSurface(match, location.href)));
+  }
+
+  function showPlayerSurface() {
+    highlight.hidden = true;
+    showPickMessage("That's a video player, not a thumbnail. Click a thumbnail that opens a video or channel.");
+  }
+
   function updateHighlight(event) {
     if (!pickMode || panel.contains(event.target)) {
       return;
@@ -317,9 +333,13 @@ if (typeof window !== "undefined") {
     }
     lastHighlight = now;
     const element = elementsAtPoint(event)[0];
+    if (playerSurfaceFor(element)) {
+      highlight.hidden = true;
+      return;
+    }
     const selector = element && buildSelector(element);
     const matches = selector && workableMatches(selector);
-    if (!selector || !matches) {
+    if (!selector || !matches || onlyPlayerSurfaces(matches)) {
       highlight.hidden = true;
       return;
     }
@@ -339,8 +359,16 @@ if (typeof window !== "undefined") {
     event.preventDefault();
     event.stopPropagation();
     const element = elementsAtPoint(event)[0];
+    if (playerSurfaceFor(element)) {
+      showPlayerSurface();
+      return;
+    }
     const selector = element && buildSelector(element);
     const matches = selector && workableMatches(selector);
+    if (onlyPlayerSurfaces(matches)) {
+      showPlayerSurface();
+      return;
+    }
     if (!selector || !matches) {
       showNoPattern();
       return;

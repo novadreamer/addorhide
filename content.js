@@ -1135,6 +1135,12 @@ window.__hoaLoaded = true;
       const image = card.querySelector("img[alt]");
       title = image ? (image.getAttribute("alt") || "").trim() : "";
     }
+    // A channel card should be named for the channel, not the adjacent video/title
+    // text a feed happens to show.
+    if (HOA.kindOf(key) === "channel") {
+      const identity = channelIdentity(card, rule);
+      if (identity && identity.name) title = identity.name;
+    }
     title = HOA.cleanTitle(title || HOA.siteOf(key)).slice(0, HOA.MAX_TITLE);
 
     let thumb = HOA.youtubeThumb(key);
@@ -1819,6 +1825,14 @@ window.__hoaLoaded = true;
     while (parent && parent !== document.body) {
       if (handled.has(parent)) return;
       parent = parent.parentElement;
+    }
+    // User-taught selectors may also match a playing short.  Do the cheap video
+    // presence check first: most cards have no video, so they incur no layout read.
+    if (variant.pickedCards && (card.matches("video") || card.querySelector("video"))
+      && HOA.isPlayerSurface(card, location.href)) {
+      removeActions(card);
+      handled.add(card);
+      return;
     }
     // Two taught selectors can match nested parts of one video: the outer card gets the single button bar.
     if (variant.pickedCards && card.parentElement && card.parentElement.closest(variant.pickedCards)) {

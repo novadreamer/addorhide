@@ -408,9 +408,60 @@ var HOA = Object.freeze((() => {
     }
   }
 
+  function isChannelUrl(value) {
+    let url;
+    try {
+      url = new URL(value, "https://www.youtube.com");
+    } catch (error) {
+      return false;
+    }
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const segments = url.pathname.split("/").filter(Boolean);
+    const first = (segments[0] || "").toLowerCase();
+    // Never let an otherwise plausible channel path turn a video into a channel.
+    if (["shorts", "watch", "video", "videos"].includes(first)) return false;
+    const hasSingleSegment = () => segments.length === 1 && Boolean(segments[0]);
+    const oneChannelPath = prefixes => prefixes.includes(first) && Boolean(segments[1]) && segments.length <= 3;
+    if (host === "youtube.com") return oneChannelPath(["@", "channel", "c", "user"])
+      || (/^@[^/]+$/i.test(segments[0] || "") && segments.length <= 2);
+    if (host === "twitch.tv") return hasSingleSegment() && !["directory", "videos", "downloads", "settings", "subscriptions", "inventory", "wallet", "drops", "p", "jobs", "turbo", "search", "friends", "following", "prime"].includes(first);
+    if (host === "kick.com") return hasSingleSegment() && !["browse", "categories", "following", "search", "category", "video"].includes(first);
+    if (host === "rumble.com") return oneChannelPath(["c", "user"]);
+    if (host === "odysee.com") return /^@[^/]+$/i.test(segments[0] || "") && segments.length === 1;
+    if (host === "dailymotion.com") return hasSingleSegment() && !["video", "playlist", "search", "us", "library", "following"].includes(first);
+    const videoTab = ["shorts", "watch", "video", "videos"].includes((segments[2] || "").toLowerCase());
+    return !videoTab && (oneChannelPath(["@", "c", "channel", "channels", "user", "profile"])
+      || (/^@[^/]+$/i.test(segments[0] || "") && segments.length <= 2));
+  }
+
+  function isPlayerSurface(element, pageUrl) {
+    if (!element || !element.querySelectorAll) return false;
+    const videos = element.matches && element.matches("video") ? [element] : Array.from(element.querySelectorAll("video"));
+    if (!videos.length || (element.closest && element.closest("a[href]"))) return false;
+    let current;
+    try { current = new URL(pageUrl || location.href).href; } catch (error) { current = ""; }
+    const links = Array.from(element.querySelectorAll("a[href]"));
+    if (links.some(link => {
+      let href = "";
+      try { href = new URL(link.href || link.getAttribute("href"), pageUrl || location.href).href; } catch (error) { return true; }
+      return !isChannelUrl(href) && href !== current;
+    })) return false;
+    const box = element.getBoundingClientRect();
+    const area = Math.max(0, box.width) * Math.max(0, box.height);
+    if (!area) return false;
+    return videos.some(video => {
+      if (video.closest && video.closest("a[href]")) return false;
+      const rect = video.getBoundingClientRect();
+      const left = Math.max(box.left, rect.left); const right = Math.min(box.right, rect.right);
+      const top = Math.max(box.top, rect.top); const bottom = Math.min(box.bottom, rect.bottom);
+      return Math.max(0, right - left) * Math.max(0, bottom - top) >= area / 2;
+    });
+  }
+
   function kindOf(url) {
     try {
       const parsed = new URL(url);
+      if (isChannelUrl(parsed.href)) return "channel";
       return YOUTUBE_HOSTS.has(parsed.hostname.toLowerCase())
         && parsed.pathname.startsWith("/shorts/") ? "short" : "video";
     } catch (error) {
@@ -1002,7 +1053,9 @@ var HOA = Object.freeze((() => {
       normalized[key] = {
         title: (title && title.length <= MAX_TITLE ? title : fallbackTitle(key)),
         thumb,
-        kind: raw.kind === "short" ? "short" : "video",
+        // Shorts are an explicit historical choice. Everything else follows the URL
+        // so saved channels migrate into their own section without a data rewrite.
+        kind: raw.kind === "short" ? "short" : kindOf(key),
         site: siteOf(key),
         ts: raw.ts
       };
@@ -1906,6 +1959,8 @@ var HOA = Object.freeze((() => {
     playerSiteName,
     siteOf,
     kindOf,
+    isChannelUrl,
+    isPlayerSurface,
     typeOf,
     parseDuration,
     parseViews,

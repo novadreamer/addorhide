@@ -16,7 +16,7 @@ const root = path.join(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, statusRows, nowPlaying, watchSettings, watchLater, playerGranted = true } = {}) {
+async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, statusRows, nowPlaying, watchSettings, watchLater, addedItems, playerGranted = true } = {}) {
   const dom = new JSDOM(read("popup.html"), { url: "https://extension.test/popup.html", runScripts: "outside-only", pretendToBeVisual: true });
   const { window } = dom;
   window.document.head.insertAdjacentHTML("beforeend", `<style>${read("pages.css")}</style>`);
@@ -25,6 +25,7 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   if (seenRows) store.seenRows = seenRows;
   if (watchSettings) store.watchSettings = watchSettings;
   if (watchLater) store.watchLater = watchLater;
+  if (addedItems) store.addedItems = addedItems;
   const listeners = [];
   const requestedOrigins = [];
   const registeredScripts = [];
@@ -174,5 +175,15 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   assert.match(laterPopup.document.querySelector("#added-summary").textContent, /1 to watch later/, "popup includes Watch Later in its compact summary");
   assert.equal(laterPopup.document.querySelector("#open-added-button").disabled, false, "Watch Later alone enables Added Videos");
   laterPopup.window.close();
-  console.log("popup.test.js: 41 passed, 0 failed");
+  const channelsPopup = await loadPopup({ addedItems: { "https://www.youtube.com/@creator": { title: "Creator", thumb: "", kind: "channel", site: "youtube.com", ts: 1 } } });
+  assert.match(channelsPopup.document.querySelector("#added-summary").textContent, /1 channel added/, "popup summarizes channels separately from videos");
+  assert.equal(channelsPopup.document.querySelector("#open-added-button").disabled, false, "channels alone enable Added Videos");
+  channelsPopup.window.close();
+  const mixedPopup = await loadPopup({ addedItems: {
+    "https://www.youtube.com/watch?v=popupvid001": { title: "Video", thumb: "", site: "youtube.com", ts: 1 },
+    "https://rumble.com/c/creator": { title: "Creator", thumb: "", kind: "channel", site: "rumble.com", ts: 2 }
+  } });
+  assert.match(mixedPopup.document.querySelector("#added-summary").textContent, /1 added video.*1.*website.*1 channel added/, "popup video-site summary excludes a channel-only site");
+  mixedPopup.window.close();
+  console.log("popup.test.js: 44 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

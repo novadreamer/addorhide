@@ -12,7 +12,7 @@ AddOrHide does not collect your data. It has no servers, no accounts, no analyti
 
 The extension stores the following in your browser's local extension storage:
 
-- **Videos you add or hide.** When you click **Add** or **Hide** on a video, the extension saves that video's web address, title, thumbnail address and site name, along with any of these that the video's card shows on the page: duration, view count, publish date or year, rating, genres, and the site's icon address. It also saves the time you took the action and, if you choose to tag a video, the type and genres you enter.
+- **Videos and channels you add or hide.** When you click **Add** or **Hide** on a video or channel, the extension saves that video's web address, title, thumbnail address and site name, along with any of these that the video's card shows on the page: duration, view count, publish date or year, rating, genres, and the site's icon address. It also saves the time you took the action and, if you choose to tag a video, the type and genres you enter.
 - **Watch history.** On sites where the extension is active, when you play a video it saves that video's address, title and thumbnail address, its length, how much of it you played, where you stopped and when. This powers the Watched tags, hiding watched videos, Continue Watching and resuming. Nothing is saved in private windows, or when Tag watched videos, Continue Watching and hiding Watched are all off, except for videos you saved to Watch Later yourself.
 - **Watch Later.** When you click **Add to Watch Later**, the extension saves that video's address, title, thumbnail address, site name, length and the time you added it.
 - **Row names.** The names of the rows a site shows, so you can pick rows to hide under Rows by name.
