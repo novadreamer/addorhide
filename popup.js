@@ -466,7 +466,7 @@ function renderSite() {
       }
     });
   });
-  teach.title = "Click a thumbnail to show AddOrHide what a video looks like here";
+  teach.title = "Show AddOrHide what a video looks like here";
   const toggleLabel = document.createElement("label");
   toggleLabel.className = "switch-row";
   const toggle = document.createElement("input");
