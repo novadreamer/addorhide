@@ -29,6 +29,10 @@ const HOA_SITES = Object.freeze((() => {
     if (!["http:", "https:"].includes(url.protocol) || !validHostname(url.hostname)) {
       return false;
     }
+    // The private-window Added Videos page borrows this address; like the extension's own pages, it is not a site.
+    if (url.hostname === "www.youtube.com" && url.pathname === "/robots.txt") {
+      return false;
+    }
     const host = url.hostname.toLowerCase();
     return host !== "chromewebstore.google.com"
       && host !== "addons.mozilla.org"

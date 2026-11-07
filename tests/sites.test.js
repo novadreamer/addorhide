@@ -22,7 +22,8 @@ function check(name, fn) {
   ["view-source:https://example.com", false], ["devtools://devtools/bundled/inspector.html", false],
   ["https://chromewebstore.google.com/detail/example", false],
   ["https://chrome.google.com/webstore/category/extensions", false],
-  ["https://chrome.google.com/docs", true], ["https://addons.mozilla.org/en-US/firefox/", false]
+  ["https://chrome.google.com/docs", true], ["https://addons.mozilla.org/en-US/firefox/", false],
+  ["https://www.youtube.com/robots.txt#addorhide-added", false],
 ].forEach(([value, expected]) => check(`supported URL ${value}`, () => assert.equal(SITES.isSupportedPageUrl(value), expected)));
 
 [

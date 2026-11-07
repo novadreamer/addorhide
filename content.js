@@ -6,7 +6,8 @@ if (typeof window.__hoaRetire === "function") {
 window.__hoaLoaded = true;
 
 // Find all rows reads a genre page in a hidden frame from the top page: nothing may run or be recorded in there.
-if (window.name !== "hoa-rows-frame") {
+// Nor on the private-window Added Videos page, which only borrows a YouTube address (its players still get it).
+if (window.name !== "hoa-rows-frame" && !(window === window.top && location.hostname === "www.youtube.com" && location.pathname === "/robots.txt")) {
   const ownInstance = Math.random().toString(36).slice(2) + Date.now().toString(36);
   const rootElement = document.documentElement;
   const childFrame = (() => { if (window.__hoaTestChildFrame) return true; try { return window.top !== window; } catch (error) { return true; } })();

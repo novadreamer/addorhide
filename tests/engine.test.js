@@ -592,6 +592,17 @@ const CASES = [
     page.window.close();
   }
   {
+    // The private-window Added Videos page borrows youtube.com/robots.txt: the feed engine stays out of it.
+    const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/robots.txt#addorhide-added", siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
+    await wait(200);
+    check("the hosted Added Videos page gets no feed buttons, tags or hiding", () => {
+      assert.equal(page.document.querySelectorAll(".hoa-actions, [data-hoa-watched], .hoa-removed, .hoa-filtered").length, 0);
+    });
+    const hostedStatus = await page.status();
+    check("the hosted Added Videos page does not answer the popup as a site", () => assert.equal(hostedStatus, null));
+    page.window.close();
+  }
+  {
     const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/" });
     check("filters: nothing is filtered while no filter is on", () => assert.strictEqual(
       page.document.querySelectorAll(".hoa-filtered").length, 0));
