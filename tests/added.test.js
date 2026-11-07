@@ -171,5 +171,37 @@ async function load(initial = {}) {
   assert.equal(Object.values(categories.store.addedItems).filter(entry => entry.kind === "category").length, 1, "category remove edits added items only");
   const categoryClear = categories.document.querySelector(".added-categories .site-delete-all"); categoryClear.click(); await wait(5); categories.document.querySelector(".added-categories .site-delete-all").click(); await wait(25);
   assert.equal(Object.values(categories.store.addedItems).filter(entry => entry.kind === "category").length, 0, "category delete-all uses the shared two-click control");
-  categories.window.close(); console.log("added.test.js: 51 passed, 0 failed");
+  categories.window.close();
+  const manySites = {}; for (let index = 0; index < 12; index += 1) { const site = `site${index}.example`; for (let copy = 0; copy <= index; copy += 1) manySites[`https://${site}/v/${copy}`] = { site, title: `Video ${index}-${copy}`, thumb: "", kind: "video", ts: index + 1 }; }
+  const crowded = await load({ addedItems: manySites, addedViewPrefs: { __page: { grouping: "tabs" } } });
+  assert.equal(crowded.document.querySelector(".added-more"), null, "tabs that fit two rows need no More sites");
+  // Four tabs to a row, in place of the layout jsdom does not have.
+  Object.defineProperty(crowded.window.HTMLElement.prototype, "offsetTop", { get() { const bar = this.closest(".added-tab-bar"); return bar ? Math.floor(Array.from(bar.querySelectorAll(".added-tab-list > .added-page-tab, .added-more")).indexOf(this) / 4) * 50 : 0; } });
+  crowded.window.innerWidth = 700; crowded.window.dispatchEvent(new crowded.window.Event("resize")); await wait(220);
+  const crowdedTabs = () => Array.from(crowded.document.querySelectorAll(".added-tab-list [role='tab']"));
+  const moreButton = () => crowded.document.querySelector(".added-more-button");
+  assert.equal(crowdedTabs().length + 1, 8, "tabs and More sites fill exactly two rows");
+  assert.ok(crowdedTabs().some(tab => tab.textContent.includes("Continue Watching")), "lists are never moved");
+  assert.ok(crowded.document.querySelector("#added-tab-site11-example"), "the site with most videos keeps its tab");
+  assert.equal(crowded.document.querySelector("#added-tab-site0-example"), null, "the site with fewest videos moves");
+  const movedCount = 13 - crowdedTabs().length; assert.equal(moreButton().textContent, `More sites (${movedCount})`, "More sites counts what it holds");
+  moreButton().click(); await wait(5);
+  assert.equal(crowded.document.querySelectorAll(".added-more-item").length, movedCount, "the panel lists every moved site");
+  const search = crowded.document.querySelector(".added-more-search"); assert.equal(crowded.document.activeElement, search, "search takes the focus");
+  search.value = "nothing-like-this"; search.dispatchEvent(new crowded.window.Event("input", { bubbles: true }));
+  assert.equal(crowded.document.querySelector(".added-more-empty").hidden, false, "a search with no match says so");
+  search.value = "site0"; search.dispatchEvent(new crowded.window.Event("input", { bubbles: true }));
+  assert.equal(Array.from(crowded.document.querySelectorAll(".added-more-item")).filter(item => !item.hidden).length, 1, "search filters the sites");
+  search.dispatchEvent(new crowded.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  assert.equal(crowded.document.querySelector(".added-more-panel"), null, "Escape closes the panel");
+  assert.equal(crowded.document.activeElement, moreButton(), "focus returns to More sites");
+  moreButton().click(); await wait(5);
+  const pick = Array.from(crowded.document.querySelectorAll(".added-more-item")).find(item => item.textContent.includes("site0")); pick.click(); await wait(30);
+  assert.equal(crowded.store.addedViewPrefs.__page.selectedTab, "site0.example", "picking a site selects it");
+  assert.equal(crowded.document.querySelector("#added-tab-site0-example").getAttribute("aria-selected"), "true", "a picked site gets a visible tab");
+  assert.ok(crowded.document.querySelector(".site-group[data-site='site0.example']"), "a picked site shows its videos");
+  assert.equal(crowdedTabs().length + 1, 8, "a picked site takes a place rather than adding a row");
+  moreButton().click(); await wait(5); crowded.document.body.dispatchEvent(new crowded.window.MouseEvent("pointerdown", { bubbles: true }));
+  assert.equal(crowded.document.querySelector(".added-more-panel"), null, "clicking elsewhere closes the panel");
+  crowded.window.close(); console.log("added.test.js: 52 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

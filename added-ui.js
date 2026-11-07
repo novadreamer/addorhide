@@ -674,6 +674,86 @@ const HOA_ADDED = (() => {
       return icon;
     }
 
+    // Many sites would push the videos down the page, so tabs stop at two rows. The lists always stay, then
+    // the sites holding the most videos and the one in use; the rest move behind More sites.
+    const TAB_ROWS = 2;
+    let closeMoreSites = null;
+
+    function fitSiteTabs(tabBar, sections, selected, selectTab) {
+      if (closeMoreSites) closeMoreSites();
+      const rows = () => new Set(Array.from(tabBar.querySelectorAll(".added-tab-list > .added-page-tab, .added-more")).map(node => node.offsetTop)).size;
+      if (rows() <= TAB_ROWS) return;
+      const movable = sections.filter(section => section.group && section.key !== selected)
+        .sort((left, right) => left.group.entries.length - right.group.entries.length || right.name.localeCompare(left.name));
+      if (!movable.length) return;
+      const more = element("div", "added-more");
+      const button = element("button", "added-page-tab added-more-button"); button.type = "button";
+      button.setAttribute("aria-haspopup", "dialog"); button.setAttribute("aria-expanded", "false");
+      more.appendChild(button); tabBar.appendChild(more);
+      const moved = [];
+      for (const section of movable) {
+        const tab = document.getElementById(`added-tab-${section.key.replace(/[^a-z0-9]+/gi, "-")}`);
+        if (tab) tab.remove();
+        moved.push(section);
+        button.textContent = `More sites (${moved.length})`;
+        if (rows() <= TAB_ROWS) break;
+      }
+      const hiddenSites = sections.filter(section => moved.includes(section));
+      button.addEventListener("click", () => {
+        if (closeMoreSites) closeMoreSites();
+        else openMoreSites(more, button, hiddenSites, selectTab);
+      });
+    }
+
+    function openMoreSites(more, button, hiddenSites, selectTab) {
+      const panel = element("div", "added-more-panel"); panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", "More sites");
+      const search = document.createElement("input"); search.type = "search"; search.className = "added-more-search";
+      search.placeholder = "Search sites"; search.setAttribute("aria-label", "Search sites");
+      const list = element("div", "added-more-list");
+      const none = element("p", "added-more-empty muted", "No sites match."); none.hidden = true;
+      const outside = event => { if (!more.contains(event.target)) close(); };
+      function close() {
+        closeMoreSites = null; panel.remove(); button.setAttribute("aria-expanded", "false");
+        document.removeEventListener("pointerdown", outside, true);
+      }
+      const items = hiddenSites.map(section => {
+        const item = element("button", "added-more-item"); item.type = "button";
+        item.append(makeLogo(section.group), element("span", "tab-name", section.name), element("span", "count-badge", String(section.group.entries.length)));
+        item.addEventListener("click", () => { close(); selectTab(section.key); });
+        list.appendChild(item);
+        return { item, name: `${section.name} ${section.key}`.toLowerCase() };
+      });
+      const shown = () => items.filter(entry => !entry.item.hidden).map(entry => entry.item);
+      search.addEventListener("input", () => {
+        const query = search.value.trim().toLowerCase();
+        items.forEach(entry => { entry.item.hidden = !entry.name.includes(query); });
+        none.hidden = shown().length !== 0;
+      });
+      panel.addEventListener("keydown", event => {
+        const visible = shown(); const index = visible.indexOf(document.activeElement);
+        if (event.key === "Escape") { event.preventDefault(); close(); button.focus(); }
+        else if (event.key === "Enter" && event.target === search && visible[0]) { event.preventDefault(); visible[0].click(); }
+        else if (event.key === "ArrowDown" && visible.length) { event.preventDefault(); visible[(index + 1) % visible.length].focus(); }
+        else if (event.key === "ArrowUp") { event.preventDefault(); (index <= 0 ? search : visible[index - 1]).focus(); }
+      });
+      panel.append(search, list, none); more.appendChild(panel);
+      // Near the right edge of the page the panel slides left rather than running off it.
+      const overflow = panel.getBoundingClientRect().right - (document.documentElement.clientWidth - 16);
+      if (overflow > 0) panel.style.left = `${-overflow}px`;
+      button.setAttribute("aria-expanded", "true");
+      document.addEventListener("pointerdown", outside, true);
+      closeMoreSites = close;
+      search.focus();
+    }
+
+    let tabResizeTimer = 0; let tabWidth = window.innerWidth;
+    window.addEventListener("resize", () => {
+      if (window.innerWidth === tabWidth) return;
+      tabWidth = window.innerWidth;
+      clearTimeout(tabResizeTimer);
+      tabResizeTimer = window.setTimeout(() => { if (groupsRoot.querySelector(".added-tab-bar")) render(); }, 150);
+    });
+
     function pageLabel(text, control) {
       const label = element("label", "page-control-label", text);
       label.htmlFor = control.id;
@@ -745,6 +825,7 @@ const HOA_ADDED = (() => {
         const selectedMissing = !!page.selectedTab && !sections.some(section => section.key === page.selectedTab);
         const selected = selectedMissing ? sections[0].key : (page.selectedTab || sections[0].key);
         if (selectedMissing) setPrefs("__page", { selectedTab: selected });
+        const tabBar = element("div", "added-tab-bar");
         const tabList = element("div", "added-tab-list"); tabList.setAttribute("role", "tablist"); tabList.setAttribute("aria-label", "Added Videos sections");
         const selectTab = key => {
           setPrefs("__page", { selectedTab: key }); render();
@@ -771,7 +852,8 @@ const HOA_ADDED = (() => {
           });
           tabList.appendChild(tab);
         });
-        groupsRoot.appendChild(tabList);
+        tabBar.appendChild(tabList); groupsRoot.appendChild(tabBar);
+        fitSiteTabs(tabBar, sections, selected, selectTab);
         const active = sections.find(section => section.key === selected);
         const slug = active.key.replace(/[^a-z0-9]+/gi, "-");
         const options = { tabMode: true, tabId: `added-tab-${slug}`, panelId: `added-tabpanel-${slug}` };

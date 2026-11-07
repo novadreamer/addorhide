@@ -22,7 +22,7 @@ movie and streaming sites, and a card picker that teaches it any other video sit
 - **Continue Watching:** videos you start appear with a progress bar and time left, and resume where you stopped, with Start over.
 - **Hide by type, keyword and channel:** per-site categories such as Shorts, Playlists and Live, your own keywords, whole channels, and rows by name on streaming sites.
 - **Channels and Categories:** Add works out what a card leads to. A channel or a category goes to its own list under Watch Later, and a card with both an info link and a play link saves the one that plays. On The Roku Channel, By type then splits Movies from TV shows.
-- **Added Videos:** tabs for Continue Watching, Watch Later, Channels, Categories and each website, website sorting, and grouping by channel, date added, decade or rating.
+- **Added Videos:** tabs for Continue Watching, Watch Later, Channels, Categories and each website (a long list of sites moves behind a searchable More sites tab), website sorting, and grouping by channel, date added, decade or rating.
 - **Hidden Videos:** the same sorting and grouping, a Show all button on every group, and channels and watched videos in their own groups.
 - **Popup:** a redrawn power button (green on, red off), new position arrows and an Auto-add switch.
 - **Privacy:** nothing is recorded in private windows or when the watch features are off, except videos you saved to Watch Later yourself, and Clear watch history wipes it in one click.

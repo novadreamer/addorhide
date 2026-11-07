@@ -40,7 +40,7 @@ Hover over the player on a video's own page and choose Add to Watch Later to sav
 Once you play a saved video for a few seconds, it moves to Continue Watching on its own. Videos you start appear there with a progress bar and the time left. Open one and it resumes where you stopped, with a Start over button. Turn automatic adding off with one switch.
 
 YOUR ADDED VIDEOS PAGE
-- See everything on one page, or give Continue Watching, Watch Later, Channels, Categories and each website its own tab.
+- See everything on one page, or give Continue Watching, Watch Later, Channels, Categories and each website its own tab. With many websites, the rest wait behind a searchable More sites tab.
 - Add a channel from a card that leads to one and it goes to your Channels list, right under Watch Later. A category, such as one on Twitch's Browse page, goes to Categories, and a card that plays a video saves the video, not its info page.
 - Sort websites by name or by what you added last.
 - Sort each site's videos by date, views, duration, year, channel or A-Z.

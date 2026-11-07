@@ -39,7 +39,19 @@ body.hoa-added-view main {
 .hoa-added-page .added-page-toolbar { display: flex; justify-content: flex-end; margin: -14px 0 18px; }
 .hoa-added-page .page-controls { justify-content: flex-end; }
 .hoa-added-page .page-control-label { margin-left: 8px; color: var(--muted); font-size: 13px; font-weight: 600; }
-.hoa-added-page .added-tab-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: -10px; }
+.hoa-added-page .added-tab-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: -10px; }
+.hoa-added-page .added-tab-list { display: contents; }
+.hoa-added-page .added-more { position: relative; display: inline-flex; }
+.hoa-added-page .added-more-button { padding: 6px 12px; font-weight: 600; cursor: pointer; }
+.hoa-added-page .added-more-panel { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; display: grid; gap: 8px; width: 300px; max-width: calc(100vw - 32px); padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 10px 28px rgba(0, 0, 0, .22); }
+.hoa-added-page .added-more-search { width: 100%; box-sizing: border-box; padding: 7px 10px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); font: inherit; }
+.hoa-added-page .added-more-list { display: grid; gap: 2px; max-height: 320px; overflow-y: auto; scrollbar-width: thin; }
+.hoa-added-page .added-more-item { display: flex; gap: 8px; align-items: center; width: 100%; min-width: 0; padding: 5px 6px; color: var(--text); background: none; border: 0; border-radius: var(--radius-sm); text-align: left; cursor: pointer; box-shadow: none; }
+.hoa-added-page .added-more-item:hover, .hoa-added-page .added-more-item:focus-visible { background: var(--surface-2); }
+.hoa-added-page .added-more-item[hidden] { display: none; }
+.hoa-added-page .added-more-item .site-logo { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 7px; }
+.hoa-added-page .added-more-item .tab-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hoa-added-page .added-more-empty { margin: 4px 6px; font-size: 13px; }
 .hoa-added-page .added-page-tab {
   display: inline-flex;
   min-width: 0;
