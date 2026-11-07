@@ -16,7 +16,7 @@ const root = path.join(__dirname, "..");
 const read = file => fs.readFileSync(path.join(root, file), "utf8");
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, statusRows, nowPlaying, watchSettings, watchLater, addedItems, playerGranted = true } = {}) {
+async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, statusRows, nowPlaying, watchSettings, watchLater, addedItems, playerGranted = true, findReply, noFindReply = false, findDelay = 0 } = {}) {
   const dom = new JSDOM(read("popup.html"), { url: "https://extension.test/popup.html", runScripts: "outside-only", pretendToBeVisual: true });
   const { window } = dom;
   window.document.head.insertAdjacentHTML("beforeend", `<style>${read("pages.css")}</style>`);
@@ -27,12 +27,13 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   if (watchLater) store.watchLater = watchLater;
   if (addedItems) store.addedItems = addedItems;
   const listeners = [];
+  const messageListeners = [];
   const requestedOrigins = [];
   const registeredScripts = [];
   const clone = value => JSON.parse(JSON.stringify(value));
   window.matchMedia = () => ({ matches: false, addEventListener() {} });
   window.chrome = {
-    runtime: { lastError: null, getURL: value => value, getManifest: () => ({ version: "1.1.0" }), sendMessage(_message, callback) { if (callback) callback(); } },
+    runtime: { lastError: null, getURL: value => value, getManifest: () => ({ version: "1.1.0" }), onMessage: { addListener: listener => messageListeners.push(listener) }, sendMessage(_message, callback) { if (callback) callback(); } },
     storage: { local: {
       get(defaults, callback) {
         const result = {};
@@ -45,14 +46,14 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
         setTimeout(() => { listeners.forEach(listener => listener(changes, "local")); if (callback) callback(); }, 0);
       }
     }, onChanged: { addListener: listener => listeners.push(listener) } },
-    tabs: { query(_query, callback) { callback([{ id: 1, url }]); }, sendMessage(_id, _message, callback) { if (callback) callback({ active: true, cards: 1, overlays: 1, rows: statusRows || [], nowPlaying }); }, create() {}, reload() {} },
+    tabs: { query(_query, callback) { callback([{ id: 1, url }]); }, sendMessage(_id, message, callback) { if (message.type === "hoa-find-rows") { if (callback) setTimeout(() => callback(noFindReply ? undefined : findReply), findDelay); return; } if (callback) callback({ active: true, cards: 1, overlays: 1, rows: statusRows || [], nowPlaying }); }, create() {}, reload() {} },
     permissions: { contains(details, callback) { callback(details.origins.some(origin => /player\.(pbs|dailymotion)\.org/.test(origin)) ? playerGranted : true); }, request(details, callback) { requestedOrigins.push(details.origins); callback(true); } },
     scripting: { unregisterContentScripts(_details, callback) { callback(); }, registerContentScripts(details, callback) { registeredScripts.push(...details); callback(); }, updateContentScripts(_details, callback) { callback(); }, executeScript(_details, callback) { callback(); }, insertCSS(_details, callback) { callback(); } },
     windows: { getCurrent(callback) { callback({ id: 1, incognito: false }); } }
   };
   window.eval(["theme.js", "shared.js", "edge-choice.js", "catalog.js", "sites.js", "popup.js"].map(read).join("\n;\n"));
   await wait(40);
-  return { window, document: window.document, store, requestedOrigins, registeredScripts };
+  return { window, document: window.document, store, requestedOrigins, registeredScripts, progress: message => messageListeners.forEach(listener => listener(message)) };
 }
 
 (async () => {
@@ -183,6 +184,26 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   assert.match(channelsPopup.document.querySelector("#added-summary").textContent, /No added videos/, "popup counts videos only, not channels");
   assert.equal(channelsPopup.document.querySelector("#open-added-button").disabled, false, "channels alone enable Added Videos");
   channelsPopup.window.close();
+  const findPopup = await loadPopup({ url: "https://play.xumo.com/free-movies/", siteRules: { "play.xumo.com": { enabled: true } },
+    statusRows: [{ title: "Drama", kind: "genre", listed: true }], findDelay: 25, findReply: { ok: true, rowsHere: 1, rows: ["Drama", "Horror"], pages: 2, read: 2, blocked: 0, empty: 0, skipped: 0 } });
+  findPopup.document.querySelector(".filter-launch").click(); await wait(15); findPopup.document.querySelector(".genres-row").click(); await wait(8);
+  const findButton = findPopup.document.querySelector(".genres-find"); findButton.click(); findPopup.progress({ type: "hoa-rows-progress", done: 1, total: 2 });
+  assert.equal(findButton.disabled, true, "Find all rows stays disabled while it runs");
+  assert.match(findPopup.document.querySelector(".genres-live-note").textContent, /Reading genre pages: 1 of 2/, "genre-page progress is shown while reading"); await wait(30);
+  assert.equal(findButton.disabled, false, "Find all rows re-enables after its reply");
+  assert.match(findPopup.document.querySelector(".genres-live-note").textContent, /Found 1 row on this page and 2 genre pages/, "Find all rows reports successful page reads");
+  assert.ok(Array.from(findPopup.document.querySelectorAll(".genre-check")).some(node => /Horror/.test(node.textContent)), "Find all rows refreshes the discovered list");
+  findPopup.window.close();
+  const noReply = await loadPopup({ url: "https://play.xumo.com/free-movies/", siteRules: { "play.xumo.com": { enabled: true } }, statusRows: [{ title: "Drama", kind: "genre", listed: true }], noFindReply: true });
+  noReply.document.querySelector(".filter-launch").click(); await wait(15); noReply.document.querySelector(".genres-row").click(); await wait(8); noReply.document.querySelector(".genres-find").click(); await wait(5);
+  assert.match(noReply.document.querySelector(".genres-live-note").textContent, /didn't answer/, "Find all rows explains a missing page reply");
+  noReply.window.close();
+  for (const [reason, expected] of [["no-cards", /No videos found on this page/], ["busy", /Still finding rows/]]) {
+    const replyPopup = await loadPopup({ url: "https://play.xumo.com/free-movies/", siteRules: { "play.xumo.com": { enabled: true } }, statusRows: [{ title: "Drama", kind: "genre", listed: true }], findReply: { ok: false, reason } });
+    replyPopup.document.querySelector(".filter-launch").click(); await wait(15); replyPopup.document.querySelector(".genres-row").click(); await wait(8); replyPopup.document.querySelector(".genres-find").click(); await wait(5);
+    assert.match(replyPopup.document.querySelector(".genres-live-note").textContent, expected, `Find all rows explains ${reason}`);
+    replyPopup.window.close();
+  }
   const mixedPopup = await loadPopup({ addedItems: {
     "https://www.youtube.com/watch?v=popupvid001": { title: "Video", thumb: "", site: "youtube.com", ts: 1 },
     "https://rumble.com/c/creator": { title: "Creator", thumb: "", kind: "channel", site: "rumble.com", ts: 2 }
@@ -193,5 +214,5 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   assert.match(categoriesPopup.document.querySelector("#added-summary").textContent, /^There is 1 added video and 1\swebsite\.$/, "popup counts a category and its site");
   assert.equal(categoriesPopup.document.querySelector("#open-added-button").disabled, false, "categories alone enable Added Videos");
   categoriesPopup.window.close();
-  console.log("popup.test.js: 46 passed, 0 failed");
+  console.log("popup.test.js: 54 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

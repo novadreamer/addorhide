@@ -1,6 +1,6 @@
 # AddOrHide Privacy Policy
 
-**Effective date:** October 9, 2026 (updated November 5, 2026)
+**Effective date:** October 9, 2026 (updated November 6, 2026)
 **Developer:** Ashraf Mustafa
 **Contact:** mybrainnoor@gmail.com
 
@@ -15,7 +15,7 @@ The extension stores the following in your browser's local extension storage:
 - **Videos, channels and categories you add or hide.** When you click **Add** or **Hide** on a video, channel or category, the extension saves that video's web address, title, thumbnail address and site name, along with any of these that the video's card shows on the page: duration, view count, publish date or year, rating, genres, and the site's icon address. It also saves the time you took the action and, if you choose to tag a video, the type and genres you enter.
 - **Watch history.** On sites where the extension is active, when you play a video it saves that video's address, title and thumbnail address, its length, how much of it you played, where you stopped and when. This powers the Watched tags, hiding watched videos, Continue Watching and resuming. Nothing is saved in private windows, or when Tag watched videos, Continue Watching and hiding Watched are all off, except for videos you saved to Watch Later yourself.
 - **Watch Later.** When you click **Add to Watch Later**, the extension saves that video's address, title, thumbnail address, site name, length and the time you added it.
-- **Row names.** The names of the rows a site shows, so you can pick rows to hide under Rows by name.
+- **Row names.** The names of the rows a site shows, so you can pick rows to hide under Rows by name. If you press **Find all rows**, the extension also opens up to 12 of that site's own genre pages in a hidden frame to read their row names. Like any page you open, those pages are loaded from that site.
 - **Site settings.** The sites where you turned the extension on, the card pattern (a CSS selector) learned when you use the card picker, and your "hide the whole feed" switches.
 - **Page preferences.** How you sorted, grouped or collapsed things on the Added Videos and Hidden Videos pages, and your Watching settings.
 

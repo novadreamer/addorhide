@@ -30,7 +30,7 @@ Point at a video on a supported site and small buttons appear:
 - Hide the whole feed clears every recommendation on a page when you just want to search.
 
 HIDE WHOLE CATEGORIES
-Hide on this site lists what that site offers, such as Watched, Shorts, Playlists, Live or Movies & TV, and you can switch each one off. Add your own keywords, and hide whole rows by name on streaming sites.
+Hide on this site lists what that site offers, such as Watched, Shorts, Playlists, Live or Movies & TV, and you can switch each one off. Add your own keywords, and hide whole rows by name on streaming sites. It works on sites you teach too, and Find all rows also looks through a site's genre pages.
 
 KNOW WHAT YOU'VE WATCHED
 A video counts as watched only after you really play about 90% of it, not when you open it or skip to the end. Watched videos get a tag on every thumbnail and on their own page, or you can hide them automatically. Remove a tag from any video with one click.

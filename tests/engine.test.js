@@ -1119,6 +1119,24 @@ const CASES = [
     page.window.close();
   }
   {
+    const html = '<h2 id="heading">Featured dramas</h2><div id="row"><article class="card">One</article><article class="card">Two</article></div><div id="untitled"><article class="card">Three</article><article class="card">Four</article></div>';
+    const rule = { "rows.test": { enabled: true, pickedSelectors: [".card"], hideSections: ["Featured dramas"] } };
+    const page = await load({ html, url: "https://rows.test/", siteRules: rule });
+    const status = await page.status();
+    check("taught flat rows use their preceding heading and ignore unnamed card groups", () => assert.deepEqual(status.rows, [{ title: "Featured dramas", kind: "genre", listed: true }]));
+    check("hiding an auto row hides its external heading too", () => {
+      assert.ok(page.document.getElementById("row").classList.contains("hoa-filtered"));
+      assert.ok(page.document.getElementById("heading").classList.contains("hoa-filtered"));
+    });
+    page.window.close();
+    const restored = await load({ html, url: "https://rows.test/", siteRules: { "rows.test": { enabled: true, pickedSelectors: [".card"] } } });
+    check("unticking an auto row restores its row and external heading", () => {
+      assert.ok(!restored.document.getElementById("row").classList.contains("hoa-filtered"));
+      assert.ok(!restored.document.getElementById("heading").classList.contains("hoa-filtered"));
+    });
+    restored.window.close();
+  }
+  {
     const page = await load({ html: '<a class="video-link" href="/watch?v=abc123def45"><span class="title">Synthetic video</span></a>', url: "https://www.youtube.com/", siteRules: { "www.youtube.com": { enabled: true, hideKinds: ["watched"] } }, testSeam: true });
     const card = page.document.querySelector("a.video-link");
     check("a repeated apply does not append watched-pill controls", () => {

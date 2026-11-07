@@ -225,8 +225,8 @@ if (typeof window !== "undefined") {
             }
           } catch (error) { /* ignore an unusable class selector */ }
         });
-        // A carousel's own classes say where a slide is, not what it is: slick-active is only the slides on screen.
-        Array.from(selectors).filter(selector => !/(?:slick|swiper|owl|splide|glide|active|current|selected|hover|focus)/i.test(selector)).forEach(selector => {
+        // A carousel's own classes say where a slide is, not what it is: slick-active is only the slides on screen. Tracking classes (gtm-hp) are per page, so they would miss the genre pages.
+        Array.from(selectors).filter(selector => !/(?:slick|swiper|owl|splide|glide|active|current|selected|hover|focus|gtm-|ga-|analytics|tracking)/i.test(selector)).forEach(selector => {
           const scored = scoreCandidate(selector, node, true);
           if (scored && (!best || scored.matches.length > best.matches.length
             || (scored.matches.length === best.matches.length && scored.parts < best.parts))) best = scored;

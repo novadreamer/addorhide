@@ -8,7 +8,7 @@ window.__hoaLoaded = true;
 {
   const ownInstance = Math.random().toString(36).slice(2) + Date.now().toString(36);
   const rootElement = document.documentElement;
-  const childFrame = (() => { if (window.__hoaTestChildFrame) return true; try { return window.top !== window; } catch (error) { return true; } })();
+  const childFrame = (() => { if (window.name === "hoa-rows-frame" || window.__hoaTestChildFrame) return true; try { return window.top !== window; } catch (error) { return true; } })();
   const isIncognitoContext = () => typeof chrome !== "undefined" && Boolean(chrome.extension && chrome.extension.inIncognitoContext === true);
   const ownExtension = (() => {
     try {
@@ -94,6 +94,8 @@ window.__hoaLoaded = true;
   let seenRowsTimer = 0;
   let lastSeenRows = [];
   let lastRowsReadAt = 0;
+  let findingRows = false;
+  const autoRowsCache = new WeakMap();
   let playerTracker = null;
   let playbackTrackerStarted = false;
   let lastProgressWrite = 0;
@@ -264,6 +266,7 @@ window.__hoaLoaded = true;
       merged.titleCandidates = [];
       merged.meta = { texts: ["*"] };
       merged.pickedCards = validPicks.join(",");
+      merged.categories = [...(base.categories || []), { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }];
     }
     if (!validSelector(merged.cardSelector)) {
       return null;
@@ -871,18 +874,65 @@ window.__hoaLoaded = true;
 
   // Sections are classified as a group once per pass.  In particular, this keeps the Xumo rail useful while
   // its lower rows have not been lazy-rendered yet.
-  function sectionRows(rule) {
-    const rows = [];
+  function autoRows(rule, doc = document) {
+    if (!rule || rule.sections || !rule.pickedCards) return [];
+    let cards = [];
+    try { cards = Array.from(doc.querySelectorAll(rule.pickedCards)); } catch (error) { return []; }
+    // Rows load late, so the answer only holds while the card count does.
+    const cached = doc === document && autoRowsCache.get(doc);
+    if (cached && cached.selector === rule.pickedCards && cached.version === filterVersion && cached.count === cards.length) return cached.rows;
+    const counts = new Map();
+    const cardCount = node => {
+      if (counts.has(node)) return counts.get(node);
+      let count = 0;
+      try { count = node.querySelectorAll(rule.pickedCards).length; } catch (error) { count = 0; }
+      counts.set(node, count);
+      return count;
+    };
+    const headingText = node => {
+      const text = rowLabel(node);
+      return text && text.length >= 2 && text.length <= 60 && !/[\r\n]/.test(text) ? text : "";
+    };
+    const headingLike = node => node && (node.matches("h1,h2,h3,h4,[role=heading]") || /title|heading|header/i.test(node.className || ""));
+    const findHeading = section => {
+      const inside = Array.from(section.querySelectorAll("h1,h2,h3,h4,[role=heading],[class*=title i],[class*=heading i],[class*=header i]"))
+        .find(node => !node.closest(rule.pickedCards) && headingText(node));
+      if (inside) return inside;
+      let current = section;
+      for (let level = 0; level <= 3 && current; level += 1, current = current.parentElement) {
+        let sibling = current.previousElementSibling;
+        while (sibling) { if (!cardCount(sibling) && headingLike(sibling) && headingText(sibling)) return sibling; sibling = sibling.previousElementSibling; }
+      }
+      return null;
+    };
+    const found = new Map();
+    cards.forEach(card => {
+      let section = card.parentElement;
+      while (section && section !== doc.body && cardCount(section) < 2) section = section.parentElement;
+      if (!section || section === doc.body) return;
+      const count = cardCount(section);
+      while (section.parentElement && section.parentElement !== doc.body && cardCount(section.parentElement) === count) section = section.parentElement;
+      if (found.has(section)) return;
+      const heading = findHeading(section); const title = heading && headingText(heading);
+      if (title) found.set(section, { section, title, heading, featured: false });
+    });
+    const rows = Array.from(found.values());
+    if (doc === document) autoRowsCache.set(doc, { selector: rule.pickedCards, version: filterVersion, count: cards.length, rows });
+    return rows;
+  }
+
+  function sectionRows(rule, doc = document) {
+    const rows = rule.sections && rule.sections.length ? [] : autoRows(rule, doc);
     (rule.sections || []).forEach(config => {
       if (!config || !config.container) return;
-      try { document.querySelectorAll(config.container).forEach(section => {
+      try { doc.querySelectorAll(config.container).forEach(section => {
         const title = sectionTitle(section, config, rule);
         if (title) rows.push({ section, title, featured: sectionHasFeaturedCarousel(section, rule) });
       }); } catch (error) { /* stale optional selector */ }
     });
     let navTitles = [];
     if (rule.sectionNav) {
-      try { navTitles = Array.from(document.querySelectorAll(rule.sectionNav)).map(rowLabel).filter(Boolean); } catch (error) { navTitles = []; }
+      try { navTitles = Array.from(doc.querySelectorAll(rule.sectionNav)).map(rowLabel).filter(Boolean); } catch (error) { navTitles = []; }
     }
     const order = navTitles.length ? navTitles : rows.map(row => row.title);
     const picker = (rule.categories || []).find(category => category.id === "genres");
@@ -906,18 +956,18 @@ window.__hoaLoaded = true;
   }
 
   function rememberRows(rule) {
-    if (!rule || !rule.sections) return;
+    if (!rule || (!(rule.sections && rule.sections.length) && !rule.pickedCards)) return;
     if (Date.now() - lastRowsReadAt < 2000) return;
     lastRowsReadAt = Date.now();
     const titles = HOA.normalizeSectionTitles(sectionRows(rule).rows.map(row => row.title));
     if (!titles.some(title => !lastSeenRows.some(old => old.localeCompare(title, undefined, { sensitivity: "accent" }) === 0))) return;
-    lastSeenRows = HOA.normalizeSectionTitles([...lastSeenRows, ...titles]).slice(-150);
+    lastSeenRows = HOA.normalizeSectionTitles([...lastSeenRows, ...titles]).slice(-300);
     if (seenRowsTimer) return;
     seenRowsTimer = window.setTimeout(() => {
       seenRowsTimer = 0; const host = (rule.hosts && rule.hosts[0]) || HOA.siteOf(location.href);
       chrome.storage.local.get({ [HOA.SEEN_ROWS_KEY]: {} }, saved => {
         const all = saved[HOA.SEEN_ROWS_KEY] && typeof saved[HOA.SEEN_ROWS_KEY] === "object" ? saved[HOA.SEEN_ROWS_KEY] : {};
-        const next = HOA.normalizeSectionTitles([...(all[host] || []), ...lastSeenRows]).slice(-150);
+        const next = HOA.normalizeSectionTitles([...(all[host] || []), ...lastSeenRows]).slice(-300);
         if (next.some(title => !(all[host] || []).some(old => String(old).localeCompare(title, undefined, { sensitivity: "accent" }) === 0))) chrome.storage.local.set({ [HOA.SEEN_ROWS_KEY]: { ...all, [host]: next } });
       });
     }, 2000);
@@ -970,6 +1020,7 @@ window.__hoaLoaded = true;
         nodes.add(row.section);
         filtered.add(node);
         nodes.add(node);
+        if (row.heading && !row.section.contains(row.heading)) { filtered.add(row.heading); nodes.add(row.heading); }
       }
     });
     hideSectionNav(rule, info.rows, filtered, nodes);
@@ -1028,6 +1079,53 @@ window.__hoaLoaded = true;
     const categoryLink = Array.from(card.querySelectorAll("a[href]"))
       .find(candidate => !candidate.closest(".hoa-actions, #hoa-toast, #hoa-banner")) || null;
     return { link: HOA.chooseCardLink(card, null), preferred: null, categoryLink };
+  }
+
+  function scrollForRows(done) {
+    const startX = scrollX; const startY = scrollY; const started = Date.now(); let steady = 0; let height = document.documentElement.scrollHeight;
+    const step = () => { const nextHeight = document.documentElement.scrollHeight; const atBottom = scrollY + (innerHeight || 600) >= nextHeight - 4; steady = nextHeight <= height && atBottom ? steady + 1 : 0; height = Math.max(height, nextHeight); if (steady >= 4 || Date.now() - started >= 20000) { scrollTo({ left: startX, top: startY, behavior: "instant" }); done(); return; } scrollBy(0, Math.max(innerHeight || 600, 200)); window.setTimeout(step, 350); };
+    step();
+  }
+
+  function rememberFoundRows(rule, titles) {
+    const host = (rule.hosts && rule.hosts[0]) || HOA.siteOf(location.href);
+    chrome.storage.local.get({ [HOA.SEEN_ROWS_KEY]: {} }, saved => {
+      const all = saved[HOA.SEEN_ROWS_KEY] && typeof saved[HOA.SEEN_ROWS_KEY] === "object" ? saved[HOA.SEEN_ROWS_KEY] : {};
+      const next = HOA.normalizeSectionTitles([...(all[host] || []), ...titles]).slice(-300);
+      chrome.storage.local.set({ [HOA.SEEN_ROWS_KEY]: { ...all, [host]: next } });
+    });
+  }
+
+  function genrePageUrls(rule, callback) {
+    const current = HOA.canonicalUrl(location.href); const urls = new Set();
+    Array.from(document.querySelectorAll("a[href]")).forEach(link => { const href = HOA.canonicalUrl(link.href, location.href); if (href && href !== current && HOA.kindOf(href) === "category" && new URL(href).origin === location.origin) urls.add(href); });
+    const cards = sectionRows(rule).rows.filter(row => /genre|categor|collection|browse/i.test(row.title)).flatMap(row => {
+      try { return Array.from(row.section.querySelectorAll(rule.pickedCards || rule.cardSelector)); } catch (error) { return []; }
+    }).slice(0, 12);
+    const next = () => { const card = cards.shift(); if (!card || urls.size >= 12) { callback(Array.from(urls).slice(0, 12)); return; } resolveCardLink(card).then(href => { if (href && href !== current && new URL(href).origin === location.origin && HOA.kindOf(href) === "category") urls.add(href); next(); }).catch(next); };
+    next();
+  }
+
+  function readRowsFrame(url, rule, deadline, done) {
+    const frame = document.createElement("iframe"); let finished = false; let last = -1; let steady = 0; const giveUp = Math.min(deadline, Date.now() + 7000);
+    const finish = result => { if (finished) return; finished = true; frame.remove(); done(result); };
+    frame.name = "hoa-rows-frame"; frame.src = url; frame.setAttribute("aria-hidden", "true"); frame.tabIndex = -1; frame.sandbox = "allow-same-origin allow-scripts"; frame.allow = "autoplay 'none'";
+    Object.assign(frame.style, { position: "fixed", left: "-3000px", top: "0", width: "1300px", height: "900px", opacity: "0", pointerEvents: "none" });
+    const poll = () => { let doc; try { doc = frame.contentDocument; } catch (error) { finish({ blocked: true, rows: [] }); return; } if (!doc || !doc.body) { if (Date.now() >= giveUp) finish({ blocked: true, rows: [] }); else window.setTimeout(poll, 500); return; }
+      try { doc.defaultView.scrollBy(0, 800); } catch (error) { /* frame may be loading */ }
+      const rows = sectionRows(rule, doc).rows; // A page that has not rendered yet has no rows: an unchanging zero means nothing.
+      steady = rows.length && rows.length === last ? steady + 1 : 0; last = rows.length;
+      if (steady >= 3 || Date.now() >= giveUp) { finish({ empty: !rows.length, rows }); return; } window.setTimeout(poll, 500);
+    };
+    frame.addEventListener("error", () => finish({ blocked: true, rows: [] }), { once: true }); document.body.appendChild(frame); window.setTimeout(poll, 500);
+  }
+
+  function readGenrePages(urls, rule, callback) {
+    const result = { pages: urls.length, read: 0, blocked: 0, empty: 0, skipped: 0, rows: [] }; const deadline = Date.now() + 45000; let next = 0; let running = 0; let finished = false;
+    const launch = () => { if (finished) return; if ((next >= urls.length && !running) || Date.now() >= deadline) { finished = true; result.skipped += urls.length - next; callback(result); return; }
+      while (running < 3 && next < urls.length && Date.now() < deadline) { const url = urls[next++]; running += 1; readRowsFrame(url, rule, deadline, value => { running -= 1; if (value.blocked) result.blocked += 1; else { result.read += 1; if (value.empty) result.empty += 1; result.rows.push(...value.rows.map(row => row.title)); } try { chrome.runtime.sendMessage({ type: "hoa-rows-progress", done: result.read + result.blocked, total: result.pages }, () => void chrome.runtime.lastError); } catch (error) { /* popup may have closed */ } launch(); }); }
+    };
+    launch();
   }
 
   function getLink(card, rule) {
@@ -2814,10 +2912,22 @@ window.__hoaLoaded = true;
         sendResponse({ otherCopy: true, otherVersion: rootElement.dataset.hoaVersion || "" });
         return;
       }
-      if (message && message.type === "hoa-load-rows" && !retired) {
-        const startX = scrollX; const startY = scrollY; const started = Date.now(); let steady = 0; let height = document.documentElement.scrollHeight;
-        const step = () => { const nextHeight = document.documentElement.scrollHeight; steady = nextHeight <= height ? steady + 1 : 0; height = Math.max(height, nextHeight); if (steady >= 3 || Date.now() - started >= 20000) { scrollTo({ left: startX, top: startY, behavior: "instant" }); const rule = hostnameRule(); const count = rule ? HOA.normalizeSectionTitles(sectionRows(rule).rows.map(row => row.title)).length : 0; sendResponse({ done: true, rows: count }); return; } scrollBy(0, Math.max(innerHeight || 600, 200)); window.setTimeout(step, 350); };
-        step(); return true;
+      if (message && message.type === "hoa-find-rows" && !retired) {
+        if (findingRows) { sendResponse({ ok: false, reason: "busy" }); return; }
+        const rule = hostnameRule(); let cards = [];
+        try { cards = rule ? Array.from(document.querySelectorAll([rule.cardSelector, ...(rule.variants || []).map(variant => variant.cardSelector)].filter(Boolean).join(", "))) : []; } catch (error) { cards = []; }
+        if (!rule || !cards.length) { sendResponse({ ok: false, reason: "no-cards" }); return; }
+        findingRows = true;
+        scrollForRows(() => {
+          const rows = HOA.normalizeSectionTitles(sectionRows(rule).rows.map(row => row.title));
+          genrePageUrls(rule, urls => readGenrePages(urls, rule, pages => {
+            const allRows = HOA.normalizeSectionTitles([...rows, ...pages.rows]);
+            rememberFoundRows(rule, allRows);
+            findingRows = false;
+            sendResponse({ ok: true, rowsHere: rows.length, rows: allRows, pages: pages.pages, read: pages.read, blocked: pages.blocked, empty: pages.empty, skipped: pages.skipped });
+          }));
+        });
+        return true;
       }
       // A replaced (retired) copy of this script stays registered as a listener; only the live one answers.
       if (message && message.type === "hoa-status" && !retired) {
@@ -2867,7 +2977,7 @@ window.__hoaLoaded = true;
             && !node.closest(".hoa-empty"));
         const collapsedSections = outer(Array.from(document.querySelectorAll(".hoa-empty")), ".hoa-empty");
         let rows = [];
-        if (rule && rule.sections && rule.sections.length) {
+        if (rule) {
           const info = sectionRows(rule);
           const titles = info.navTitles.length ? info.navTitles : info.rows.map(row => row.title);
           const renderedByKey = new Map(info.rows.map(row => [rowKey(row.title), row]));

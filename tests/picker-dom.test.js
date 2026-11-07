@@ -37,7 +37,7 @@ assert.match(pickerWindow.document.querySelector(".hoa-picker-panel").textConten
 pickerWindow.document.querySelector(".hoa-picker-button").click();
 assert.ok(stored.siteRules && stored.siteRules["rumble.com"].pickedSelectors.length, "saving a thumbnail persists its selector");
 pickerWindow.close();
-const fawesome = new JSDOM(`<div class="slick-track">${Array.from({ length: 4 }, (_, index) => `<div id="vod-0-${index}" class="mrItem slick-slide ${index < 2 ? "slick-active" : ""}"><div class="titleItem pointer-events-none"><div class="titlePic"><img alt="Title ${index}"></div><div class="titleMeta"><h3>Title ${index}</h3></div></div></div>`).join("")}</div>`, { url: "https://fawesome.tv/", runScripts: "outside-only" });
+const fawesome = new JSDOM(`<div class="slick-track">${Array.from({ length: 4 }, (_, index) => `<div id="vod-0-${index}" class="gtm-hp mrItem slick-slide ${index < 2 ? "slick-active" : ""}"><div class="titleItem pointer-events-none"><div class="titlePic"><img alt="Title ${index}"></div><div class="titleMeta"><h3>Title ${index}</h3></div></div></div>`).join("")}</div>`, { url: "https://fawesome.tv/", runScripts: "outside-only" });
 fawesome.window.__hoaPickerTest = {};
 fawesome.window.eval(fs.readFileSync(require("node:path").join(__dirname, "..", "picker.js"), "utf8"));
 const fawesomeSelector = fawesome.window.__hoaPickerTest.buildSelector(fawesome.window.document.querySelector(".titlePic img"));
