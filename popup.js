@@ -580,14 +580,15 @@ function render() {
   // Added Videos works the same way: off while nothing is added, with the count underneath.
   const addedEntries = Object.entries(added || {});
   const channelCount = addedEntries.filter(([key, entry]) => entry && (entry.kind === "channel" || HOA.kindOf(key) === "channel")).length;
-  const categoryCount = addedEntries.filter(([key, entry]) => entry && (entry.kind === "category" || HOA.kindOf(key) === "category")).length;
+  const categories = addedEntries.filter(([key, entry]) => entry && (entry.kind === "category" || HOA.kindOf(key) === "category")).map(([key]) => key);
+  const categoryCount = categories.length;
   const videoAdded = Object.fromEntries(addedEntries.filter(([key, entry]) => !entry || ((entry.kind !== "channel" && HOA.kindOf(key) !== "channel") && (entry.kind !== "category" && HOA.kindOf(key) !== "category"))));
   const addedCount = Object.keys(videoAdded).length;
   const continuing = Object.keys(watchProgress).filter(key => watchProgress[key] && watchProgress[key].cw && !watchProgress[key].watched);
   const later = Object.keys(watchLater || {});
   openAddedButton.disabled = addedCount === 0 && channelCount === 0 && categoryCount === 0 && continuing.length === 0 && later.length === 0;
-  // Just videos and sites: every video the page lists, each counted once, whichever list it is on.
-  const videoKeys = new Set([...Object.keys(videoAdded), ...continuing, ...later]);
+  // Just videos and sites: everything on the page except channels, each counted once, whichever list it is on.
+  const videoKeys = new Set([...Object.keys(videoAdded), ...continuing, ...later, ...categories]);
   addedSummary.textContent = HOA.addedCountText(videoKeys.size, new Set(Array.from(videoKeys, HOA.siteOf)).size);
   schedulePositionBreathingRoom();
 }
