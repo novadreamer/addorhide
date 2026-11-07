@@ -205,11 +205,14 @@ const HOA_SITES = Object.freeze((() => {
       const next = { ...rules };
       delete next[hostname];
       setRules(next, () => {
-        chrome.storage.local.get({ seenRows: {} }, result => {
+        chrome.storage.local.get({ seenRows: {}, cardLinks: {} }, result => {
           const seenRows = result.seenRows && typeof result.seenRows === "object" ? { ...result.seenRows } : {};
+          const cardLinks = Object.fromEntries(Object.entries(result.cardLinks || {}).filter(([key]) => {
+            try { return new URL(key).hostname.replace(/^www\./, "") !== hostname.replace(/^www\./, ""); } catch (error) { return false; }
+          }));
           delete seenRows[hostname];
           delete seenRows[hostname.replace(/^www\./, "")];
-          chrome.storage.local.set({ seenRows }, () => removePermissionAndScript(hostname, () => cb({ ok: true })));
+          chrome.storage.local.set({ seenRows, cardLinks }, () => removePermissionAndScript(hostname, () => cb({ ok: true })));
         });
       });
     });

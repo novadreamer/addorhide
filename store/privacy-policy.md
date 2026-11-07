@@ -16,6 +16,7 @@ The extension stores the following in your browser's local extension storage:
 - **Watch history.** On sites where the extension is active, when you play a video it saves that video's address, title and thumbnail address, its length, how much of it you played, where you stopped and when. This powers the Watched tags, hiding watched videos, Continue Watching and resuming. Nothing is saved in private windows, or when Tag watched videos, Continue Watching and hiding Watched are all off, except for videos you saved to Watch Later yourself.
 - **Watch Later.** When you click **Add to Watch Later**, the extension saves that video's address, title, thumbnail address, site name, length and the time you added it.
 - **Row names.** The names of the rows a site shows, so you can pick rows to hide under Rows by name. If you press **Find all rows**, the extension also opens up to 12 of that site's own genre pages in a hidden frame to read their row names. Like any page you open, those pages are loaded from that site.
+- **Addresses of cards with no link.** Some sites keep a card's address out of the page. When you click **Add** or **Hide** on such a card, the extension clicks the card itself, reads the address the site tries to open, cancels the move and saves that address for the card. The site may count this as a click on that card.
 - **Site settings.** The sites where you turned the extension on, the card pattern (a CSS selector) learned when you use the card picker, and your "hide the whole feed" switches.
 - **Page preferences.** How you sorted, grouped or collapsed things on the Added Videos and Hidden Videos pages, and your Watching settings.
 
@@ -37,12 +38,12 @@ You can delete your data at any time:
 - **Added videos:** **Remove** on a card deletes that video's record, and **Clear page** deletes all of them.
 - **Watch Later:** **Remove** on a card deletes that video's record, and its bin button deletes the whole list. Playing a saved video moves it to Continue Watching.
 - **Watch history:** **Clear watch history** in Options deletes all of it. Removing a video from Continue Watching takes it off that list.
-- **Site settings:** **Forget** in Options deletes a site's saved settings and row names. (**Disable** turns the extension off for the site but keeps the saved settings.)
+- **Site settings:** **Forget** in Options deletes a site's saved settings, row names and card addresses. (**Disable** turns the extension off for the site but keeps the saved settings.)
 - **Everything:** removing the extension deletes all the data it stored.
 
 ## Private windows
 
-If you allow the extension to run in private (incognito) windows, videos you add or hide there are saved in the same extension storage used by your normal windows. They remain after the private window is closed until you delete them as described above. If you do not want this, do not enable the extension in private windows. What you play in a private window is not recorded in your watch history, unless you saved that video to Watch Later, in which case its progress is kept so it can move to Continue Watching and resume.
+If you allow the extension to run in private (incognito) windows, videos you add or hide there are saved in the same extension storage used by your normal windows. They remain after the private window is closed until you delete them as described above. If you do not want this, do not enable the extension in private windows. Row names are not remembered from private windows unless you press **Find all rows**. What you play in a private window is not recorded in your watch history, unless you saved that video to Watch Later, in which case its progress is kept so it can move to Continue Watching and resume.
 
 ## Popup player
 

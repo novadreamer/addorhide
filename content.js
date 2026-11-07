@@ -5,10 +5,11 @@ if (typeof window.__hoaRetire === "function") {
 }
 window.__hoaLoaded = true;
 
-{
+// Find all rows reads a genre page in a hidden frame from the top page: nothing may run or be recorded in there.
+if (window.name !== "hoa-rows-frame") {
   const ownInstance = Math.random().toString(36).slice(2) + Date.now().toString(36);
   const rootElement = document.documentElement;
-  const childFrame = (() => { if (window.name === "hoa-rows-frame" || window.__hoaTestChildFrame) return true; try { return window.top !== window; } catch (error) { return true; } })();
+  const childFrame = (() => { if (window.__hoaTestChildFrame) return true; try { return window.top !== window; } catch (error) { return true; } })();
   const isIncognitoContext = () => typeof chrome !== "undefined" && Boolean(chrome.extension && chrome.extension.inIncognitoContext === true);
   const ownExtension = (() => {
     try {
@@ -956,7 +957,7 @@ window.__hoaLoaded = true;
   }
 
   function rememberRows(rule) {
-    if (!rule || (!(rule.sections && rule.sections.length) && !rule.pickedCards)) return;
+    if (!rule || isIncognitoContext() || (!(rule.sections && rule.sections.length) && !rule.pickedCards)) return;
     if (Date.now() - lastRowsReadAt < 2000) return;
     lastRowsReadAt = Date.now();
     const titles = HOA.normalizeSectionTitles(sectionRows(rule).rows.map(row => row.title));
@@ -1506,9 +1507,10 @@ window.__hoaLoaded = true;
           const finish = value => { if (!done) { done = true; window.navigation.removeEventListener("navigate", onNavigate); window.clearTimeout(timer); resolve(value); } };
           const onNavigate = event => {
             try {
+              // Whatever the card tried to do, the user stays on this page.
+              if (event && event.cancelable) event.preventDefault();
               const url = new URL(event && event.destination && event.destination.url);
               if ((url.protocol === "http:" || url.protocol === "https:") && url.origin === origin && url.href !== location.href) {
-                if (event.cancelable) event.preventDefault();
                 finish(HOA.canonicalUrl(url.href));
               }
             } catch (error) { /* ignore unrelated navigation */ }

@@ -1554,10 +1554,10 @@ const CASES = [
     let foreign;
     const refused = await load({ html: cardHtml, url: "https://fawesome.tv/", siteRules: rule, setup(window) {
       foreign = navigation(); window.navigation = foreign;
-      window.document.querySelector(".mrItem").addEventListener("click", () => foreign.emit("https://elsewhere.example/video"));
+      window.document.querySelector(".mrItem").addEventListener("click", () => { foreign.cancelled = foreign.emit("https://elsewhere.example/video"); });
     } });
     refused.document.querySelector("[data-action='add']").click(); await wait(520);
-    check("cross-site navigation is refused and listeners are removed", () => { assert.ok(refused.store.addedItems["https://fawesome.tv/hoa-card/breakdown"]); assert.equal(refused.store.cardLinks, undefined); assert.equal(foreign.listeners.size, 0); });
+    check("cross-site navigation is refused and listeners are removed", () => { assert.ok(refused.store.addedItems["https://fawesome.tv/hoa-card/breakdown"]); assert.equal(refused.store.cardLinks, undefined); assert.equal(foreign.listeners.size, 0); assert.equal(foreign.cancelled, true, "the page stays put even when the address is refused"); });
     refused.window.close();
   }
   {

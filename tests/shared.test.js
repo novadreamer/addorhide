@@ -611,6 +611,8 @@ check("unhide all retains watched videos as user-shown", () => {
 check("clear watch history returns watched-hidden videos and clears tracking", () => {
   const watchedKey = "https://www.youtube.com/watch?v=clearwatch1";
   const manualKey = "https://www.youtube.com/watch?v=manualhide1";
+  const linked = HOA.clearWatchHistory({ hidden: {}, added: { "https://fawesome.tv/movies/1/kept": { title: "Kept" } }, watchLater: {}, cardLinks: { "https://fawesome.tv/hoa-card/kept": "https://fawesome.tv/movies/1/kept", "https://fawesome.tv/hoa-card/gone": "https://fawesome.tv/movies/2/gone" } });
+  assert.deepEqual(linked.cardLinks, { "https://fawesome.tv/hoa-card/kept": "https://fawesome.tv/movies/1/kept" }, "clearing history drops card addresses nothing saved uses");
   const next = HOA.clearWatchHistory({ hidden: {
     [watchedKey]: { title: "Watched", thumb: "", ts: 1, reason: "watched" },
     [manualKey]: { title: "Manual", thumb: "", ts: 1 }

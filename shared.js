@@ -1809,7 +1809,10 @@ var HOA = Object.freeze((() => {
     const hidden = normalizeItems(source.hidden, { max: MAX_HIDDEN, withListed: true });
     Object.keys(hidden).forEach(key => { if (hidden[key].reason === "watched") delete hidden[key]; });
     // Watch Later is deliberately user-curated, not watch history.
-    return { hidden, watchedShown: {}, watchProgress: {}, watchLater: normalizeWatchLater(source.watchLater) };
+    // A card's address is only worth keeping while something saved still uses it.
+    const kept = new Set([...Object.keys(hidden), ...Object.keys(isObject(source.added) ? source.added : {}), ...Object.keys(normalizeWatchLater(source.watchLater))]);
+    const cardLinks = Object.fromEntries(Object.entries(normalizeCardLinks(source.cardLinks)).filter(([, link]) => kept.has(link)));
+    return { hidden, watchedShown: {}, watchProgress: {}, watchLater: normalizeWatchLater(source.watchLater), cardLinks };
   }
 
   function buildBackup(data, version, nowMs) {
