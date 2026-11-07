@@ -964,7 +964,7 @@ window.__hoaLoaded = true;
     lastSeenRows = HOA.normalizeSectionTitles([...lastSeenRows, ...titles]).slice(-300);
     if (seenRowsTimer) return;
     seenRowsTimer = window.setTimeout(() => {
-      seenRowsTimer = 0; const host = (rule.hosts && rule.hosts[0]) || HOA.siteOf(location.href);
+      seenRowsTimer = 0; const host = location.hostname.toLowerCase();   // the popup, Options and Forget all use this name
       chrome.storage.local.get({ [HOA.SEEN_ROWS_KEY]: {} }, saved => {
         const all = saved[HOA.SEEN_ROWS_KEY] && typeof saved[HOA.SEEN_ROWS_KEY] === "object" ? saved[HOA.SEEN_ROWS_KEY] : {};
         const next = HOA.normalizeSectionTitles([...(all[host] || []), ...lastSeenRows]).slice(-300);
@@ -1088,7 +1088,7 @@ window.__hoaLoaded = true;
   }
 
   function rememberFoundRows(rule, titles) {
-    const host = (rule.hosts && rule.hosts[0]) || HOA.siteOf(location.href);
+    const host = location.hostname.toLowerCase();   // the popup, Options and Forget all use this name
     chrome.storage.local.get({ [HOA.SEEN_ROWS_KEY]: {} }, saved => {
       const all = saved[HOA.SEEN_ROWS_KEY] && typeof saved[HOA.SEEN_ROWS_KEY] === "object" ? saved[HOA.SEEN_ROWS_KEY] : {};
       const next = HOA.normalizeSectionTitles([...(all[host] || []), ...titles]).slice(-300);

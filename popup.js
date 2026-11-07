@@ -327,7 +327,7 @@ function appendFilterControls(container, catalogRule) {
           const paintRowNote = () => { rowNote.textContent = rowsComplete ? "" : findMessage || (rowsScanned ? `${genreTitles.length} rows · from your last visit too` : `Rows load as you scroll — ${genreTitles.length} listed so far.`); rowNote.hidden = rowsComplete; findRows.hidden = rowsComplete; };
           const closeGenresPanel = () => { genresOpen = false; genreWrap.classList.remove("is-open"); genreRow.setAttribute("aria-expanded", "false"); panel.hoaCloseInner = null; if (rowsRefresh) { window.clearInterval(rowsRefresh); rowsRefresh = 0; } };
           const loadGenres = () => chrome.storage.local.get({ [HOA.SEEN_ROWS_KEY]: {} }, saved => {
-            const seen = saved[HOA.SEEN_ROWS_KEY] && saved[HOA.SEEN_ROWS_KEY][activeHost] || [];
+            const stored = saved[HOA.SEEN_ROWS_KEY] || {}; const seen = normalize([...(stored[activeHost] || []), ...(stored[HOA.siteOf(`https://${activeHost}/`)] || [])]);   // older saves left out the www.
             const finish = (pageRows, reply) => { const pageTitles = normalize((pageRows || []).filter(row => row && row.listed).map(row => row.title)); const remembered = normalize([...seen, ...pageTitles]).slice(-300); const before = genreTitles.length;
               setTitles([...genreTitles, ...pageTitles, ...seen, ...hideSections]); drawGenreList(before > 0); paintAll(); rowsComplete = Boolean(reply && reply.rowsComplete); paintRowNote();
               if (pageTitles.some(title => !normalize(seen).some(old => old.localeCompare(title, undefined, { sensitivity: "accent" }) === 0))) chrome.storage.local.set({ [HOA.SEEN_ROWS_KEY]: { ...(saved[HOA.SEEN_ROWS_KEY] || {}), [activeHost]: remembered } }); };

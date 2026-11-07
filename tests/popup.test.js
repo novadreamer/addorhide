@@ -78,6 +78,11 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
     seenRows: { "play.xumo.com": ["Westerns"] },
     statusRows: [{ title: "Most Popular", kind: "popular", listed: false }, { title: "Comedy", kind: "genre", listed: true }, { title: "Drama", kind: "genre", listed: true }]
   });
+  const wwwRows = await loadPopup({ url: "https://www.example.com/", siteRules: { "www.example.com": { enabled: true, pickedSelectors: ["a.card"] } }, seenRows: { "example.com": ["Old save"], "www.example.com": ["New save"] } });
+  wwwRows.document.querySelector(".filter-launch").click(); await wait(25); wwwRows.document.querySelector(".genres-row").click(); await wait(60);
+  const wwwText = wwwRows.document.querySelector(".filter-popover").textContent;
+  assert.ok(wwwText.includes("Old save") && wwwText.includes("New save"), "saved rows are found with or without www");
+  wwwRows.window.close();
   const genreLaunch = genres.document.querySelector(".filter-launch");
   genreLaunch.click();
   await wait(25);
