@@ -23,8 +23,8 @@ function bindButtonControls(toggle, edgeGroup) {
     toggle.dataset.enabled = String(enabled);
     const note = document.getElementById("buttons-toggle-note");
     if (note) {
-      note.textContent = enabled ? "Click to turn off the hover buttons on thumbnails"
-        : "Click to turn on the hover buttons on thumbnails";
+      note.textContent = enabled ? "Turn off the hover buttons"
+        : "Turn on the hover buttons";
     }
     // Position only matters while the buttons are shown.
     edgeButtons.forEach(button => {

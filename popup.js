@@ -103,7 +103,7 @@ function appendPageStatus(container) {
     } else if (!reply.overlays) {
       line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"}, but none got buttons. Reload the page; if it stays like this, send the details below.`;
     } else {
-      line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"} on this page. Move your mouse over one to see Add and Hide.`;
+      line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"}. Hover over one for Add and Hide.`;
     }
     schedulePositionBreathingRoom();
   });
@@ -461,15 +461,16 @@ function renderSite() {
   const heading = document.createElement("p");
   heading.textContent = isCatalog ? `${catalogRule.name} - supported site` : activeHost;
   siteContent.appendChild(heading);
-  const status = document.createElement("p");
-  status.className = "muted";
   const learnedCount = pickedSelectors(rule).length;
-  // Labels follow what the user has actually done on this site.
-  status.textContent = learnedCount
-    ? `You taught ${learnedCount} kind${learnedCount === 1 ? "" : "s"} of card here`
-    : (isCatalog ? "Supported" : "Pick the cards to finish setup");
-  siteContent.appendChild(status);
-  appendContinueSwitch(siteContent);
+  // Labels follow what the user has actually done on this site. The heading already says a catalog site is supported.
+  if (learnedCount || !isCatalog) {
+    const status = document.createElement("p");
+    status.className = "muted";
+    status.textContent = learnedCount
+      ? `You taught ${learnedCount} kind${learnedCount === 1 ? "" : "s"} of card here`
+      : "Pick the cards to finish setup";
+    siteContent.appendChild(status);
+  }
   appendPageStatus(siteContent);
   if (!playerGranted) {
     const playerNote = document.createElement("p");
@@ -483,10 +484,8 @@ function renderSite() {
     playerNote.appendChild(allowPlayer);
     siteContent.appendChild(playerNote);
   }
-  const actions = document.createElement("div");
-  actions.className = "page-actions";
   const teachLabel = learnedCount ? "Teach more cards" : (isCatalog ? "Teach cards" : "Pick cards");
-  actions.appendChild(siteButton(teachLabel, () => {
+  const teach = siteButton(teachLabel, () => {
     HOA_SITES.startPicker(activeTab.id, result => {
       if (result.ok) {
         window.close();
@@ -494,7 +493,7 @@ function renderSite() {
         setSiteStatus(result.error, "error");
       }
     });
-  }));
+  });
   const toggleLabel = document.createElement("label");
   toggleLabel.className = "switch-row";
   const toggle = document.createElement("input");
@@ -506,7 +505,12 @@ function renderSite() {
   }, "Feed setting saved."));
   toggleLabel.appendChild(toggle);
   toggleLabel.appendChild(document.createTextNode(" Hide the whole feed"));
-  actions.appendChild(toggleLabel);
+  // Same order as a built-in site, with Teach between the switches and Hide on this site.
+  siteContent.appendChild(toggleLabel);
+  appendContinueSwitch(siteContent);
+  const actions = document.createElement("div");
+  actions.className = "page-actions teach-actions";
+  actions.appendChild(teach);
   siteContent.appendChild(actions);
   appendFilterControls(siteContent, catalogRule);
   const links = document.createElement("div");

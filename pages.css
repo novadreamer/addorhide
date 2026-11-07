@@ -150,6 +150,7 @@ body.popup main { display: flex; flex-direction: column; min-height: 0; }
 .popup .popup-header .theme-toggle { min-height: 34px; width: 34px; height: 34px; padding: 4px; font-size: inherit; }
 .popup button { min-height: 28px; padding: 4px 10px; font-size: 12.5px; }
 .popup .page-actions { gap: 6px; }
+.popup .teach-actions { justify-content: center; margin: 8px 0; }
 /* Added Videos (green) | Hidden Videos (red), side by side with a line between; each is off while its list is
    empty, with its count underneath. */
 .popup .lists-card { display: flex; align-items: stretch; gap: 0; padding: 14px 8px; flex: 0 0 auto; }
@@ -389,3 +390,15 @@ button.filter-tool:disabled { opacity: .4; cursor: default; }
 .popup .popup-control-divider { display: block; width: 1px; align-self: stretch; justify-self: stretch; background: var(--border); }
 .popup .button-controls .position-row { grid-template-columns: auto auto; column-gap: 8px; align-items: center; align-content: center; justify-self: end; }
 .popup .continue-watching-switch { justify-content: flex-start; }
+
+/* The site card holds up to seven rows on a catalog site, and Chrome caps a popup at 600px: these keep the bottom bar in view.
+   If a very long summary still overflows, the scrollbar shows, so nothing is out of reach unseen. */
+body.popup main { scrollbar-width: thin; }
+.popup .popup-header { margin-bottom: 4px; padding-bottom: 4px; }
+.popup .panel { margin-bottom: 8px; padding: 10px 14px; }
+.popup .lists-card { padding: 10px 8px; }
+.popup .switch-row { min-height: 30px; }
+.popup .teach-actions { margin: 4px 0; }
+.popup #site-content p { margin-bottom: 4px; }
+.popup .filter-launch { margin-top: 4px; }
+.popup .site-links { justify-content: center; margin-top: 6px; }
