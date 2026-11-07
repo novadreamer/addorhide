@@ -312,6 +312,8 @@ body.popup main { overflow: visible; scrollbar-width: auto; }
 /* Options gear: turns a little and lifts on hover (and keyboard focus). */
 #open-options-button svg { transition: transform .45s cubic-bezier(.34, 1.56, .64, 1), color .2s ease; }
 #open-options-button:hover svg, #open-options-button:focus-visible svg { transform: rotate(90deg) scale(1.12); color: var(--accent); }
+/* The gear is round, but the corners of its square box pass the bottom of the popup mid-turn, which brought up the scrollbar. */
+.popup #open-options-button { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { #open-options-button svg { transition: color .2s ease; } #open-options-button:hover svg, #open-options-button:focus-visible svg { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .filter-launch, .filter-launch:hover:not(:disabled), .filter-launch:active:not(:disabled) { transform: none; transition: none; } }
 @media (prefers-reduced-motion: reduce) { .filter-popover { transform: translate(-50%,-50%); transition: opacity 160ms ease; } .filter-popover.is-open, .filter-popover.is-closing { transform: translate(-50%,-50%); } .filter-backdrop { transition-duration: 160ms; } }
@@ -370,9 +372,9 @@ button.filter-tool:disabled { opacity: .4; cursor: default; }
 .popup .popup-footer .footer-icon-button { width: 30px; min-width: 30px; padding: 3px; }
 
 /* Round 9. Centred tooltips (tooltip.js). */
-.hoa-tip { position: fixed; z-index: 2147483000; max-width: 260px; padding: 5px 9px; color: var(--surface, #fff); background: color-mix(in srgb, var(--text, #222) 68%, transparent);
-  -webkit-backdrop-filter: blur(6px) saturate(1.3); backdrop-filter: blur(6px) saturate(1.3); text-shadow: 0 0 6px color-mix(in srgb, var(--text, #222) 70%, transparent);
-  border-radius: 7px; font-size: 12px; line-height: 1.35; text-align: center; pointer-events: none; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+/* No box: the text stands on its own, with a halo of the page colour so it reads over anything beneath it, raised by a shadow. */
+.hoa-tip { position: fixed; z-index: 2147483000; max-width: 260px; padding: 2px 4px; color: var(--text, #222); font-size: 12px; font-weight: 600; line-height: 1.35; text-align: center; pointer-events: none;
+  -webkit-text-stroke: 3px var(--surface, #fff); paint-order: stroke fill; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .4)) drop-shadow(0 3px 6px rgba(0, 0, 0, .3)); }
 /* Site links on one line (taught sites have three), and the status line as a toast that takes no room. */
 .popup .site-links { flex-wrap: nowrap; justify-content: center; gap: 12px; white-space: nowrap; }
 .popup .site-links .link-button { font-size: 12px; }

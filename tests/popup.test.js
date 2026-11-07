@@ -129,6 +129,10 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   const autoAdd = playing.document.querySelector(".continue-watching-switch input");
   assert.ok(autoAdd && autoAdd.checked, "site card shows the enabled Auto-add Continue Watching switch without requiring playback");
   assert.ok(playing.document.querySelector("section.popup-edge.panel .position-row"), "hover-button and position controls share a panel");
+  assert.equal(playing.document.querySelector("#buttons-toggle").hasAttribute("title"), false, "the power button has no tooltip, only its note");
+  assert.ok(playing.document.querySelector("#buttons-toggle").getAttribute("aria-label"), "the power button still has a name for screen readers");
+  assert.ok(playing.document.querySelector("#open-added-button").title, "Added Videos has a tooltip");
+  assert.ok(playing.document.querySelector("#open-hidden-button").title, "Hidden Videos has a tooltip");
   autoAdd.checked = false; autoAdd.dispatchEvent(new playing.window.Event("change", { bubbles: true })); await wait(12);
   assert.equal(playing.store.watchSettings.continueWatching, "off", "Auto-add switch writes the global off setting");
   playing.window.close();
