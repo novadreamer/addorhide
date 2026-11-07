@@ -18,6 +18,10 @@ movie and streaming sites, and a card picker that teaches it any other video sit
 ## What's new in 1.1.0
 
 - **Watched:** a video counts as watched after about 90% real playback, not by opening it or skipping to the end. Tag it on every thumbnail and on its own page, or hide it automatically, and untag any video.
+  - **How it is measured:** each video is split into 100 equal slices. A slice counts once about 70% of it has really played, and the video is watched when 90 slices count, so skipping an intro and the credits is fine. Seeking, playing faster than 2× and replaying the same part add nothing. Progress adds up across sessions.
+  - **On YouTube:** a red progress bar at least 90% full under a thumbnail also counts, which covers videos watched before installing or on another device.
+  - **Not tracked:** videos under 20 seconds, and anything played in a private window unless you saved it to Watch Later yourself.
+  - **Watched on or off:** with Watched on for a site, watched videos are hidden and listed under Hidden Videos > Watched. With it off, they stay in the feed with a Watched tag. Remove Watched clears the mark until the video is played to 90% again.
 - **Watch Later:** hover over the player on a video's own page and choose Add to Watch Later. The list sits under Continue Watching, and a saved video moves there once you have played a few seconds.
 - **Continue Watching:** videos you start appear with a progress bar and time left, and resume where you stopped, with Start over.
 - **Hide by type, keyword and channel:** per-site categories such as Shorts, Playlists and Live, your own keywords, whole channels, and rows by name on streaming sites and any site where you taught cards. Find all rows also reads the site's genre pages.

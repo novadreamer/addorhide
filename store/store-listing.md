@@ -34,6 +34,14 @@ Hide on this site lists what that site offers, such as Watched, Shorts, Playlist
 
 KNOW WHAT YOU'VE WATCHED
 A video counts as watched only after you really play about 90% of it, not when you open it or skip to the end. Watched videos get a tag on every thumbnail and on their own page, or you can hide them automatically. Remove a tag from any video with one click.
+How a video counts as watched:
+- Each video is split into 100 equal slices. A slice counts once you have actually played most of it, and the video counts as watched when 90 of them do, so skipping an intro and the credits is fine.
+- Jumping ahead, playing faster than 2x or replaying the same part adds nothing new.
+- Progress adds up across sessions, so a film watched over several evenings counts once it reaches 90%.
+- On YouTube, a red progress bar at least 90% full under a thumbnail also counts, so videos you watched before installing AddOrHide or on another device are recognised too.
+- Videos shorter than 20 seconds are not tracked, and neither is anything you play in a private window unless you saved it to Watch Later.
+- With Watched switched on for a site, watched videos are hidden and listed under Hidden Videos > Watched. With it off, they stay in the feed with a Watched tag.
+- Remove Watched takes the mark off a video until you play it to 90% again.
 
 WATCH LATER AND CONTINUE WATCHING
 Hover over the player on a video's own page and choose Add to Watch Later to save it for another time. Your list sits right under Continue Watching on the Added Videos page.
