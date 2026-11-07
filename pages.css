@@ -324,9 +324,9 @@ button.filter-chip { min-height: 23px; padding: 2px 7px; color: var(--text); bac
 .popup .popup-header #page-details-toggle { margin-left: auto; }
 .popup .popup-header #theme-toggle { margin-left: -6px; }
 .popup .panel { margin-bottom: 8px; }
-.popup .lists-card { padding: 12px 8px; }
+.popup .lists-card { padding: 11px 8px; }
 .lists-card .list-column { gap: 5px; }
-.popup .button-controls { gap: 12px; padding-bottom: 2px; }
+.popup .button-controls { gap: 12px; }
 .popup .popup-edge { margin-bottom: 6px; }
 .popup .filter-launch { margin-top: 6px; padding-top: 4px; padding-bottom: 4px; }
 .popup .panel { padding-top: 10px; padding-bottom: 10px; }
@@ -368,7 +368,6 @@ button.filter-tool:disabled { opacity: .4; cursor: default; }
 .genre-check span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 @media (prefers-reduced-motion: reduce) { .genres-panel { transition: none; } }
 .popup .popup-footer .footer-icon-button { width: 30px; min-width: 30px; padding: 3px; }
-.popup .button-controls.popup-position-room { padding-bottom: var(--popup-position-room, 14px); }
 
 /* Round 9. Centred tooltips (tooltip.js). */
 .hoa-tip { position: fixed; z-index: 2147483000; max-width: 260px; padding: 5px 9px; color: var(--surface, #fff); background: color-mix(in srgb, var(--text, #222) 68%, transparent);
@@ -396,11 +395,11 @@ button.filter-tool:disabled { opacity: .4; cursor: default; }
 body.popup main { scrollbar-width: thin; }
 .popup .popup-header { margin-bottom: 4px; padding-bottom: 4px; }
 .popup .panel { margin-bottom: 10px; padding: 12px 14px; }
-.popup .lists-card { padding: 12px 8px; }
+.popup .lists-card { padding: 11px 8px; }
 .popup .switch-row { min-height: 34px; }
-.popup .teach-actions { margin: 6px 0; }
+.popup .teach-actions { margin: 6px 0 12px; }
 .popup #site-content p { margin-bottom: 6px; }
 .popup .filter-launch { margin-top: 6px; }
-.popup .site-links { justify-content: center; margin-top: 6px; }
+.popup .site-links { justify-content: center; margin-top: 4px; }
 /* Room either side of Position moves the divider left and centres Position in its half. */
 .popup .position-row { padding: 0 10px; }

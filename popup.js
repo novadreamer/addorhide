@@ -10,7 +10,6 @@ const siteContent = document.getElementById("site-content");
 const siteStatus = document.getElementById("site-status");
 const themeToggle = document.getElementById("theme-toggle");
 const pageDetailsToggle = document.getElementById("page-details-toggle");
-const popupMain = document.querySelector("body.popup main");
 
 let hidden = {};
 let added = {};
@@ -20,29 +19,7 @@ let watchLater = {};
 let activeTab = null;
 let activeHost = "";
 let siteRulesWrittenHere = false;
-let positionRoomFrame = 0;
 let rowsRefresh = 0;
-
-function fitPositionBreathingRoom() {
-  positionRoomFrame = 0;
-  const controls = document.querySelector(".popup .button-controls");
-  if (!controls || !popupMain) return;
-  controls.classList.remove("popup-position-room");
-  controls.style.removeProperty("--popup-position-room");
-  const mainOverflows = popupMain.clientHeight > 0 && popupMain.scrollHeight > popupMain.clientHeight + 1;
-  // Measure the content itself (the document's height is at least the window's, which can already be 600).
-  const used = Math.ceil(popupMain.getBoundingClientRect().bottom + (parseFloat(getComputedStyle(document.body).paddingBottom) || 0));
-  const space = 600 - used;
-  const padding = space >= 14 ? 14 : (space >= 6 ? space : 0);
-  if (!mainOverflows && padding >= 6) {
-    controls.style.setProperty("--popup-position-room", `${padding}px`);
-    controls.classList.add("popup-position-room");
-  }
-}
-
-function schedulePositionBreathingRoom() {
-  if (!positionRoomFrame) positionRoomFrame = requestAnimationFrame(fitPositionBreathingRoom);
-}
 
 function appendContinueSwitch(container) {
   const label = document.createElement("label");
@@ -71,7 +48,6 @@ function appendPageStatus(container) {
   container.appendChild(line);
   if (!activeTab || typeof activeTab.id !== "number") {
     line.textContent = "";
-    schedulePositionBreathingRoom();
     return;
   }
   chrome.tabs.sendMessage(activeTab.id, { type: "hoa-status" }, reply => {
@@ -105,7 +81,6 @@ function appendPageStatus(container) {
     } else {
       line.textContent = `Found ${reply.cards} video${reply.cards === 1 ? "" : "s"}. Hover over one for Add and Hide.`;
     }
-    schedulePositionBreathingRoom();
   });
 }
 
@@ -384,7 +359,6 @@ function renderSite() {
   setSiteStatus("");
   if (!activeTab || !HOA_SITES.isSupportedPageUrl(activeTab.url || "")) {
     siteContent.textContent = "AddOrHide can't run on this page.";
-    schedulePositionBreathingRoom();
     return;
   }
   const isBuiltIn = HOA_SITES.isBuiltIn(activeHost);
@@ -415,7 +389,6 @@ function renderSite() {
     siteContent.appendChild(label);
     appendContinueSwitch(siteContent);
     appendFilterControls(siteContent, catalogRule);
-    schedulePositionBreathingRoom();
     return;
   }
   const renderEnabled = (granted, playerGranted = true) => {
@@ -455,7 +428,6 @@ function renderSite() {
         });
       }, activeScheme());
     }));
-    schedulePositionBreathingRoom();
     return;
   }
   const heading = document.createElement("p");
@@ -536,7 +508,6 @@ function renderSite() {
   forgetSite.className = "link-button";
   links.appendChild(forgetSite);
   siteContent.appendChild(links);
-  schedulePositionBreathingRoom();
   };
   chrome.permissions.contains({ origins: [HOA_SITES.matchPattern(activeHost, activeScheme())] }, granted => {
     const players = HOA_SITES.playerHosts(activeHost);
@@ -590,7 +561,6 @@ function render() {
   // Just videos and sites: everything on the page except channels, each counted once, whichever list it is on.
   const videoKeys = new Set([...Object.keys(videoAdded), ...continuing, ...later, ...categories]);
   addedSummary.textContent = HOA.addedCountText(videoKeys.size, new Set(Array.from(videoKeys, HOA.siteOf)).size);
-  schedulePositionBreathingRoom();
 }
 
 openHiddenButton.addEventListener("click", () => {
