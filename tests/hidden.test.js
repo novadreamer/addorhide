@@ -4,9 +4,9 @@ const path = require("node:path");
 let JSDOM;
 try { JSDOM = require(process.env.JSDOM_PATH || "jsdom").JSDOM; } catch (error) { console.log("hidden.test.js: SKIPPED (jsdom not installed; set JSDOM_PATH to run it)"); process.exit(0); }
 const root = path.join(__dirname, ".."); const read = file => fs.readFileSync(path.join(root, file), "utf8"); const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function load({ hiddenItems = {}, hiddenChannels = {}, watchProgress = {}, hiddenViewPrefs = {}, breakSite = "" } = {}) {
+async function load({ hiddenItems = {}, hiddenChannels = {}, watchProgress = {}, hiddenViewPrefs = {}, siteRules = {}, breakSite = "" } = {}) {
   const dom = new JSDOM(read("hidden.html"), { url: "https://extension.test/hidden.html", runScripts: "outside-only", pretendToBeVisual: true });
-  const { window } = dom; const store = { hiddenItems, hiddenChannels, watchedShown: {}, watchProgress, hiddenViewPrefs }; const listeners = []; const clone = value => JSON.parse(JSON.stringify(value));
+  const { window } = dom; const store = { hiddenItems, hiddenChannels, watchedShown: {}, watchProgress, hiddenViewPrefs, siteRules }; const listeners = []; const clone = value => JSON.parse(JSON.stringify(value));
   window.scrollTo = () => {}; window.chrome = { runtime: { getURL: value => value, lastError: null }, tabs: { create() {} }, windows: { getCurrent(callback) { callback({}); } }, storage: { local: {
     get(defaults, callback) { const result = {}; Object.keys(defaults).forEach(key => { result[key] = key in store ? clone(store[key]) : defaults[key]; }); setTimeout(() => callback(result), 0); },
     set(values, callback) { Object.entries(values).forEach(([key, value]) => { store[key] = clone(value); }); setTimeout(() => { listeners.forEach(listener => listener({}, "local")); if (callback) callback(); }, 0); }
@@ -34,9 +34,10 @@ async function load({ hiddenItems = {}, hiddenChannels = {}, watchProgress = {},
   check("watched hidden videos render their own group", () => assert.ok(watched.document.querySelector(".site-group[data-site='watched-videos']")));
   watched.document.querySelector("#hidden-restore-watched-watched").click(); await wait(15);
   check("Watched Videos still restores every watched entry", () => assert.equal(watched.store.hiddenItems[key], undefined)); watched.window.close();
+  const watchedOn = { "www.youtube.com": { enabled: true, hideKinds: ["watched"] } };
   const progress = (title, position = 590) => ({ site: "youtube.com", title, url: "", thumbnail: "", duration: 600, position, buckets: "0000000000000000000000000", watched: true, ts: 1, updated: 2 });
   const seenOne = "https://www.youtube.com/watch?v=aaaaaaaaaaa"; const seenTwo = "https://www.youtube.com/watch?v=bbbbbbbbbbb"; const siteVideo = "https://tubitv.com/movies/only";
-  const mixed = await load({ hiddenItems: { [siteVideo]: { title: "Only", thumb: "", site: "tubitv.com", listed: true, ts: 1 } }, watchProgress: { [seenOne]: progress("Seen one"), [seenTwo]: progress("Seen two") } });
+  const mixed = await load({ hiddenItems: { [siteVideo]: { title: "Only", thumb: "", site: "tubitv.com", listed: true, ts: 1 } }, watchProgress: { [seenOne]: progress("Seen one"), [seenTwo]: progress("Seen two") }, siteRules: watchedOn });
   const watchedRows = page => page.document.querySelectorAll(".site-group[data-site='watched-videos'] [id^='hidden-restore-']:not(.group-restore-all)").length;
   check("watched-only videos are listed", () => assert.equal(watchedRows(mixed), 2));
   check("the header counts them", () => assert.match(mixed.document.querySelector(".hidden-header-copy .muted").textContent, /^3 hidden videos/));
@@ -48,7 +49,21 @@ async function load({ hiddenItems = {}, hiddenChannels = {}, watchProgress = {},
   check("removing a watched-only video keeps it off the list", () => { assert.equal(mixed.document.querySelector(".site-group[data-site='watched-videos']"), null); assert.equal(Object.values(mixed.store.watchProgress).filter(entry => entry.unlisted).length, 1); });
   check("watched history survives removing it from the list", () => assert.equal(Object.values(mixed.store.watchProgress).filter(entry => entry.watched).length, 2));
   mixed.window.close();
-  const autoHidden = await load({ hiddenItems: { [seenOne]: { title: "Auto", thumb: "", site: "youtube.com", reason: "watched", listed: true, ts: 1 } }, watchProgress: { [seenOne]: progress("Auto") } });
+  const off = await load({ watchProgress: { [seenOne]: progress("Seen one") }, siteRules: { "www.youtube.com": { enabled: true, hideKinds: [] } } });
+  check("with Watched off a watched video stays in the feed, so it is not listed", () => { assert.equal(off.document.querySelector(".site-group[data-site='watched-videos']"), null); });
+  off.window.close();
+  const toggled = await load({ watchProgress: { [seenOne]: progress("Seen one"), [seenTwo]: { ...progress("Seen two"), unlisted: true }, "https://tubitv.com/movies/1/x": { ...progress("Tubi"), site: "tubitv.com", unlisted: true } }, siteRules: watchedOn });
+  toggled.store.watchedShown = { [seenOne]: 5, "https://tubitv.com/movies/1/x": 5 };
+  toggled.window.eval(`${read("shared.js")}
+;HOA.resetWatched("www.youtube.com", false);`); await wait(30);
+  check("turning Watched on or off clears that site's restores and removals", () => {
+    assert.deepEqual(Object.keys(toggled.store.watchedShown), ["https://tubitv.com/movies/1/x"]);
+    assert.equal(toggled.store.watchProgress[seenTwo].unlisted, undefined);
+    assert.equal(toggled.store.watchProgress["https://tubitv.com/movies/1/x"].unlisted, true);
+    assert.equal(toggled.store.watchProgress[seenTwo].watched, true);
+  });
+  toggled.window.close();
+  const autoHidden = await load({ hiddenItems: { [seenOne]: { title: "Auto", thumb: "", site: "youtube.com", reason: "watched", listed: true, ts: 1 } }, watchProgress: { [seenOne]: progress("Auto") }, siteRules: watchedOn });
   autoHidden.document.querySelector(".site-group[data-site='watched-videos'] [id^='hidden-remove-']:not(.site-remove-all)").click(); await wait(25);
   check("a removed auto-hidden video does not come back through its progress", () => { assert.equal(autoHidden.document.querySelector(".site-group[data-site='watched-videos']"), null); assert.equal(autoHidden.store.hiddenItems[seenOne].listed, false); });
   autoHidden.window.close();

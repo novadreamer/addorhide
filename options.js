@@ -289,7 +289,7 @@ function saveFilterRule(host, categories, kinds, keywords, hideSections = siteRu
   } };
   siteRulesWrittenHere = true;
   chrome.storage.local.set({ [HOA.SITES_KEY]: siteRules }, () => renderFilterSites());
-  if (wasWatched && !nextKinds.includes("watched")) HOA.clearAutoWatched(host);
+  if (wasWatched !== nextKinds.includes("watched")) HOA.resetWatched(host, wasWatched);
 }
 
 function saveFeaturedCarousels(host, included) {

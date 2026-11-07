@@ -6,6 +6,7 @@
   let hidden = {};
   let channels = {};
   let watchedShown = {};
+  let siteRules = {};
   let watchProgress = {};
   let prefs = {};
   let pageStatusText = "";
@@ -465,7 +466,7 @@
     const watchedEntries = entries.filter(([, entry]) => entry.reason === "watched" || entry.watched === true);
     const watchedKeys = new Set(watchedEntries.map(([key]) => key));
     // Watched but with no hidden record. Restored or removed ones stay off; a record of any kind speaks for itself.
-    const watchOnly = HOA.watchedOnlyKeys(watchProgress, hidden, watchedShown).map(key => [key, watchProgress[key]]).map(([key, entry]) => [key, { title: entry.title, thumb: entry.thumbnail || "", site: entry.site, kind: HOA.kindOf(key), ts: entry.updated, listed: false, watched: true, reason: "watched" }]);
+    const watchOnly = HOA.watchedOnlyKeys(watchProgress, hidden, watchedShown, siteRules).map(key => [key, watchProgress[key]]).map(([key, entry]) => [key, { title: entry.title, thumb: entry.thumbnail || "", site: entry.site, kind: HOA.kindOf(key), ts: entry.updated, listed: false, watched: true, reason: "watched" }]);
     watchedEntries.push(...watchOnly);
     const everyEntry = [...entries, ...watchOnly];
     const groups = groupsFor(entries.filter(([, entry]) => entry.reason !== "watched" && entry.watched !== true));
@@ -550,15 +551,16 @@
       channels = lists.channels;
       watchedShown = lists.watchedShown;
       watchProgress = lists.watchProgress;
-      chrome.storage.local.get({ [HIDDEN_PREFS_KEY]: {} }, result => {
+      chrome.storage.local.get({ [HIDDEN_PREFS_KEY]: {}, [HOA.SITES_KEY]: {} }, result => {
         prefs = normalizePrefs(result[HIDDEN_PREFS_KEY]);
+        siteRules = result[HOA.SITES_KEY] && typeof result[HOA.SITES_KEY] === "object" ? result[HOA.SITES_KEY] : {};
         render();
       });
     });
   }
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.CHANNELS_KEY] || changes[HOA.WATCHED_SHOWN_KEY] || changes[HOA.PROGRESS_KEY] || changes[HIDDEN_PREFS_KEY])) {
+    if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.CHANNELS_KEY] || changes[HOA.WATCHED_SHOWN_KEY] || changes[HOA.PROGRESS_KEY] || changes[HIDDEN_PREFS_KEY] || changes[HOA.SITES_KEY])) {
       if (ignoreOwnStorageChange) { ignoreOwnStorageChange = false; return; }
       refresh();
     }

@@ -262,7 +262,7 @@ function appendFilterControls(container, catalogRule) {
     saveSiteRules({ ...siteRules, [activeHost]: { ...siteRule(activeHost), enabled: siteRule(activeHost).enabled !== false,
       hideKinds: HOA.normalizeHideKinds(kinds, categories.map(c => c.id)), hideKeywords: HOA.normalizeKeywords(keywords), hideSections: HOA.normalizeSectionTitles(hideSections), featuredCarousels } }, "Filter settings saved.");
     updateSummary();
-    if (hadWatched && !hasWatched) HOA.clearAutoWatched(activeHost);
+    if (hadWatched !== hasWatched) HOA.resetWatched(activeHost, hadWatched);
     window.setTimeout(() => refreshCount(), 400);
   }
   function openPanel() {
@@ -540,7 +540,7 @@ function render() {
   if (rowsRefresh) { window.clearInterval(rowsRefresh); rowsRefresh = 0; }
   const listed = HOA.listedHidden(hidden);
   // The same videos the Hidden Videos page lists, watched ones included.
-  const watchOnly = HOA.watchedOnlyKeys(watchProgress, hidden, watchedShown);
+  const watchOnly = HOA.watchedOnlyKeys(watchProgress, hidden, watchedShown, siteRules);
   const count = listed.length + watchOnly.length;
   openHiddenButton.disabled = count === 0 && Object.keys(channels).length === 0;
   hiddenSummary.textContent = HOA.hiddenSummaryText(count, new Set([...listed.map(([key]) => key), ...watchOnly].map(HOA.siteOf)).size);

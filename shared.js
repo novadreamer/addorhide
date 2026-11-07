@@ -1293,21 +1293,38 @@ var HOA = Object.freeze((() => {
     return normalizeWatchedShown(next);
   }
 
-  function clearAutoWatched(host) {
+  // Watched was turned on or off for a site: a fresh start for its watched videos. Videos restored or removed
+  // from the list under the old setting follow the new one, and turning it off returns the auto-hidden ones.
+  function resetWatched(host, turnedOff) {
     readLists(lists => {
       const site = String(host || "").replace(/^www\./, "");
+      const onSite = (key, entry) => String((entry && entry.site) || siteOf(key) || "").replace(/^www\./, "") === site;
       const hidden = { ...lists.hidden };
       const watchedShown = { ...lists.watchedShown };
-      let changed = false;
-      Object.entries(hidden).forEach(([key, entry]) => {
-        if (entry && entry.reason === "watched" && String(entry.site || siteOf(key) || "").replace(/^www\./, "") === site) {
-          delete hidden[key];
-          delete watchedShown[key];
-          changed = true;
-        }
+      const watchProgress = { ...lists.watchProgress };
+      const changed = {};
+      if (turnedOff) {
+        Object.entries(hidden).forEach(([key, entry]) => {
+          if (entry && entry.reason === "watched" && onSite(key, entry)) { delete hidden[key]; changed.hidden = true; }
+        });
+      }
+      Object.keys(watchedShown).forEach(key => { if (onSite(key)) { delete watchedShown[key]; changed.watchedShown = true; } });
+      Object.entries(watchProgress).forEach(([key, entry]) => {
+        if (entry && entry.unlisted && onSite(key, entry)) { const { unlisted, ...rest } = entry; watchProgress[key] = rest; changed.watchProgress = true; }
       });
-      if (changed) writeLists({ hidden, watchedShown });
+      if (Object.keys(changed).length) {
+        writeLists({ ...(changed.hidden ? { hidden } : {}), ...(changed.watchedShown ? { watchedShown } : {}), ...(changed.watchProgress ? { watchProgress } : {}) });
+      }
     });
+  }
+
+  function clearAutoWatched(host) { resetWatched(host, true); }
+
+  // Whether this site hides watched videos, so they belong on the Hidden Videos list.
+  function watchedHiddenOn(siteRules, site) {
+    const bare = String(site || "").replace(/^www\./, "");
+    return Object.entries(siteRules || {}).some(([host, rule]) => host.replace(/^www\./, "") === bare && rule
+      && rule.enabled !== false && Array.isArray(rule.hideKinds) && rule.hideKinds.includes("watched"));
   }
 
   function listedHidden(hidden) {
@@ -1316,11 +1333,13 @@ var HOA = Object.freeze((() => {
       .sort((left, right) => right[1].ts - left[1].ts || left[0].localeCompare(right[0]));
   }
 
-  // Listed under Watched Videos with no hidden record of their own. Restored or removed ones stay off.
-  function watchedOnlyKeys(progress, hidden, shown) {
+  // Listed under Watched Videos with no hidden record of their own. Restored or removed ones stay off, and so do
+  // videos on sites where Watched is off: those stay in the feed with their Watched tag, so nothing is hidden.
+  function watchedOnlyKeys(progress, hidden, shown, siteRules) {
     return Object.keys(progress || {}).filter(key => {
       const entry = progress[key];
-      return entry && entry.watched && !entry.untagged && !entry.unlisted && !(hidden && hidden[key]) && !(shown && shown[key]);
+      return entry && entry.watched && !entry.untagged && !entry.unlisted && !(hidden && hidden[key]) && !(shown && shown[key])
+        && (siteRules === undefined || watchedHiddenOn(siteRules, entry.site || siteOf(key)));
     });
   }
 
@@ -2164,6 +2183,8 @@ var HOA = Object.freeze((() => {
     channelLinkKey,
     markWatchedShown,
     clearAutoWatched,
+    resetWatched,
+    watchedHiddenOn,
     prepareUnhideAll,
     clearWatchHistory,
     buildBackup,
