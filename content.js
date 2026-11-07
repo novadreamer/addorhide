@@ -57,6 +57,8 @@ window.__hoaLoaded = true;
   let watchedShown = {};
   let watchProgress = {};
   let watchLater = {};
+  let cardLinks = {};
+  let resolvingCardLink = false;
   let hasWatchProgress = false;
   let watchSettings = { tagWatched: true, continueWatching: "auto" };
   let watchedWriteTimer = 0;
@@ -261,6 +263,7 @@ window.__hoaLoaded = true;
       merged.linkSelector = "";
       merged.titleCandidates = [];
       merged.meta = { texts: ["*"] };
+      merged.pickedCards = validPicks.join(",");
     }
     if (!validSelector(merged.cardSelector)) {
       return null;
@@ -1058,8 +1061,8 @@ window.__hoaLoaded = true;
   }
 
   function pickedTitle(card, link) {
-    const linkLabel = plausiblePickedTitle(link.getAttribute("aria-label"))
-      || plausiblePickedTitle(link.getAttribute("title"));
+    const linkLabel = plausiblePickedTitle(link && link.getAttribute("aria-label"))
+      || plausiblePickedTitle(link && link.getAttribute("title"));
     if (linkLabel) {
       return linkLabel;
     }
@@ -1132,7 +1135,15 @@ window.__hoaLoaded = true;
     const linkInfo = getLinkInfo(card, rule);
     const link = linkInfo.link;
     if (!link) {
-      return null;
+      if (!rule.pickedCards) return null;
+      const heading = card.querySelector("h1, h2, h3, h4");
+      const image = card.querySelector("img[alt]");
+      const title = HOA.cleanTitle(textFrom(heading) || (image && image.getAttribute("alt")) || pickedTitle(card, null)).slice(0, HOA.MAX_TITLE);
+      const formerKey = HOA.cardKey(location.origin, title);
+      if (!formerKey) return null;
+      const key = cardLinks[formerKey] || formerKey;
+      return { key, title, thumb: image && (image.currentSrc || image.src || image.getAttribute("src")) || "", kind: HOA.kindOf(key), site: HOA.siteOf(key), ts: Date.now(), linkless: true,
+        ...(key !== formerKey ? { formerKey } : {}) };
     }
     const href = (rule.linkAttribute && link.getAttribute(rule.linkAttribute)) || link.href || link.getAttribute("href");
     const key = keyForHref(href, rule);
@@ -1385,7 +1396,50 @@ window.__hoaLoaded = true;
     card.classList.remove("hoa-host", "hoa-show");
   }
 
-  function hideEntry(data, watched = false) {
+  async function resolveCardLink(card) {
+    if (!window.navigation || resolvingCardLink) return null;
+    const origin = location.origin;
+    const targets = [card, card.parentElement, card.parentElement && card.parentElement.parentElement].filter(Boolean);
+    resolvingCardLink = true;
+    try {
+      for (const target of targets) {
+        const result = await new Promise(resolve => {
+          let done = false;
+          const finish = value => { if (!done) { done = true; window.navigation.removeEventListener("navigate", onNavigate); window.clearTimeout(timer); resolve(value); } };
+          const onNavigate = event => {
+            try {
+              const url = new URL(event && event.destination && event.destination.url);
+              if ((url.protocol === "http:" || url.protocol === "https:") && url.origin === origin && url.href !== location.href) {
+                if (event.cancelable) event.preventDefault();
+                finish(HOA.canonicalUrl(url.href));
+              }
+            } catch (error) { /* ignore unrelated navigation */ }
+          };
+          const timer = window.setTimeout(() => finish(null), 150);
+          window.navigation.addEventListener("navigate", onNavigate);
+          try { target.click(); } catch (error) { finish(null); }
+        });
+        if (result) return result;
+      }
+    } finally {
+      resolvingCardLink = false;
+    }
+    return null;
+  }
+
+  async function resolveLinkless(data) {
+    // Already known: no need to click the card again.
+    if (!data.linkless || data.formerKey) return data;
+    const realKey = await resolveCardLink(data.card);
+    if (!realKey) return data;
+    cardLinks = { ...cardLinks, [data.formerKey || data.key]: realKey };
+    HOA.writeLists({ cardLinks });
+    return { ...data, key: realKey, formerKey: data.formerKey || data.key };
+  }
+
+  async function hideEntry(data, watched = false) {
+    data = await resolveLinkless(data);
+    migrateFormerKey(data);
     const entry = { ...data, ts: Date.now(), listed: true };
     delete entry.card;
     if (watched === true) entry.watched = true;
@@ -1438,7 +1492,9 @@ window.__hoaLoaded = true;
     }
   }
 
-  function toggleAdd(data, button) {
+  async function toggleAdd(data, button) {
+    data = await resolveLinkless(data);
+    migrateFormerKey(data);
     added = HOA.toggleAdded(added, data.key, data);
     try {
       HOA.writeLists({ added });
@@ -1587,10 +1643,10 @@ window.__hoaLoaded = true;
       actions.dataset.hoaOwner = ownInstance;
       // Sites recycle card elements for other items, so handlers read the current
       // item from the actions node instead of capturing the first one.
-      const add = actionButton("Add", button => toggleAdd({ ...actions.hoaData, ...cardMeta(actions.hoaCard, actions.hoaRule, actions.hoaData.key) }, button));
+      const add = actionButton("Add", button => toggleAdd({ ...actions.hoaData, card: actions.hoaCard, ...cardMeta(actions.hoaCard, actions.hoaRule, actions.hoaData.key) }, button));
       add.dataset.action = "add";
       actions.appendChild(add);
-      const hide = actionButton("Hide", () => hideEntry({ ...actions.hoaData, ...cardMeta(actions.hoaCard, actions.hoaRule, actions.hoaData.key) }, watchedCard(actions.hoaCard, actions.hoaRule, actions.hoaData)));
+      const hide = actionButton("Hide", () => hideEntry({ ...actions.hoaData, card: actions.hoaCard, ...cardMeta(actions.hoaCard, actions.hoaRule, actions.hoaData.key) }, watchedCard(actions.hoaCard, actions.hoaRule, actions.hoaData)));
       hide.dataset.action = "hide";
       actions.appendChild(hide);
       const unwatch = actionButton("", () => {
@@ -2644,6 +2700,7 @@ window.__hoaLoaded = true;
     watchedShown = lists.watchedShown;
     watchProgress = lists.watchProgress;
     watchLater = lists.watchLater;
+    cardLinks = lists.cardLinks;
     hasWatchProgress = Object.keys(watchProgress).length > 0;
     listsReady = true;
     scheduleApply();
@@ -2674,6 +2731,7 @@ window.__hoaLoaded = true;
     }
     if (changes[HOA.PROGRESS_KEY]) { watchProgress = HOA.normalizeProgress(changes[HOA.PROGRESS_KEY].newValue); hasWatchProgress = Object.keys(watchProgress).length > 0; }
     if (changes[HOA.WATCH_LATER_KEY]) { watchLater = HOA.normalizeWatchLater(changes[HOA.WATCH_LATER_KEY].newValue); updateWatchLaterButton(); }
+    if (changes[HOA.CARD_LINKS_KEY]) cardLinks = HOA.normalizeCardLinks(changes[HOA.CARD_LINKS_KEY].newValue);
     if (changes[HOA.WATCH_SETTINGS_KEY]) watchSettings = HOA.normalizeWatchSettings(changes[HOA.WATCH_SETTINGS_KEY].newValue);
     if (changes[HOA.SITES_KEY]) {
       siteRules = changes[HOA.SITES_KEY].newValue && typeof changes[HOA.SITES_KEY].newValue === "object"

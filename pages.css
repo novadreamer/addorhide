@@ -372,9 +372,7 @@ button.filter-tool:disabled { opacity: .4; cursor: default; }
 .popup .popup-footer .footer-icon-button { width: 30px; min-width: 30px; padding: 3px; }
 
 /* Round 9. Centred tooltips (tooltip.js). */
-/* No box: the text stands on its own, with a halo of the page colour so it reads over anything beneath it, raised by a shadow. */
-.hoa-tip { position: fixed; z-index: 2147483000; max-width: 260px; padding: 2px 4px; color: var(--text, #222); font-size: 12px; font-weight: 600; line-height: 1.35; text-align: center; pointer-events: none;
-  -webkit-text-stroke: 5px var(--surface, #fff); paint-order: stroke fill; filter: drop-shadow(0 0 2px var(--surface, #fff)) drop-shadow(0 0 3px var(--surface, #fff)) drop-shadow(0 1px 2px rgba(0, 0, 0, .35)); }
+.hoa-tip { position: fixed; z-index: 2147483000; max-width: 260px; padding: 1px 5px; color: #1b1b24; background: #fff; border-radius: 4px; font-size: 12px; font-weight: 600; line-height: 1.3; text-align: center; pointer-events: none; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); }
 /* Site links on one line (taught sites have three), and the status line as a toast that takes no room. */
 .popup .site-links { flex-wrap: nowrap; justify-content: center; gap: 12px; white-space: nowrap; }
 .popup .site-links .link-button { font-size: 12px; }
@@ -405,3 +403,5 @@ body.popup main { scrollbar-width: thin; }
 .popup .site-links { justify-content: center; margin-top: 4px; }
 /* Room either side of Position moves the divider left and centres Position in its half. */
 .popup .position-row { padding: 0 10px; }
+.popup #site-content > .site-title { display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline; }
+.popup .site-title-note { font-size: 12.5px; font-weight: 400; }

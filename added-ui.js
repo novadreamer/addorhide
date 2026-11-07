@@ -314,7 +314,7 @@ const HOA_ADDED = (() => {
     }
 
     function makeCard(key, entry, hasPlayable) {
-      const href = HOA.safeHref(key);
+      const href = HOA.openUrl(key);
       if (!href) {
         return null;
       }
@@ -598,7 +598,7 @@ const HOA_ADDED = (() => {
         if (sort === "last-watched") return Number(entry.updated) || 0; if (sort === "time-left") return Math.max(0, Number(entry.duration) - Number(entry.position)); if (sort === "progress") return Number(entry.duration) > 0 ? Number(entry.position) / Number(entry.duration) : -1; return sort === "site" ? HOA.siteDisplayName(entry.site) : entry.title; };
       const sorted = entries.slice().sort((left, right) => { const a = valueFor(left[1]); const b = valueFor(right[1]); const compare = typeof a === "string" ? a.localeCompare(b, undefined, { sensitivity: "base" }) : a - b; return compare * (dir === "asc" ? 1 : -1) || left[1].title.localeCompare(right[1].title, undefined, { sensitivity: "base" }); });
       HOA.orderGroupsBySort(HOA.groupEntries(sorted, groupMode), sorted, groupMode).forEach(subgroup => { const body = element("section", "added-subgroup"); if (subgroup.label) { const name = element("h3", "subgroup-heading", subgroup.label); name.appendChild(element("span", "count-badge", String(subgroup.entries.length))); body.appendChild(name); }
-        const grid = element("div", `added-card-grid ${categoriesList ? "category-grid" : "landscape-grid"}`); subgroup.entries.forEach(([key, entry]) => { let href = HOA.safeHref(key) || key; if (!later && !savedList) try { const url = new URL(href); if (HOA.siteOf(key) === "youtube.com") url.searchParams.set("t", `${Math.max(0, Math.floor(entry.position - 5))}s`); href = url.href; } catch (error) { /* keep stored URL */ }
+        const grid = element("div", `added-card-grid ${categoriesList ? "category-grid" : "landscape-grid"}`); subgroup.entries.forEach(([key, entry]) => { let href = HOA.openUrl(key) || key; if (!later && !savedList) try { const url = new URL(href); if (HOA.siteOf(key) === "youtube.com") url.searchParams.set("t", `${Math.max(0, Math.floor(entry.position - 5))}s`); href = url.href; } catch (error) { /* keep stored URL */ }
           const card = element("article", `added-card ${channelsList ? "channel-card" : (categoriesList ? "category-card" : (later ? "watch-later-card" : "continue-card"))}`); const media = element("a", "card-media card-external"); media.href = href; media.target = "_blank"; media.rel = "noopener noreferrer"; media.setAttribute("aria-label", `${later || savedList ? "Open" : "Resume"} ${entry.title}`);
           const thumb = later || savedList ? entry.thumb : entry.thumbnail; if (thumb || HOA.youtubeThumb(key)) { const image = document.createElement("img"); image.src = HOA.safeHref(thumb) || HOA.youtubeThumb(key); image.alt = ""; image.loading = "lazy"; media.appendChild(image); } else { const placeholder = element("div", "hoa-placeholder"); if (channelsList) placeholder.innerHTML = PERSON_ICON; if (categoriesList) placeholder.innerHTML = CATEGORY_ICON; media.appendChild(placeholder); }
           if (!later && !savedList && !entry.live) { const bar = element("span", "continue-progress"); bar.style.setProperty("--hoa-progress", `${Math.min(100, entry.position / entry.duration * 100)}%`); media.appendChild(bar); } card.appendChild(media);

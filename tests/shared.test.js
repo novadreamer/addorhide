@@ -26,6 +26,12 @@ check("canonical IMDb video URL", () => assert.equal(HOA.canonicalUrl("https://w
 check("canonical IMDb non-title URL", () => assert.equal(HOA.canonicalUrl("https://m.imdb.com/chart/moviemeter/?ref_=x&pf_rd_i=y&foo=1#hash"), "https://www.imdb.com/chart/moviemeter?foo=1"));
 check("canonical ref tracking params", () => assert.equal(HOA.canonicalUrl("https://example.com/path?ref_=x&pf_rd_i=y&ref_source=z&keep=1"), "https://example.com/path?keep=1"));
 check("reject unsafe URL", () => assert.equal(HOA.canonicalUrl("javascript:alert(1)"), null));
+check("card keys are stable title slugs", () => assert.equal(HOA.cardKey("https://fawesome.tv/browse", "Breakdown!"), "https://fawesome.tv/hoa-card/breakdown"));
+check("card links keep same-site real URLs and cap invalid values", () => assert.deepEqual(HOA.normalizeCardLinks({
+  "https://fawesome.tv/hoa-card/breakdown": "https://fawesome.tv/movies/10863050/breakdown?x=1",
+  "https://fawesome.tv/hoa-card/nope": "https://elsewhere.example/video"
+}), { "https://fawesome.tv/hoa-card/breakdown": "https://fawesome.tv/movies/10863050/breakdown?x=1" }));
+check("openUrl sends unresolved card keys to their home page", () => assert.equal(HOA.openUrl("https://fawesome.tv/hoa-card/breakdown"), "https://fawesome.tv/"));
 check("reject invalid YouTube id", () => assert.equal(HOA.canonicalUrl("https://www.youtube.com/watch?v=bad"), null));
 check("player maps YouTube watch", () => assert.deepEqual(HOA.playerFor(watch), {
   hash: `site=youtube&id=${id}`, siteName: "YouTube"

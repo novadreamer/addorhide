@@ -185,7 +185,7 @@
     const row = element("article", "hidden-row");
     row.appendChild(makeThumbnail(entry));
     const info = element("div", "hidden-info");
-    const href = HOA.safeHref(key);
+    const href = HOA.openUrl(key);
     if (href) {
       const title = element("a", "hidden-title", entry.title || key);
       title.href = href;

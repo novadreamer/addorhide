@@ -161,9 +161,11 @@ if (typeof window !== "undefined") {
 
   // card is the ancestor the selector was built from (not the image under the mouse): its matches must
   // include it, look like it in size, and not be nested in each other.
-  function scoreCandidate(selector, card) {
+  function scoreCandidate(selector, card, linkless = false) {
     const matches = workableMatches(selector);
-    if (!matches || !matches.includes(card) || matches.filter(hasAnchor).length / matches.length < 0.8) {
+    const qualifying = linkless ? matches && matches.filter(match => match.querySelector("img")).length / matches.length >= 0.8
+      : matches && matches.filter(hasAnchor).length / matches.length >= 0.8;
+    if (!matches || !matches.includes(card) || !qualifying) {
       return null;
     }
     const nested = matches.filter(match => matches.some(other => other !== match && other.contains(match))).length;
@@ -171,7 +173,9 @@ if (typeof window !== "undefined") {
       return null;
     }
     const cardArea = area(card);
-    const visibleAreas = matches.map(area).filter(value => value > 0);
+    // Click-only cards are often carousel slides: those off screen are not laid out like the one clicked.
+    const measured = linkless ? matches.filter(match => { const rect = match.getBoundingClientRect(); return rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth; }) : matches;
+    const visibleAreas = measured.map(area).filter(value => value > 0);
     if (cardArea > 0 && visibleAreas.length) {
       const similar = visibleAreas.filter(value => value >= cardArea * 0.4 && value <= cardArea * 2.5).length;
       if (similar / visibleAreas.length < 0.6) {
@@ -207,11 +211,35 @@ if (typeof window !== "undefined") {
       }
       node = node.parentElement;
     }
-    return structural ? structural.selector : null;
+    if (structural) return structural.selector;
+    node = element;
+    for (let level = 0; node && node !== document.documentElement && node !== document.body && level < 12; level += 1) {
+      if (!hasAnchor(node) && node.querySelector("img") && node.querySelector("h1, h2, h3, h4")
+        && !(node.classList && node.classList.contains("pointer-events-none"))) {
+        let best = null;
+        const selectors = new Set(candidateSelectors(node));
+        Array.from(node.classList || []).forEach(token => {
+          try {
+            if (document.querySelectorAll(`.${pickerCssEscape(token)}`).length >= 2) {
+              selectors.add(`${node.localName}.${pickerCssEscape(token)}`);
+            }
+          } catch (error) { /* ignore an unusable class selector */ }
+        });
+        // A carousel's own classes say where a slide is, not what it is: slick-active is only the slides on screen.
+        Array.from(selectors).filter(selector => !/(?:slick|swiper|owl|splide|glide|active|current|selected|hover|focus)/i.test(selector)).forEach(selector => {
+          const scored = scoreCandidate(selector, node, true);
+          if (scored && (!best || scored.matches.length > best.matches.length
+            || (scored.matches.length === best.matches.length && scored.parts < best.parts))) best = scored;
+        });
+        if (best) return best.selector;
+      }
+      node = node.parentElement;
+    }
+    return null;
   }
 
   // Narrow test seam; production pages never set this flag.
-  if (window.__hoaPickerTest) window.__hoaPickerTest = { buildSelector, workableMatches };
+  if (window.__hoaPickerTest) window.__hoaPickerTest = { buildSelector, workableMatches, candidateSelectors };
 
   function setPanel(text) {
     message.textContent = text;

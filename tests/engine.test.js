@@ -1501,6 +1501,48 @@ const CASES = [
     altCategory.window.close();
   }
   {
+    const cardHtml = '<div class="mrItem"><div class="titlePic"><img alt="Breakdown"></div><div class="titleMeta"><h3>Breakdown</h3></div></div>';
+    const rule = { "fawesome.tv": { enabled: true, pickedSelectors: [".mrItem"] } };
+    const navigation = () => {
+      const listeners = new Set();
+      return { listeners, addEventListener(type, listener) { if (type === "navigate") listeners.add(listener); }, removeEventListener(type, listener) { if (type === "navigate") listeners.delete(listener); }, emit(url) { let prevented = false; listeners.forEach(listener => listener({ destination: { url }, cancelable: true, preventDefault() { prevented = true; } })); return prevented; } };
+    };
+    let direct;
+    const resolved = await load({ html: cardHtml, url: "https://fawesome.tv/", siteRules: rule, setup(window) {
+      direct = navigation(); window.navigation = direct;
+      window.document.querySelector(".mrItem").addEventListener("click", () => { direct.prevented = direct.emit("https://fawesome.tv/movies/10863050/breakdown"); });
+    } });
+    const add = resolved.document.querySelector("[data-action='add']");
+    check("a taught linkless card gets a bar and title-based key", () => { assert.ok(add); assert.equal(add.closest(".mrItem").querySelector(".hoa-actions").hoaData.key, "https://fawesome.tv/hoa-card/breakdown"); });
+    add.click(); await wait(35);
+    check("linkless Add resolves and stores the real URL without navigating", () => {
+      assert.ok(resolved.store.addedItems["https://fawesome.tv/movies/10863050/breakdown"]);
+      assert.equal(resolved.store.cardLinks["https://fawesome.tv/hoa-card/breakdown"], "https://fawesome.tv/movies/10863050/breakdown");
+      assert.equal(direct.prevented, true); assert.equal(add.textContent, "Added"); assert.equal(direct.listeners.size, 0);
+    });
+    resolved.window.close();
+    let parent;
+    const parentResolved = await load({ html: `<div class="wrap">${cardHtml}</div>`, url: "https://fawesome.tv/", siteRules: rule, setup(window) {
+      parent = navigation(); window.navigation = parent;
+      window.document.querySelector(".wrap").addEventListener("click", () => parent.emit("https://fawesome.tv/movies/from-parent"));
+    } });
+    parentResolved.document.querySelector("[data-action='add']").click(); await wait(360);
+    check("linkless resolver tries the parent when the card itself does not navigate", () => { assert.ok(parentResolved.store.addedItems["https://fawesome.tv/movies/from-parent"]); assert.equal(parent.listeners.size, 0); });
+    parentResolved.window.close();
+    const fallback = await load({ html: cardHtml, url: "https://fawesome.tv/", siteRules: rule });
+    fallback.document.querySelector("[data-action='add']").click(); await wait(520);
+    check("no navigation falls back to the hoa-card key", () => assert.ok(fallback.store.addedItems["https://fawesome.tv/hoa-card/breakdown"]));
+    fallback.window.close();
+    let foreign;
+    const refused = await load({ html: cardHtml, url: "https://fawesome.tv/", siteRules: rule, setup(window) {
+      foreign = navigation(); window.navigation = foreign;
+      window.document.querySelector(".mrItem").addEventListener("click", () => foreign.emit("https://elsewhere.example/video"));
+    } });
+    refused.document.querySelector("[data-action='add']").click(); await wait(520);
+    check("cross-site navigation is refused and listeners are removed", () => { assert.ok(refused.store.addedItems["https://fawesome.tv/hoa-card/breakdown"]); assert.equal(refused.store.cardLinks, undefined); assert.equal(foreign.listeners.size, 0); });
+    refused.window.close();
+  }
+  {
     const css = new JSDOM(`<!doctype html><style>${read("content.css")}</style><div class="hoa-actions"><button hidden>Hidden action</button></div>`, { pretendToBeVisual: true });
     check("Xumo action buttons with hidden state are not displayed", () => assert.equal(css.window.getComputedStyle(css.window.document.querySelector(".hoa-actions button")).display, "none"));
     css.window.close();

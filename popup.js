@@ -430,18 +430,17 @@ function renderSite() {
     }));
     return;
   }
+  // The title and what has been taught share one line: the popup has no height to spare.
   const heading = document.createElement("p");
-  heading.textContent = isCatalog ? `${catalogRule.name} - supported site` : activeHost;
+  heading.className = "site-title";
+  heading.appendChild(Object.assign(document.createElement("span"), { textContent: isCatalog ? `${catalogRule.name} - supported site` : activeHost }));
   siteContent.appendChild(heading);
   const learnedCount = pickedSelectors(rule).length;
   // Labels follow what the user has actually done on this site. The heading already says a catalog site is supported.
   if (learnedCount || !isCatalog) {
-    const status = document.createElement("p");
-    status.className = "muted";
-    status.textContent = learnedCount
-      ? `You taught ${learnedCount} kind${learnedCount === 1 ? "" : "s"} of card here`
-      : "Pick the cards to finish setup";
-    siteContent.appendChild(status);
+    heading.appendChild(Object.assign(document.createElement("span"), { className: "site-title-note muted", textContent: learnedCount
+      ? `Taught: ${learnedCount} card${learnedCount === 1 ? "" : "s"}`
+      : "Pick the cards to finish setup" }));
   }
   appendPageStatus(siteContent);
   if (!playerGranted) {

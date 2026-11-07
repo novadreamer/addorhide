@@ -11,6 +11,7 @@ var HOA = Object.freeze((() => {
   const SEEN_ROWS_KEY = "seenRows";
   const PROGRESS_KEY = "watchProgress";
   const WATCH_LATER_KEY = "watchLater";
+  const CARD_LINKS_KEY = "cardLinks";
   const WATCH_SETTINGS_KEY = "watchSettings";
   const MAX_HIDDEN = 1000;
   const MAX_CHANNELS = 500;
@@ -18,6 +19,7 @@ var HOA = Object.freeze((() => {
   const MAX_ADDED = 500;
   const MAX_PROGRESS = 1500;
   const MAX_WATCH_LATER = 1500;
+  const MAX_CARD_LINKS = 2000;
   // A resume is meaningful once it can land five seconds back from a real later point.
   const MIN_RESUME_SECONDS = 10;
   const MAX_TITLE = 200;
@@ -456,6 +458,30 @@ var HOA = Object.freeze((() => {
       }
     }
     return hasCategoryPath(["category", "categories", "browse", "genre", "genres", "tag", "tags", "topic", "topics", "collection", "collections"]);
+  }
+
+  function cardKey(origin, title) {
+    let base;
+    try { base = new URL(origin).origin; } catch (error) { return ""; }
+    const slug = String(title || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return slug ? `${base}/hoa-card/${slug}` : "";
+  }
+
+  function isHoaCardKey(key) {
+    try { return new URL(key).pathname.startsWith("/hoa-card/"); } catch (error) { return false; }
+  }
+
+  function normalizeCardLinks(value) {
+    const normalized = {};
+    if (!isObject(value)) return normalized;
+    Object.keys(value).forEach(key => {
+      const link = canonicalUrl(value[key]);
+      try {
+        if (isHoaCardKey(key) && link && new URL(key).origin === new URL(link).origin) normalized[key] = link;
+      } catch (error) { /* ignore malformed origins */ }
+    });
+    const keys = Object.keys(normalized);
+    return keys.length <= MAX_CARD_LINKS ? normalized : Object.fromEntries(keys.slice(-MAX_CARD_LINKS).map(key => [key, normalized[key]]));
   }
 
   function isPlayerSurface(element, pageUrl) {
@@ -1131,7 +1157,7 @@ var HOA = Object.freeze((() => {
       return normalized;
     }
     Object.keys(value).forEach(key => {
-      if (canonicalUrl(key) !== key) {
+      if (canonicalUrl(key) !== key && !isHoaCardKey(key)) {
         return;
       }
       const raw = value[key];
@@ -1799,6 +1825,7 @@ var HOA = Object.freeze((() => {
       watchedShown: normalizeWatchedShown(source.watchedShown),
       watchProgress: normalizeProgress(source.watchProgress),
       watchLater: normalizeWatchLater(source.watchLater),
+      cardLinks: normalizeCardLinks(source.cardLinks),
       seenRows: sanitizeBackupSeenRows(source.seenRows),
       hiddenViewPrefs: sanitizeBackupHiddenPrefs(source.hiddenViewPrefs),
       watchSettings: normalizeWatchSettings(source.watchSettings),
@@ -1837,6 +1864,7 @@ var HOA = Object.freeze((() => {
         watchedShown: normalizeWatchedShown(value.watchedShown),
         watchProgress: normalizeProgress(value.watchProgress),
         watchLater: normalizeWatchLater(value.watchLater),
+        cardLinks: normalizeCardLinks(value.cardLinks),
         seenRows: sanitizeBackupSeenRows(value.seenRows),
         hiddenViewPrefs: sanitizeBackupHiddenPrefs(value.hiddenViewPrefs),
         watchSettings: isObject(value.watchSettings) ? normalizeWatchSettings(value.watchSettings) : null,
@@ -1900,6 +1928,7 @@ var HOA = Object.freeze((() => {
     const watchedShown = normalizeWatchedShown({ ...normalizeWatchedShown(source.watchedShown), ...normalizeWatchedShown(imported.watchedShown) });
     const watchProgress = normalizeProgress({ ...normalizeProgress(source.watchProgress), ...normalizeProgress(imported.watchProgress) });
     const watchLaterResult = mergeBackupWatchLater(source.watchLater, imported.watchLater);
+    const cardLinks = normalizeCardLinks({ ...normalizeCardLinks(source.cardLinks), ...normalizeCardLinks(imported.cardLinks) });
     const seenRows = sanitizeBackupSeenRows(source.seenRows);
     Object.entries(sanitizeBackupSeenRows(imported.seenRows)).forEach(([host, rows]) => {
       seenRows[host] = normalizeSectionTitles([...(seenRows[host] || []), ...rows]).slice(-150);
@@ -1942,6 +1971,7 @@ var HOA = Object.freeze((() => {
       watchedShown,
       watchProgress,
       watchLater: watchLaterResult.items,
+      cardLinks,
       seenRows,
       hiddenViewPrefs,
       watchSettings,
@@ -1955,20 +1985,28 @@ var HOA = Object.freeze((() => {
     return canonicalUrl(url) || null;
   }
 
+  function openUrl(key) {
+    if (isHoaCardKey(key)) {
+      try { return new URL(key).origin + "/"; } catch (error) { return null; }
+    }
+    return safeHref(key);
+  }
+
   function readLists(callback) {
     const cb = typeof callback === "function" ? callback : () => {};
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
-      cb({ hidden: {}, added: {}, channels: {}, watchedShown: {}, watchProgress: {}, watchLater: {} });
+      cb({ hidden: {}, added: {}, channels: {}, watchedShown: {}, watchProgress: {}, watchLater: {}, cardLinks: {} });
       return;
     }
-    chrome.storage.local.get({ [HIDDEN_KEY]: {}, [ADDED_KEY]: {}, [CHANNELS_KEY]: {}, [WATCHED_SHOWN_KEY]: {}, [PROGRESS_KEY]: {}, [WATCH_LATER_KEY]: {} }, result => {
+    chrome.storage.local.get({ [HIDDEN_KEY]: {}, [ADDED_KEY]: {}, [CHANNELS_KEY]: {}, [WATCHED_SHOWN_KEY]: {}, [PROGRESS_KEY]: {}, [WATCH_LATER_KEY]: {}, [CARD_LINKS_KEY]: {} }, result => {
       cb({
         hidden: normalizeItems(result[HIDDEN_KEY], { max: MAX_HIDDEN, withListed: true }),
         added: normalizeItems(result[ADDED_KEY], { max: MAX_ADDED, withListed: false }),
         channels: normalizeChannels(result[CHANNELS_KEY]),
         watchedShown: normalizeWatchedShown(result[WATCHED_SHOWN_KEY]),
         watchProgress: normalizeProgress(result[PROGRESS_KEY]),
-        watchLater: normalizeWatchLater(result[WATCH_LATER_KEY])
+        watchLater: normalizeWatchLater(result[WATCH_LATER_KEY]),
+        cardLinks: normalizeCardLinks(result[CARD_LINKS_KEY])
       });
     });
   }
@@ -1990,6 +2028,7 @@ var HOA = Object.freeze((() => {
     if (lists && Object.prototype.hasOwnProperty.call(lists, "watchedShown")) payload[WATCHED_SHOWN_KEY] = normalizeWatchedShown(lists.watchedShown);
     if (lists && Object.prototype.hasOwnProperty.call(lists, "watchProgress")) payload[PROGRESS_KEY] = normalizeProgress(lists.watchProgress);
     if (lists && Object.prototype.hasOwnProperty.call(lists, "watchLater")) payload[WATCH_LATER_KEY] = normalizeWatchLater(lists.watchLater);
+    if (lists && Object.prototype.hasOwnProperty.call(lists, "cardLinks")) payload[CARD_LINKS_KEY] = normalizeCardLinks(lists.cardLinks);
     chrome.storage.local.set(payload, cb);
   }
 
@@ -2032,6 +2071,7 @@ var HOA = Object.freeze((() => {
     SEEN_ROWS_KEY,
     PROGRESS_KEY,
     WATCH_LATER_KEY,
+    CARD_LINKS_KEY,
     WATCH_SETTINGS_KEY,
     PREFS_KEY,
     THEME_KEY,
@@ -2048,6 +2088,7 @@ var HOA = Object.freeze((() => {
     MAX_HIDDEN,
     MAX_WATCHED_SHOWN,
     MAX_ADDED,
+    MAX_CARD_LINKS,
     MAX_TITLE,
     MAX_URL,
     HOSTED_ADDED_URL,
@@ -2057,6 +2098,8 @@ var HOA = Object.freeze((() => {
     playerFor,
     playerSiteName,
     siteOf,
+    cardKey,
+    normalizeCardLinks,
     kindOf,
     chooseCardLink,
     isChannelUrl,
@@ -2119,6 +2162,7 @@ var HOA = Object.freeze((() => {
     removeFromList,
     toggleAdded,
     safeHref,
+    openUrl,
     readLists,
     writeLists,
     readPrefs,
