@@ -86,6 +86,7 @@ var HOA = Object.freeze((() => {
       const entry = { site: siteOf(canonical), title: title || fallbackTitle(canonical), url: canonical, thumbnail: thumb, duration, position: Math.min(position, duration), buckets: bitmapBuckets(raw.buckets), watched: raw.watched === true, ts: Number.isFinite(raw.ts) ? raw.ts : updated, updated };
       if (Number.isFinite(Number(raw.played)) && Number(raw.played) >= 0) entry.played = Number(raw.played);
       if (raw.untagged === true) entry.untagged = true;
+      if (raw.unlisted === true) entry.unlisted = true;
       if (live) entry.live = true;
       if (raw.cw === "auto" || raw.cw === "manual" || raw.cw === "later") entry.cw = raw.cw === "later" ? "later" : "auto";
       const old = normalized[canonical];
@@ -1315,6 +1316,14 @@ var HOA = Object.freeze((() => {
       .sort((left, right) => right[1].ts - left[1].ts || left[0].localeCompare(right[0]));
   }
 
+  // Listed under Watched Videos with no hidden record of their own. Restored or removed ones stay off.
+  function watchedOnlyKeys(progress, hidden, shown) {
+    return Object.keys(progress || {}).filter(key => {
+      const entry = progress[key];
+      return entry && entry.watched && !entry.untagged && !entry.unlisted && !(hidden && hidden[key]) && !(shown && shown[key]);
+    });
+  }
+
   function restoreKeys(hidden, keys) {
     const next = { ...(hidden || {}) };
     (keys || []).forEach(key => delete next[key]);
@@ -2161,6 +2170,7 @@ var HOA = Object.freeze((() => {
     parseBackup,
     mergeBackup,
     listedHidden,
+    watchedOnlyKeys,
     restoreKeys,
     removeFromList,
     toggleAdded,

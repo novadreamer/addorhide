@@ -160,7 +160,8 @@
   }
 
   function restoreEntries(keys, message) {
-    const watchedKeys = (keys || []).filter(key => hidden[key] && hidden[key].reason === "watched");
+    // A video listed here only because it was watched has no hidden record: showing it is what restores it.
+    const watchedKeys = (keys || []).filter(key => !hidden[key] || hidden[key].reason === "watched");
     hidden = HOA.restoreKeys(hidden, keys);
     if (watchedKeys.length) watchedShown = HOA.markWatchedShown(watchedShown, watchedKeys);
     pageStatusText = message;
@@ -168,6 +169,24 @@
     ignoreOwnStorageChange = true;
     HOA.writeLists({ hidden, ...(watchedKeys.length ? { watchedShown } : {}) }, () => {
       if (chrome.runtime.lastError) { pageStatusText = "Could not save the hidden videos list."; render(); }
+    });
+  }
+
+  // Off this list, whichever kind of entry it is. Progress changes in other tabs, so it is read fresh.
+  function removeEntries(keys, message) {
+    const watchOnly = (keys || []).filter(key => !hidden[key]);
+    if (!watchOnly.length) { writeHidden(HOA.removeFromList(hidden, keys), message); return; }
+    HOA.readLists(lists => {
+      const progress = { ...lists.watchProgress };
+      watchOnly.forEach(key => { if (progress[key]) progress[key] = { ...progress[key], unlisted: true }; });
+      hidden = HOA.removeFromList(hidden, keys);
+      watchProgress = progress;
+      pageStatusText = message;
+      render();
+      ignoreOwnStorageChange = true;
+      HOA.writeLists({ hidden, watchProgress: progress }, () => {
+        if (chrome.runtime.lastError) { pageStatusText = "Could not save the hidden videos list."; render(); }
+      });
     });
   }
 
@@ -218,7 +237,7 @@
     remove.id = `hidden-remove-${index}`;
     remove.addEventListener("click", () => {
       rowStatus.textContent = "Removed from the list; videos remain hidden.";
-      writeHidden(HOA.removeFromList(hidden, [key]), "Removed from the list; videos remain hidden.");
+      removeEntries([key], "Removed from the list; videos remain hidden.");
     });
     actions.appendChild(restore);
     actions.appendChild(remove);
@@ -316,7 +335,7 @@
         clearTimeout(pendingTimer);
         siteRemoveConfirmations.delete(group.site);
         const keys = group.entries.map(([key]) => key);
-        writeHidden(HOA.removeFromList(hidden, keys), "Removed from the list; videos remain hidden.");
+        removeEntries(keys, "Removed from the list; videos remain hidden.");
         return;
       }
       const timer = window.setTimeout(() => {
@@ -445,33 +464,36 @@
     const entries = HOA.listedHidden(hidden);
     const watchedEntries = entries.filter(([, entry]) => entry.reason === "watched" || entry.watched === true);
     const watchedKeys = new Set(watchedEntries.map(([key]) => key));
-    Object.entries(watchProgress).filter(([key, entry]) => entry && entry.watched && !entry.untagged && !watchedKeys.has(key)).forEach(([key, entry]) => watchedEntries.push([key, { title: entry.title, thumb: entry.thumbnail || "", site: entry.site, kind: HOA.kindOf(key), ts: entry.updated, listed: false, watched: true, reason: "watched" }]));
+    // Watched but with no hidden record. Restored or removed ones stay off; a record of any kind speaks for itself.
+    const watchOnly = HOA.watchedOnlyKeys(watchProgress, hidden, watchedShown).map(key => [key, watchProgress[key]]).map(([key, entry]) => [key, { title: entry.title, thumb: entry.thumbnail || "", site: entry.site, kind: HOA.kindOf(key), ts: entry.updated, listed: false, watched: true, reason: "watched" }]);
+    watchedEntries.push(...watchOnly);
+    const everyEntry = [...entries, ...watchOnly];
     const groups = groupsFor(entries.filter(([, entry]) => entry.reason !== "watched" && entry.watched !== true));
     const channelEntries = Object.entries(channels).map(([key, entry]) => [key, { ...entry, title: channelTitle(key, entry) }]);
     const header = element("header", "hidden-header");
     const copy = element("div", "hidden-header-copy");
     const title = element("h1", "", "Hidden videos");
-    title.appendChild(element("span", "count-badge", String(entries.length)));
+    title.appendChild(element("span", "count-badge", String(everyEntry.length)));
     copy.appendChild(title);
-    const allSites = new Set(entries.map(([key, entry]) => siteFor(key, entry)).filter(Boolean));
-    const videoSummary = entries.length
-      ? `${entries.length} hidden video${entries.length === 1 ? "" : "s"} on ${allSites.size} website${allSites.size === 1 ? "" : "s"}`
+    const allSites = new Set(everyEntry.map(([key, entry]) => siteFor(key, entry)).filter(Boolean));
+    const videoSummary = everyEntry.length
+      ? `${everyEntry.length} hidden video${everyEntry.length === 1 ? "" : "s"} on ${allSites.size} website${allSites.size === 1 ? "" : "s"}`
       : "";
     const channelSummary = channelEntries.length ? `${channelEntries.length} hidden channel${channelEntries.length === 1 ? "" : "s"}` : "";
     copy.appendChild(element("p", "muted", [videoSummary, channelSummary].filter(Boolean).join(" · ") || "No hidden videos."));
     const actions = element("div", "page-actions hidden-header-actions");
     const restoreAll = iconButton("restore-button header-restore-all", RESTORE_ALL_ICON, "Restore all: show every video in the feed again");
     restoreAll.id = "hidden-restore-all";
-    restoreAll.disabled = entries.length === 0;
+    restoreAll.disabled = everyEntry.length === 0;
     restoreAll.addEventListener("click", () => {
-      restoreEntries(entries.map(([key]) => key), "Returned to feed.");
+      restoreEntries(everyEntry.map(([key]) => key), "Returned to feed.");
     });
     // Remove all (every site): a bin icon like the per-site ones; the first click opens the bin with a "?", a second
     // click within 4 s removes every video from the list (they stay hidden).
     removeAllButton = element("button", "site-remove-all header-remove-all");
     removeAllButton.type = "button";
     removeAllButton.id = "hidden-remove-all";
-    removeAllButton.disabled = entries.length === 0;
+    removeAllButton.disabled = everyEntry.length === 0;
     const showRemoveAll = armed => {
       if (!removeAllButton) {
         return;
@@ -488,7 +510,7 @@
         clearTimeout(removeAllTimer);
         removeAllTimer = 0;
         showRemoveAll(false);
-        writeHidden(HOA.removeFromList(hidden, entries.map(([key]) => key)), "Removed from the list; videos remain hidden.");
+        removeEntries(everyEntry.map(([key]) => key), "Removed from the list; videos remain hidden.");
         return;
       }
       showRemoveAll(true);
@@ -505,7 +527,7 @@
     const status = element("p", "status hidden-status", pageStatusText);
     status.setAttribute("role", "status");
     root.appendChild(status);
-    if (!entries.length && !channelEntries.length) {
+    if (!everyEntry.length && !channelEntries.length) {
       root.appendChild(element("p", "empty-state hidden-empty muted", "No hidden videos or channels."));
     } else {
       const groupsRoot = element("div", "hidden-groups");

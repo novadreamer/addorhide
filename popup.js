@@ -15,6 +15,7 @@ let hidden = {};
 let added = {};
 let channels = {};
 let watchProgress = {};
+let watchedShown = {};
 let watchLater = {};
 let activeTab = null;
 let activeHost = "";
@@ -538,9 +539,11 @@ function loadSite() {
 function render() {
   if (rowsRefresh) { window.clearInterval(rowsRefresh); rowsRefresh = 0; }
   const listed = HOA.listedHidden(hidden);
-  const count = listed.length;
+  // The same videos the Hidden Videos page lists, watched ones included.
+  const watchOnly = HOA.watchedOnlyKeys(watchProgress, hidden, watchedShown);
+  const count = listed.length + watchOnly.length;
   openHiddenButton.disabled = count === 0 && Object.keys(channels).length === 0;
-  hiddenSummary.textContent = HOA.hiddenSummaryText(count, HOA.groupBySite(Object.fromEntries(listed)).length);
+  hiddenSummary.textContent = HOA.hiddenSummaryText(count, new Set([...listed.map(([key]) => key), ...watchOnly].map(HOA.siteOf)).size);
   let channelSummary = document.getElementById("hidden-channels-summary");
   if (Object.keys(channels).length) {
     if (!channelSummary) {
@@ -627,8 +630,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === "local" && changes[HOA.THEME_KEY]) {
     refreshThemeToggle();
   }
-  if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.ADDED_KEY] || changes[HOA.CHANNELS_KEY] || changes[HOA.PROGRESS_KEY] || changes[HOA.WATCH_LATER_KEY])) {
-    HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; channels = lists.channels; watchProgress = lists.watchProgress; watchLater = lists.watchLater; render(); });
+  if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.ADDED_KEY] || changes[HOA.CHANNELS_KEY] || changes[HOA.PROGRESS_KEY] || changes[HOA.WATCHED_SHOWN_KEY] || changes[HOA.WATCH_LATER_KEY])) {
+    HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; channels = lists.channels; watchProgress = lists.watchProgress; watchedShown = lists.watchedShown; watchLater = lists.watchLater; render(); });
   }
   if (areaName === "local" && changes[HOA.SITES_KEY]) {
     siteRules = changes[HOA.SITES_KEY].newValue && typeof changes[HOA.SITES_KEY].newValue === "object"
@@ -637,5 +640,5 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     renderSite();
   }
 });
-HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; channels = lists.channels; watchProgress = lists.watchProgress; watchLater = lists.watchLater; render(); });
+HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; channels = lists.channels; watchProgress = lists.watchProgress; watchedShown = lists.watchedShown; watchLater = lists.watchLater; render(); });
 loadSite();

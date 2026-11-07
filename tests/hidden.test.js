@@ -34,6 +34,24 @@ async function load({ hiddenItems = {}, hiddenChannels = {}, watchProgress = {},
   check("watched hidden videos render their own group", () => assert.ok(watched.document.querySelector(".site-group[data-site='watched-videos']")));
   watched.document.querySelector("#hidden-restore-watched-watched").click(); await wait(15);
   check("Watched Videos still restores every watched entry", () => assert.equal(watched.store.hiddenItems[key], undefined)); watched.window.close();
+  const progress = (title, position = 590) => ({ site: "youtube.com", title, url: "", thumbnail: "", duration: 600, position, buckets: "0000000000000000000000000", watched: true, ts: 1, updated: 2 });
+  const seenOne = "https://www.youtube.com/watch?v=aaaaaaaaaaa"; const seenTwo = "https://www.youtube.com/watch?v=bbbbbbbbbbb"; const siteVideo = "https://tubitv.com/movies/only";
+  const mixed = await load({ hiddenItems: { [siteVideo]: { title: "Only", thumb: "", site: "tubitv.com", listed: true, ts: 1 } }, watchProgress: { [seenOne]: progress("Seen one"), [seenTwo]: progress("Seen two") } });
+  const watchedRows = page => page.document.querySelectorAll(".site-group[data-site='watched-videos'] [id^='hidden-restore-']:not(.group-restore-all)").length;
+  check("watched-only videos are listed", () => assert.equal(watchedRows(mixed), 2));
+  check("the header counts them", () => assert.match(mixed.document.querySelector(".hidden-header-copy .muted").textContent, /^3 hidden videos/));
+  mixed.document.querySelector(".site-group[data-site='tubitv.com'] [id^='hidden-restore-']:not(.group-restore-all)").click(); await wait(20);
+  check("restoring the last site video leaves Watched Videos in place", () => assert.equal(watchedRows(mixed), 2));
+  mixed.document.querySelector(".site-group[data-site='watched-videos'] [id^='hidden-restore-']:not(.group-restore-all)").click(); await wait(20);
+  check("restoring a watched-only video takes it off the list and back to the feed", () => { assert.equal(watchedRows(mixed), 1); assert.equal(Object.keys(mixed.store.watchedShown).length, 1); });
+  mixed.document.querySelector(".site-group[data-site='watched-videos'] [id^='hidden-remove-']:not(.site-remove-all)").click(); await wait(30);
+  check("removing a watched-only video keeps it off the list", () => { assert.equal(mixed.document.querySelector(".site-group[data-site='watched-videos']"), null); assert.equal(Object.values(mixed.store.watchProgress).filter(entry => entry.unlisted).length, 1); });
+  check("watched history survives removing it from the list", () => assert.equal(Object.values(mixed.store.watchProgress).filter(entry => entry.watched).length, 2));
+  mixed.window.close();
+  const autoHidden = await load({ hiddenItems: { [seenOne]: { title: "Auto", thumb: "", site: "youtube.com", reason: "watched", listed: true, ts: 1 } }, watchProgress: { [seenOne]: progress("Auto") } });
+  autoHidden.document.querySelector(".site-group[data-site='watched-videos'] [id^='hidden-remove-']:not(.site-remove-all)").click(); await wait(25);
+  check("a removed auto-hidden video does not come back through its progress", () => { assert.equal(autoHidden.document.querySelector(".site-group[data-site='watched-videos']"), null); assert.equal(autoHidden.store.hiddenItems[seenOne].listed, false); });
+  autoHidden.window.close();
   const resilient = await load({ hiddenItems: {
     "https://tubitv.com/movies/broken": { title: "Broken", thumb: "", site: "tubitv.com", listed: true, ts: 1 },
     "https://www.youtube.com/watch?v=stillthere1": { title: "Still there", thumb: "", site: "youtube.com", listed: true, ts: 2 }
