@@ -583,14 +583,12 @@ function render() {
   const categoryCount = addedEntries.filter(([key, entry]) => entry && (entry.kind === "category" || HOA.kindOf(key) === "category")).length;
   const videoAdded = Object.fromEntries(addedEntries.filter(([key, entry]) => !entry || ((entry.kind !== "channel" && HOA.kindOf(key) !== "channel") && (entry.kind !== "category" && HOA.kindOf(key) !== "category"))));
   const addedCount = Object.keys(videoAdded).length;
-  const continuing = Object.values(watchProgress).filter(entry => entry && entry.cw && !entry.watched).length;
-  const later = Object.keys(watchLater || {}).length;
-  openAddedButton.disabled = addedCount === 0 && channelCount === 0 && categoryCount === 0 && continuing === 0 && later === 0;
-  addedSummary.textContent = addedCount || !continuing ? continuing ? `${HOA.addedCountText(addedCount, HOA.groupBySite(videoAdded).length).replace(/\.$/, "")} · ${continuing} to continue.` : HOA.addedCountText(addedCount, HOA.groupBySite(videoAdded).length)
-    : `${continuing} to continue watching.`;
-  if (later) addedSummary.textContent = `${addedSummary.textContent.replace(/\.$/, "")} · ${later} to watch later.`;
-  if (channelCount) addedSummary.textContent = `${addedSummary.textContent.replace(/\.$/, "")} · ${channelCount} channel${channelCount === 1 ? "" : "s"} added.`;
-  if (categoryCount) addedSummary.textContent = `${addedSummary.textContent.replace(/\.$/, "")} · ${categoryCount} ${categoryCount === 1 ? "category" : "categories"} added.`;
+  const continuing = Object.keys(watchProgress).filter(key => watchProgress[key] && watchProgress[key].cw && !watchProgress[key].watched);
+  const later = Object.keys(watchLater || {});
+  openAddedButton.disabled = addedCount === 0 && channelCount === 0 && categoryCount === 0 && continuing.length === 0 && later.length === 0;
+  // Just videos and sites: every video the page lists, each counted once, whichever list it is on.
+  const videoKeys = new Set([...Object.keys(videoAdded), ...continuing, ...later]);
+  addedSummary.textContent = HOA.addedCountText(videoKeys.size, new Set(Array.from(videoKeys, HOA.siteOf)).size);
   schedulePositionBreathingRoom();
 }
 

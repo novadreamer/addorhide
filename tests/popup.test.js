@@ -172,21 +172,21 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   assert.deepEqual(pbsMissingPlayer.registeredScripts.map(script => script.matches[0]), ["https://player.pbs.org/*"], "player permission registers the player-frame script");
   pbsMissingPlayer.window.close();
   const laterPopup = await loadPopup({ watchLater: { "https://www.youtube.com/watch?v=popupwatch1": { title: "Later", thumb: "", site: "youtube.com", url: "https://www.youtube.com/watch?v=popupwatch1", ts: 1 } } });
-  assert.match(laterPopup.document.querySelector("#added-summary").textContent, /1 to watch later/, "popup includes Watch Later in its compact summary");
+  assert.match(laterPopup.document.querySelector("#added-summary").textContent, /1 added video/, "popup counts a Watch Later video");
   assert.equal(laterPopup.document.querySelector("#open-added-button").disabled, false, "Watch Later alone enables Added Videos");
   laterPopup.window.close();
   const channelsPopup = await loadPopup({ addedItems: { "https://www.youtube.com/@creator": { title: "Creator", thumb: "", kind: "channel", site: "youtube.com", ts: 1 } } });
-  assert.match(channelsPopup.document.querySelector("#added-summary").textContent, /1 channel added/, "popup summarizes channels separately from videos");
+  assert.match(channelsPopup.document.querySelector("#added-summary").textContent, /No added videos/, "popup counts videos only, not channels");
   assert.equal(channelsPopup.document.querySelector("#open-added-button").disabled, false, "channels alone enable Added Videos");
   channelsPopup.window.close();
   const mixedPopup = await loadPopup({ addedItems: {
     "https://www.youtube.com/watch?v=popupvid001": { title: "Video", thumb: "", site: "youtube.com", ts: 1 },
     "https://rumble.com/c/creator": { title: "Creator", thumb: "", kind: "channel", site: "rumble.com", ts: 2 }
   } });
-  assert.match(mixedPopup.document.querySelector("#added-summary").textContent, /1 added video.*1.*website.*1 channel added/, "popup video-site summary excludes a channel-only site");
+  assert.match(mixedPopup.document.querySelector("#added-summary").textContent, /^There is 1 added video and 1\swebsite\.$/, "popup video-site summary excludes a channel-only site");
   mixedPopup.window.close();
   const categoriesPopup = await loadPopup({ addedItems: { "https://www.twitch.tv/directory/category/just-chatting": { title: "Just Chatting", thumb: "", kind: "category", site: "twitch.tv", ts: 1 } } });
-  assert.match(categoriesPopup.document.querySelector("#added-summary").textContent, /1 category added/, "popup summarizes categories separately from videos");
+  assert.match(categoriesPopup.document.querySelector("#added-summary").textContent, /No added videos/, "popup counts videos only, not categories");
   assert.equal(categoriesPopup.document.querySelector("#open-added-button").disabled, false, "categories alone enable Added Videos");
   categoriesPopup.window.close();
   console.log("popup.test.js: 46 passed, 0 failed");
