@@ -12,6 +12,7 @@ var HOA = Object.freeze((() => {
   const PROGRESS_KEY = "watchProgress";
   const WATCH_LATER_KEY = "watchLater";
   const CARD_LINKS_KEY = "cardLinks";
+  const WATCHED_PARKED_KEY = "watchedParked";
   const WATCH_SETTINGS_KEY = "watchSettings";
   const MAX_HIDDEN = 1000;
   const MAX_CHANNELS = 500;
@@ -1293,8 +1294,9 @@ var HOA = Object.freeze((() => {
     return normalizeWatchedShown(next);
   }
 
-  // Watched was turned on or off for a site: a fresh start for its watched videos. Videos restored or removed
-  // from the list under the old setting follow the new one, and turning it off returns the auto-hidden ones.
+  // Watched was turned on or off for a site: a fresh start for its watched videos. Videos restored or removed from
+  // the list under the old setting follow the new one. Off returns the auto-hidden ones to the feed; a video known
+  // only from YouTube's own red bar has no watch record to come back from, so it waits here until Watched is on again.
   function resetWatched(host, turnedOff) {
     readLists(lists => {
       const site = String(host || "").replace(/^www\./, "");
@@ -1302,19 +1304,35 @@ var HOA = Object.freeze((() => {
       const hidden = { ...lists.hidden };
       const watchedShown = { ...lists.watchedShown };
       const watchProgress = { ...lists.watchProgress };
+      const watchedParked = { ...lists.watchedParked };
+      const untagged = key => Boolean(watchProgress[key] && watchProgress[key].untagged);
       const changed = {};
-      if (turnedOff) {
-        Object.entries(hidden).forEach(([key, entry]) => {
-          if (entry && entry.reason === "watched" && onSite(key, entry)) { delete hidden[key]; changed.hidden = true; }
+      Object.entries(hidden).forEach(([key, entry]) => {
+        if (!entry || !onSite(key, entry)) return;
+        if (turnedOff && entry.reason === "watched") {
+          if (!(watchProgress[key] && watchProgress[key].watched) && !untagged(key)) { watchedParked[key] = { ...entry, listed: true }; changed.watchedParked = true; }
+          delete hidden[key]; changed.hidden = true;
+        } else if (!turnedOff && entry.listed === false && isWatchedRecord(key, entry, watchProgress)) {
+          hidden[key] = { ...entry, listed: true }; changed.hidden = true;
+        }
+      });
+      if (!turnedOff) {
+        Object.entries(watchedParked).forEach(([key, entry]) => {
+          if (!onSite(key, entry)) return;
+          if (!hidden[key] && !untagged(key)) { hidden[key] = { ...entry, listed: true }; changed.hidden = true; }
+          delete watchedParked[key]; changed.watchedParked = true;
         });
       }
       Object.keys(watchedShown).forEach(key => { if (onSite(key)) { delete watchedShown[key]; changed.watchedShown = true; } });
       Object.entries(watchProgress).forEach(([key, entry]) => {
         if (entry && entry.unlisted && onSite(key, entry)) { const { unlisted, ...rest } = entry; watchProgress[key] = rest; changed.watchProgress = true; }
       });
-      if (Object.keys(changed).length) {
-        writeLists({ ...(changed.hidden ? { hidden } : {}), ...(changed.watchedShown ? { watchedShown } : {}), ...(changed.watchProgress ? { watchProgress } : {}) });
-      }
+      const payload = {};
+      if (changed.hidden) payload.hidden = hidden;
+      if (changed.watchedShown) payload.watchedShown = watchedShown;
+      if (changed.watchProgress) payload.watchProgress = watchProgress;
+      if (changed.watchedParked) payload.watchedParked = watchedParked;
+      if (Object.keys(payload).length) writeLists(payload);
     });
   }
 
@@ -1331,6 +1349,19 @@ var HOA = Object.freeze((() => {
     return Object.entries(hidden || {})
       .filter(([, entry]) => entry && entry.listed !== false)
       .sort((left, right) => right[1].ts - left[1].ts || left[0].localeCompare(right[0]));
+  }
+
+  // A hidden record that belongs in Watched Videos, however it got hidden: a video hidden by hand and watched later too.
+  function isWatchedRecord(key, entry, progress) {
+    const seen = progress && progress[key];
+    return Boolean(entry && (entry.reason === "watched" || entry.watched === true || (seen && seen.watched && !seen.untagged)));
+  }
+
+  // Whether Watched Videos really lists this video. The player button uses it, so it can never claim otherwise.
+  function inWatchedList(key, hidden, progress, shown, siteRules) {
+    const record = hidden && hidden[key];
+    if (record) return record.listed !== false && isWatchedRecord(key, record, progress);
+    return watchedOnlyKeys(progress && progress[key] ? { [key]: progress[key] } : {}, hidden, shown, siteRules).length > 0;
   }
 
   // Listed under Watched Videos with no hidden record of their own. Restored or removed ones stay off, and so do
@@ -1835,12 +1866,12 @@ var HOA = Object.freeze((() => {
   function clearWatchHistory(lists) {
     const source = isObject(lists) ? lists : {};
     const hidden = normalizeItems(source.hidden, { max: MAX_HIDDEN, withListed: true });
-    Object.keys(hidden).forEach(key => { if (hidden[key].reason === "watched") delete hidden[key]; });
+    Object.keys(hidden).forEach(key => { if (hidden[key].reason === "watched") delete hidden[key]; else delete hidden[key].watched; });
     // Watch Later is deliberately user-curated, not watch history.
     // A card's address is only worth keeping while something saved still uses it.
     const kept = new Set([...Object.keys(hidden), ...Object.keys(isObject(source.added) ? source.added : {}), ...Object.keys(normalizeWatchLater(source.watchLater))]);
     const cardLinks = Object.fromEntries(Object.entries(normalizeCardLinks(source.cardLinks)).filter(([, link]) => kept.has(link)));
-    return { hidden, watchedShown: {}, watchProgress: {}, watchLater: normalizeWatchLater(source.watchLater), cardLinks };
+    return { hidden, watchedShown: {}, watchProgress: {}, watchLater: normalizeWatchLater(source.watchLater), cardLinks, watchedParked: {} };
   }
 
   function buildBackup(data, version, nowMs) {
@@ -2026,10 +2057,10 @@ var HOA = Object.freeze((() => {
   function readLists(callback) {
     const cb = typeof callback === "function" ? callback : () => {};
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
-      cb({ hidden: {}, added: {}, channels: {}, watchedShown: {}, watchProgress: {}, watchLater: {}, cardLinks: {} });
+      cb({ hidden: {}, added: {}, channels: {}, watchedShown: {}, watchProgress: {}, watchLater: {}, cardLinks: {}, watchedParked: {} });
       return;
     }
-    chrome.storage.local.get({ [HIDDEN_KEY]: {}, [ADDED_KEY]: {}, [CHANNELS_KEY]: {}, [WATCHED_SHOWN_KEY]: {}, [PROGRESS_KEY]: {}, [WATCH_LATER_KEY]: {}, [CARD_LINKS_KEY]: {} }, result => {
+    chrome.storage.local.get({ [HIDDEN_KEY]: {}, [ADDED_KEY]: {}, [CHANNELS_KEY]: {}, [WATCHED_SHOWN_KEY]: {}, [PROGRESS_KEY]: {}, [WATCH_LATER_KEY]: {}, [CARD_LINKS_KEY]: {}, [WATCHED_PARKED_KEY]: {} }, result => {
       cb({
         hidden: normalizeItems(result[HIDDEN_KEY], { max: MAX_HIDDEN, withListed: true }),
         added: normalizeItems(result[ADDED_KEY], { max: MAX_ADDED, withListed: false }),
@@ -2037,7 +2068,8 @@ var HOA = Object.freeze((() => {
         watchedShown: normalizeWatchedShown(result[WATCHED_SHOWN_KEY]),
         watchProgress: normalizeProgress(result[PROGRESS_KEY]),
         watchLater: normalizeWatchLater(result[WATCH_LATER_KEY]),
-        cardLinks: normalizeCardLinks(result[CARD_LINKS_KEY])
+        cardLinks: normalizeCardLinks(result[CARD_LINKS_KEY]),
+        watchedParked: normalizeItems(result[WATCHED_PARKED_KEY], { max: MAX_HIDDEN, withListed: true })
       });
     });
   }
@@ -2060,6 +2092,7 @@ var HOA = Object.freeze((() => {
     if (lists && Object.prototype.hasOwnProperty.call(lists, "watchProgress")) payload[PROGRESS_KEY] = normalizeProgress(lists.watchProgress);
     if (lists && Object.prototype.hasOwnProperty.call(lists, "watchLater")) payload[WATCH_LATER_KEY] = normalizeWatchLater(lists.watchLater);
     if (lists && Object.prototype.hasOwnProperty.call(lists, "cardLinks")) payload[CARD_LINKS_KEY] = normalizeCardLinks(lists.cardLinks);
+    if (lists && Object.prototype.hasOwnProperty.call(lists, "watchedParked")) payload[WATCHED_PARKED_KEY] = normalizeItems(lists.watchedParked, { max: MAX_HIDDEN, withListed: true });
     chrome.storage.local.set(payload, cb);
   }
 
@@ -2103,6 +2136,7 @@ var HOA = Object.freeze((() => {
     PROGRESS_KEY,
     WATCH_LATER_KEY,
     CARD_LINKS_KEY,
+    WATCHED_PARKED_KEY,
     WATCH_SETTINGS_KEY,
     PREFS_KEY,
     THEME_KEY,
@@ -2184,6 +2218,8 @@ var HOA = Object.freeze((() => {
     markWatchedShown,
     clearAutoWatched,
     resetWatched,
+    isWatchedRecord,
+    inWatchedList,
     watchedHiddenOn,
     prepareUnhideAll,
     clearWatchHistory,

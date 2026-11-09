@@ -1586,7 +1586,8 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
 
   function queueWatched(data) {
     if (hidden[data.key] || watchedShown[data.key]) return;
-    hidden = { ...hidden, [data.key]: { ...data, ts: Date.now(), listed: true, reason: "watched" } };
+    const removed = watchProgress[data.key] && watchProgress[data.key].unlisted;
+    hidden = { ...hidden, [data.key]: { ...data, ts: Date.now(), listed: !removed, reason: "watched" } };
     queuedWatched.add(data.key);
     if (!watchedWriteTimer) {
       watchedWriteTimer = window.setTimeout(() => {
@@ -1601,8 +1602,11 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
           scheduleApply();
           return;
         }
+        const queued = {};
+        queuedWatched.forEach(key => { if (hidden[key]) queued[key] = hidden[key]; });
         queuedWatched.clear();
-        HOA.writeLists({ hidden });
+        // Only what this tab found: anything newer from another tab or the toolbar stays.
+        HOA.readLists(lists => HOA.writeLists({ hidden: { ...queued, ...lists.hidden } }));
       }, 500);
     }
   }
@@ -2423,6 +2427,9 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       position: Math.min(Math.max(0, Number(values.position) || 0), duration), watched, played,
       ...(watched ? {} : old.cw === "later" ? { cw: "later" } : automatic && watchSettings.continueWatching !== "off" ? { cw: old.cw || "auto" } : {}), ts: old.ts || Date.now(), updated: Date.now() };
     if (watched) { delete entry.cw; delete entry.untagged; }
+    // Taken off the Watched list by hand: playing it again doesn't undo that. Turning Watched off and on does.
+    delete entry.unlisted;
+    if (old.unlisted && watched) entry.unlisted = true;
     return entry;
   }
 
@@ -2614,7 +2621,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const rule = hostnameRule();
     // Watched ticked for this site: the video now belongs to the Watched list, so the button says so.
     // Not ticked: the tag on the player says it (syncPlayerWatchedTag) and the video can still be saved.
-    const inWatched = !selected && progress && progress.watched && !progress.untagged && rule && watchedEnabled(activeCategories(rule));
+    const inWatched = !selected && key && rule && watchedEnabled(activeCategories(rule)) && HOA.inWatchedList(key, hidden, watchProgress, watchedShown, siteRules);
     watchLaterButton.hidden = !key || !buttonsEnabled;
     watchLaterButton.textContent = inWatched ? "✓ In Watched" : inContinue ? "✓ In Continue Watching" : selected ? "✓ In Watch Later" : "Add to Watch Later";
     watchLaterButton.setAttribute("aria-pressed", String(Boolean(selected)));
@@ -2852,6 +2859,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       siteRules = changes[HOA.SITES_KEY].newValue && typeof changes[HOA.SITES_KEY].newValue === "object"
         ? changes[HOA.SITES_KEY].newValue : {};
     }
+    if (changes[HOA.HIDDEN_KEY] || changes[HOA.WATCHED_SHOWN_KEY] || changes[HOA.PROGRESS_KEY] || changes[HOA.SITES_KEY]) updateWatchLaterButton();
     if (changes[HOA.BUTTON_EDGE_KEY]) {
       setButtonEdge(changes[HOA.BUTTON_EDGE_KEY].newValue);
     }

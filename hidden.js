@@ -11,7 +11,6 @@
   let prefs = {};
   let pageStatusText = "";
   let removeAllTimer = 0;
-  let ignoreOwnStorageChange = false;
   let channelsRemoveTimer = 0;
   let removeAllButton = null;
   const siteRemoveConfirmations = new Map();
@@ -113,7 +112,6 @@
 
   function setPrefs(site, changes) {
     prefs = { ...prefs, [site]: { ...(prefs[site] || {}), ...changes } };
-    ignoreOwnStorageChange = true;
     chrome.storage.local.set({ [HIDDEN_PREFS_KEY]: prefs }, () => void chrome.runtime.lastError);
     render();
   }
@@ -151,7 +149,6 @@
     hidden = next;
     pageStatusText = message;
     render();
-    ignoreOwnStorageChange = true;
     HOA.writeLists({ hidden }, () => {
       if (chrome.runtime.lastError) {
         pageStatusText = "Could not save the hidden videos list.";
@@ -162,12 +159,11 @@
 
   function restoreEntries(keys, message) {
     // A video listed here only because it was watched has no hidden record: showing it is what restores it.
-    const watchedKeys = (keys || []).filter(key => !hidden[key] || hidden[key].reason === "watched");
+    const watchedKeys = (keys || []).filter(key => !hidden[key] || HOA.isWatchedRecord(key, hidden[key], watchProgress));
     hidden = HOA.restoreKeys(hidden, keys);
     if (watchedKeys.length) watchedShown = HOA.markWatchedShown(watchedShown, watchedKeys);
     pageStatusText = message;
     render();
-    ignoreOwnStorageChange = true;
     HOA.writeLists({ hidden, ...(watchedKeys.length ? { watchedShown } : {}) }, () => {
       if (chrome.runtime.lastError) { pageStatusText = "Could not save the hidden videos list."; render(); }
     });
@@ -184,7 +180,6 @@
       watchProgress = progress;
       pageStatusText = message;
       render();
-      ignoreOwnStorageChange = true;
       HOA.writeLists({ hidden, watchProgress: progress }, () => {
         if (chrome.runtime.lastError) { pageStatusText = "Could not save the hidden videos list."; render(); }
       });
@@ -387,7 +382,6 @@
     restoreAll.id = "hidden-restore-channels";
     restoreAll.addEventListener("click", () => {
       channels = {};
-      ignoreOwnStorageChange = true;
       HOA.writeLists({ channels });
       pageStatusText = "Channels visible again.";
       render();
@@ -404,7 +398,6 @@
       if (channelsRemoveTimer) {
         clearTimeout(channelsRemoveTimer); channelsRemoveTimer = 0;
         channels = {};
-        ignoreOwnStorageChange = true;
         HOA.writeLists({ channels });
         pageStatusText = "All channels are visible again.";
         render();
@@ -444,7 +437,7 @@
       const actions = element("div", "hidden-actions");
       const unhide = iconButton("restore-button", RESTORE_ICON, "Show this channel's videos again");
       unhide.id = `hidden-channel-row-${index}`;
-      unhide.addEventListener("click", () => { channels = { ...channels }; delete channels[key]; ignoreOwnStorageChange = true; HOA.writeLists({ channels }); pageStatusText = "Channel visible again."; render(); });
+      unhide.addEventListener("click", () => { channels = { ...channels }; delete channels[key]; HOA.writeLists({ channels }); pageStatusText = "Channel visible again."; render(); });
       actions.appendChild(unhide);
       row.appendChild(actions);
       body.appendChild(row);
@@ -462,7 +455,8 @@
     while (root.firstChild) {
       root.firstChild.remove();
     }
-    const entries = HOA.listedHidden(hidden);
+    // A video hidden by hand and watched later belongs with the watched ones.
+    const entries = HOA.listedHidden(hidden).map(([key, entry]) => [key, HOA.isWatchedRecord(key, entry, watchProgress) ? { ...entry, watched: true } : entry]);
     const watchedEntries = entries.filter(([, entry]) => entry.reason === "watched" || entry.watched === true);
     const watchedKeys = new Set(watchedEntries.map(([key]) => key));
     // Watched but with no hidden record. Restored or removed ones stay off; a record of any kind speaks for itself.
@@ -562,7 +556,6 @@
 
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.CHANNELS_KEY] || changes[HOA.WATCHED_SHOWN_KEY] || changes[HOA.PROGRESS_KEY] || changes[HIDDEN_PREFS_KEY] || changes[HOA.SITES_KEY])) {
-      if (ignoreOwnStorageChange) { ignoreOwnStorageChange = false; return; }
       refresh();
     }
   });

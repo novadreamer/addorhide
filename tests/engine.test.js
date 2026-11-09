@@ -1437,6 +1437,23 @@ const CASES = [
       const ticked = await open({ siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
       check("Watched ticked: the button says In Watched and the player has no tag", () => { const control = ticked.document.querySelector("#hoa-watch-later"); assert.equal(control.textContent, "✓ In Watched"); assert.equal(control.getAttribute("aria-disabled"), "true"); assert.equal(ticked.document.querySelector("[data-hoa-player-watched]"), null); });
       ticked.window.close();
+      const ticks = { siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } };
+      for (const [name, extra] of [["hidden off the list", { hiddenItems: { [url]: { title: "T", thumb: "", listed: false, ts: 1 } } }], ["restored", { watchedShown: { [url]: 5 } }], ["removed from the list", { watchProgress: { [url]: { ...done[url], unlisted: true } } }]]) {
+        const notListed = await open({ ...ticks, ...extra });
+        check(`Watched ticked but ${name}: the button does not claim In Watched`, () => assert.equal(notListed.document.querySelector("#hoa-watch-later").textContent, "Add to Watch Later"));
+        notListed.window.close();
+      }
+      const byHand = await open({ ...ticks, hiddenItems: { [url]: { title: "T", thumb: "", listed: true, ts: 1 } } });
+      check("Watched ticked and hidden by hand: it is listed in Watched, so the button says so", () => assert.equal(byHand.document.querySelector("#hoa-watch-later").textContent, "✓ In Watched"));
+      byHand.window.chrome.storage.local.set({ watchedShown: { [url]: 9 }, hiddenItems: {} }); await wait(30);
+      check("the button follows the list as it changes", () => assert.equal(byHand.document.querySelector("#hoa-watch-later").textContent, "Add to Watch Later"));
+      byHand.window.close();
+      {
+        const again = await load({ html: "", url, watchProgress: { [url]: { ...done[url], unlisted: true } }, siteRules: ticks.siteRules, testSeam: true });
+        fakeVideo(again, { duration: 100 }).play(5); await wait(35);
+        check("playing a video taken off the Watched list does not put it back", () => assert.equal(again.store.watchProgress[url].unlisted, true));
+        again.window.close();
+      }
       const plain = await open({});
       check("Watched not ticked: the player carries the Watched tag and the video can still be saved", () => { assert.ok(plain.document.getElementById("movie_player").hasAttribute("data-hoa-player-watched")); assert.equal(plain.document.querySelector("#hoa-watch-later").textContent, "Add to Watch Later"); });
       plain.window.history.pushState({}, "", "/watch?v=anotherone1"); plain.test.apply();
