@@ -468,6 +468,7 @@
     // Watched but with no hidden record. Restored or removed ones stay off; a record of any kind speaks for itself.
     const watchOnly = HOA.watchedOnlyKeys(watchProgress, hidden, watchedShown, siteRules).map(key => [key, watchProgress[key]]).map(([key, entry]) => [key, { title: entry.title, thumb: entry.thumbnail || "", site: entry.site, kind: HOA.kindOf(key), ts: entry.updated, listed: false, watched: true, reason: "watched" }]);
     watchedEntries.push(...watchOnly);
+    watchedEntries.sort((left, right) => (Number(right[1].ts) || 0) - (Number(left[1].ts) || 0) || left[0].localeCompare(right[0]));
     const everyEntry = [...entries, ...watchOnly];
     const groups = groupsFor(entries.filter(([, entry]) => entry.reason !== "watched" && entry.watched !== true));
     const channelEntries = Object.entries(channels).map(([key, entry]) => [key, { ...entry, title: channelTitle(key, entry) }]);

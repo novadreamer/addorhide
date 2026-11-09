@@ -1582,12 +1582,26 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     scheduleApply(true);
   }
 
+  const queuedWatched = new Set();
+
   function queueWatched(data) {
     if (hidden[data.key] || watchedShown[data.key]) return;
     hidden = { ...hidden, [data.key]: { ...data, ts: Date.now(), listed: true, reason: "watched" } };
+    queuedWatched.add(data.key);
     if (!watchedWriteTimer) {
       watchedWriteTimer = window.setTimeout(() => {
         watchedWriteTimer = 0;
+        const rule = hostnameRule();
+        if (!rule || !watchedEnabled(activeCategories(rule))) {
+          // Watched was turned off while these waited: saving now would bring back what that just cleared.
+          const next = { ...hidden };
+          queuedWatched.forEach(key => delete next[key]);
+          hidden = next;
+          queuedWatched.clear();
+          scheduleApply();
+          return;
+        }
+        queuedWatched.clear();
         HOA.writeLists({ hidden });
       }, 500);
     }
@@ -2535,7 +2549,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     if (!video || !Number.isFinite(video.duration) || video.duration < 20 || playerTracker && playerTracker.video === video) return;
     playerTracker = { video, key: childFrame ? "" : watchKey(hostnameRule()), last: video.currentTime || 0, bits: HOA.bitmapBuckets(""), basePlayed: 0, covered: 0, bucketSeconds: Array(100).fill(0), resumed: false };
     resetTracker(playerTracker, playerTracker.key);
-    const update = () => { const tracker = playerTracker; if (!tracker || tracker.video !== video) return; syncTrackerKey(tracker); const now = video.currentTime || 0; if (!shouldRecordWatchProgress(undefined, tracker.key)) { tracker.last = now; return; } if (video.paused || video.playbackRate > 2) return; const delta = now - tracker.last; tracker.last = now; if (delta <= 0 || delta > 2.5) return; const index = Math.min(99, Math.floor(now / video.duration * 100)); tracker.bucketSeconds[index] += delta; tracker.covered += delta; if (tracker.bucketSeconds[index] >= video.duration / 100 * .7) tracker.bits = setBit(tracker.bits, index); saveTracker(false); };
+    const update = () => { const tracker = playerTracker; if (!tracker || tracker.video !== video) return; syncTrackerKey(tracker); const now = video.currentTime || 0; if (!shouldRecordWatchProgress(undefined, tracker.key)) { tracker.last = now; return; } if (video.paused || video.playbackRate > 2) return; const delta = now - tracker.last; tracker.last = now; if (delta <= 0 || delta > 2.5) return; const slice = video.duration / 100; const from = now - delta; tracker.covered += delta; for (let index = Math.min(99, Math.floor(from / slice)); index <= Math.min(99, Math.floor(now / slice)); index += 1) { const overlap = Math.min(now, (index + 1) * slice) - Math.max(from, index * slice); if (overlap <= 0) continue; tracker.bucketSeconds[index] += overlap; if (tracker.bucketSeconds[index] >= slice * .7) tracker.bits = setBit(tracker.bits, index); } saveTracker(false); };
     video.addEventListener("timeupdate", update); video.addEventListener("loadedmetadata", () => syncTrackerKey(playerTracker)); video.addEventListener("pause", () => saveTracker(true)); video.addEventListener("ended", () => saveTracker(true));
     video.addEventListener("play", () => { playerTracker.last = video.currentTime || 0; maybeResume(playerTracker); });
   }

@@ -49,6 +49,9 @@ async function load({ hiddenItems = {}, hiddenChannels = {}, watchProgress = {},
   check("removing a watched-only video keeps it off the list", () => { assert.equal(mixed.document.querySelector(".site-group[data-site='watched-videos']"), null); assert.equal(Object.values(mixed.store.watchProgress).filter(entry => entry.unlisted).length, 1); });
   check("watched history survives removing it from the list", () => assert.equal(Object.values(mixed.store.watchProgress).filter(entry => entry.watched).length, 2));
   mixed.window.close();
+  const ordered = await load({ hiddenItems: { "https://tubitv.com/movies/2/older": { title: "Older record", thumb: "", site: "tubitv.com", reason: "watched", listed: true, ts: 100 } }, watchProgress: { [seenOne]: { ...progress("Just watched"), updated: 900 } }, siteRules: watchedOn });
+  check("Watched Videos is newest first, so a video listed from its watch history is not left at the bottom", () => assert.deepEqual([...ordered.document.querySelectorAll(".site-group[data-site='watched-videos'] .hidden-title")].map(node => node.textContent), ["Just watched", "Older record"]));
+  ordered.window.close();
   const off = await load({ watchProgress: { [seenOne]: progress("Seen one") }, siteRules: { "www.youtube.com": { enabled: true, hideKinds: [] } } });
   check("with Watched off a watched video stays in the feed, so it is not listed", () => { assert.equal(off.document.querySelector(".site-group[data-site='watched-videos']"), null); });
   off.window.close();

@@ -592,6 +592,26 @@ const CASES = [
     page.window.close();
   }
   {
+    const page = await load({ fixture: "youtube-categories.synthetic.html", url: "https://www.youtube.com/", siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
+    page.window.chrome.storage.local.set({ siteRules: { "www.youtube.com": { hideKinds: [] } } });
+    await wait(700);
+    check("an auto-hide still waiting to save is dropped when Watched is turned off", () => {
+      assert.equal((page.store.hiddenItems || {})["https://www.youtube.com/watch?v=watched1234"], undefined);
+      assert.ok(!page.document.getElementById("watched").classList.contains("hoa-removed"));
+      assert.ok(page.document.querySelector("#watched [data-hoa-watched]"));
+    });
+    page.window.close();
+  }
+  {
+    const page = await load({ html: "<div></div>", url: "https://www.youtube.com/watch?v=shortclip01", testSeam: true });
+    fakeVideo(page, { duration: 30 }).play(30, .5); await wait(35);
+    check("a short video played at 2x fills every slice it passed", () => {
+      const entry = page.store.watchProgress["https://www.youtube.com/watch?v=shortclip01"];
+      assert.ok(bucketCount(entry.buckets) >= 90, String(bucketCount(entry.buckets))); assert.equal(entry.watched, true);
+    });
+    page.window.close();
+  }
+  {
     // The private-window Added Videos page borrows youtube.com/robots.txt: the feed engine stays out of it.
     const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/robots.txt#addorhide-added", siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
     await wait(200);
