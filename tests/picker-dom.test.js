@@ -44,4 +44,10 @@ const fawesomeSelector = fawesome.window.__hoaPickerTest.buildSelector(fawesome.
 assert.equal(fawesomeSelector, "div.mrItem", "linkless Fawesome cards use their repeated class, not an id or row");
 assert.equal(fawesome.window.__hoaPickerTest.buildSelector(fawesome.window.document.querySelector(".slick-track")), null, "a row without a card image pattern is refused");
 fawesome.window.close();
-console.log("picker-dom.test.js: 11 passed, 0 failed");
+const shared = new JSDOM(`<nav>${["/library", "/live", "/music"].map(href => `<a class="nav-link ad-link-trigger" href="${href}"><span>Menu</span></a>`).join("")}</nav><div class="row">${Array.from({ length: 6 }, (_, index) => `<div class="show-card"><a class="ad-link-trigger" href="/watch/sp/${index}"><img alt="Show ${index}"><span>Show ${index}</span></a></div>`).join("")}</div>`, { url: "https://cartoony.net/", runScripts: "outside-only" });
+shared.window.__hoaPickerTest = {};
+shared.window.eval(fs.readFileSync(require("node:path").join(__dirname, "..", "picker.js"), "utf8"));
+const sharedSelector = shared.window.__hoaPickerTest.buildSelector(shared.window.document.querySelector(".show-card img"));
+assert.ok(sharedSelector && !Array.from(shared.window.document.querySelectorAll(sharedSelector)).some(node => node.closest("nav")), `a class the menu links share is not taken for cards: ${sharedSelector}`);
+shared.window.close();
+console.log("picker-dom.test.js: 12 passed, 0 failed");

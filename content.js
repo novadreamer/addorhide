@@ -520,8 +520,8 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const saved = added[data.key] || hidden[data.key];
     if (!saved || healedSaved.has(data.key) || data.kind === "channel" || data.kind === "category") return;
     const link = getLink(card, rule);
-    const badge = link ? HOA.cleanTitle(textFrom(link)) : "";
-    const wrongName = saved.title === HOA.siteOf(data.key) || (badge && saved.title === badge);
+    const badge = link ? HOA.cleanTitle(Array.from(link.childNodes).filter(node => !(node.nodeType === 1 && node.matches(".hoa-actions"))).map(node => node.textContent).join("")) : "";
+    const wrongName = saved.title === HOA.siteOf(data.key) || looksLikeBadge(saved.title) || (badge && saved.title === badge);
     if (!wrongName && saved.thumb) {
       // An empty link may be a card still filling in, so only a card with something to compare is settled.
       if (badge) healedSaved.add(data.key);
@@ -534,6 +534,10 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     // A picture can arrive before the badge that shows the name is wrong, so only a repaired name is final.
     if (patch.title) healedSaved.add(data.key);
     pendingHeals.set(data.key, patch);
+    flushHeals();
+  }
+
+  function flushHeals() {
     if (healTimer) return;
     healTimer = window.setTimeout(() => {
       healTimer = 0;
@@ -1181,7 +1185,8 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
 
   // Thumbnail links carry only a duration badge ("2:13", "1:02:03") or "LIVE"; never use that as a title.
   function looksLikeBadge(text) {
-    return /^(\d{1,2}:){1,2}\d{2}$/.test(text) || /^(live|new|shorts?)$/i.test(text);
+    return /^(\d{1,2}:){1,2}\d{2}$/.test(text) || /^(live|new|shorts?)$/i.test(text)
+      || /^(?:video(?: card| thumbnail)?|card|thumbnail|poster|image|play(?: video| now)?|watch(?: now| video)?|more info|details|now playing|free to watch|trending|most liked|new episodes?)$/i.test(text);
   }
 
   function plausiblePickedTitle(value) {
@@ -1229,6 +1234,25 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     }
     return allLeafTexts(card).map(plausiblePickedTitle).filter(Boolean)
       .sort((left, right) => right.length - left.length)[0] || "";
+  }
+
+  // The heading of the row a card sits in, which a site sometimes repeats inside its cards.
+  function rowHeading(card) {
+    for (let node = card.parentElement, level = 0; node && node !== document.body && level < 5; node = node.parentElement, level += 1) {
+      let heading = null;
+      try { heading = node.querySelector(":scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > * > h2, :scope > * > h3"); } catch (error) { heading = null; }
+      if (heading && !card.contains(heading)) return HOA.cleanTitle(heading.textContent || "");
+    }
+    return "";
+  }
+
+  const EPISODE_LABEL = /\bepisode\b|\bep\.?\s*\d|\bS\d+\s*:?\s*E\d+\b|^E\d+\b|الحلقة|حلقة|épisode|episodio|\bfolge\b|bölüm|серия/i;
+  // "Episode 3" on a show's page: the show's name is the page's heading, so the saved name carries it.
+  function withShowName(title) {
+    if (!title || !EPISODE_LABEL.test(title)) return title;
+    const heading = document.querySelector("h1");
+    const show = HOA.cleanTitle((heading && heading.textContent) || pageTitle()).slice(0, 120);
+    return show && !title.includes(show) && !show.includes(title) ? `${show} – ${title}` : title;
   }
 
   function candidateText(element, selector = "") {
@@ -1337,6 +1361,13 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       const identity = channelIdentity(card, rule);
       if (identity && identity.name) title = identity.name;
     }
+    if (title && kind !== "channel" && kind !== "category" && (rule.userPicked || !rule.catalog)) {
+      if (title === rowHeading(card)) {
+        const image = card.querySelector("img[alt]");
+        title = plausiblePickedTitle(image && image.getAttribute("alt")) || "";
+      }
+      title = withShowName(title);
+    }
     title = HOA.cleanTitle(title || HOA.siteOf(key)).slice(0, HOA.MAX_TITLE);
 
     let thumb = HOA.youtubeThumb(key);
@@ -1416,7 +1447,12 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   }
 
   function cardPicture(card) {
-    const web = value => (typeof value === "string" && /^https?:\/\//i.test(value) && value.length <= HOA.MAX_URL ? value : "");
+    const web = value => {
+      if (typeof value !== "string" || !value.trim() || /^(?:data|blob|javascript):/i.test(value.trim())) return "";
+      let absolute = "";
+      try { absolute = new URL(value.trim(), location.href).href; } catch (error) { return ""; }
+      return /^https?:\/\//i.test(absolute) && absolute.length <= HOA.MAX_URL ? absolute : "";
+    };
     const firstOfSet = value => web(String(value || "").split(",")[0].trim().split(/\s+/)[0]);
     const images = Array.from(card.querySelectorAll("img")).filter(image => !image.closest(".hoa-actions"));
     const area = image => { const box = image.getBoundingClientRect(); return box.width * box.height; };
@@ -1431,6 +1467,11 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     if (fromSource) return fromSource;
     for (const node of [card, ...card.querySelectorAll('[style*="background"]')]) {
       const match = String(node.style && node.style.backgroundImage || "").match(/url\(["']?(https?:[^"')]+)/i);
+      if (match && web(match[1])) return match[1];
+    }
+    for (const node of [card, ...Array.from(card.querySelectorAll("*")).slice(0, 60)]) {
+      if (node.closest(".hoa-actions")) continue;
+      const match = String(getComputedStyle(node).backgroundImage || "").match(/url\(["']?(https?:[^"')]+)/i);
       if (match && web(match[1])) return match[1];
     }
     return "";
@@ -2327,6 +2368,30 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       });
   }
 
+  let pageHealHref = "";
+  function healFromPage() {
+    if (pageHealHref === location.href) return;
+    pageHealHref = location.href;
+    const key = HOA.canonicalUrl(location.href);
+    const saved = key && (added[key] || hidden[key]);
+    if (!saved) return;
+    const meta = pageMetaForKey(key);
+    // "Name - Site": the site's own name is not part of the video's.
+    const trimmed = String(meta.title || "").replace(/\s+[|–—-]\s+[^|–—-]+$/, "").trim();
+    if (trimmed.length >= 2) meta.title = trimmed;
+    const named = saved.title === HOA.siteOf(key) || looksLikeBadge(saved.title || "") || !saved.title;
+    const patch = {};
+    if (named && plausibleName(meta.title) && meta.title !== HOA.siteOf(key)) patch.title = meta.title;
+    const image = document.querySelector('meta[property="og:image"]');
+    if (!saved.thumb && image && /^https?:\/\//i.test(image.content || "")) patch.thumb = image.content;
+    if (Object.keys(patch).length) { healedSaved.delete(key); pendingHeals.set(key, patch); flushHeals(); }
+  }
+
+  function plausibleName(value) {
+    const text = String(value || "").trim();
+    return text.length >= 2 && text.length <= 200 && !looksLikeBadge(text);
+  }
+
   function apply() {
     if (childFrame) return;
     if (!ensureContext()) {
@@ -2334,6 +2399,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     }
     scheduled = 0;
     if (!listsReady || !siteRulesReady) return;
+    healFromPage();
     syncPlayerWatchedTag();
     if (!document.body) {
       if (!waitingForBody) {

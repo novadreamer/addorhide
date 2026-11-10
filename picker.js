@@ -168,6 +168,10 @@ if (typeof window !== "undefined") {
     if (!matches || !matches.includes(card) || !qualifying) {
       return null;
     }
+    const siteChrome = node => node.closest("nav, header, footer, aside, [role=navigation], [role=banner], [role=contentinfo]");
+    if (!siteChrome(card) && matches.some(siteChrome)) {
+      return null;
+    }
     const nested = matches.filter(match => matches.some(other => other !== match && other.contains(match))).length;
     if (nested / matches.length > 0.1) {
       return null;

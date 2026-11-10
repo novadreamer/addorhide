@@ -694,6 +694,23 @@ const CASES = [
     back.window.close();
   }
   {
+    const taught = { "taught.example": { enabled: true, pickedSelectors: ["div.ep"] } };
+    const page = await load({ url: "https://taught.example/show/conan", siteRules: taught, html: '<h1>Detective Conan</h1><section><h2>Popular</h2>' + ["Popular|/watch/1|https://taught.example/a.jpg", "3- الحلقة الثالثة|/watch/3|", "Video card|/watch/4|"].map((row, index) => { const [label, href] = row.split("|"); return `<div class="ep" id="ep${index}"><a href="${href}" aria-label="${index === 2 ? "Video card" : ""}"><img alt="${index === 0 ? "The real name" : ""}" src="https://taught.example/p${index}.jpg"><span class="title">${label}</span></a></div>`; }).join("") + '</section>' });
+    ["ep0", "ep1", "ep2"].forEach(id => page.document.querySelector(`#${id} .hoa-actions [data-action="add"]`).click()); await wait(40);
+    const titles = Object.fromEntries(Object.entries(page.store.addedItems).map(([key, entry]) => [key.split("/").pop(), entry.title]));
+    check("a card titled like its row is saved under its own name", () => assert.equal(titles["1"], "The real name"));
+    check("an episode number is saved with its show's name", () => assert.equal(titles["3"], "Detective Conan – 3- الحلقة الثالثة"));
+    check("a generic label such as Video card is never a name", () => assert.notEqual(titles["4"], "Video card"));
+    page.window.close();
+  }
+  {
+    const key = "https://taught.example/watch/1123";
+    const page = await load({ url: key, html: '<meta property="og:image" content="https://taught.example/cover.webp"><h1>Grendizer</h1>', siteRules: { "taught.example": { enabled: true, pickedSelectors: ["div.card"] } }, addedItems: { [key]: { title: "taught.example", thumb: "", ts: 1 } }, setup: window => { window.document.title = "Grendizer | Cartoony"; } });
+    await wait(950);
+    check("a saved video with no name of its own takes its page's name and picture when opened", () => { assert.equal(page.store.addedItems[key].title, "Grendizer"); assert.equal(page.store.addedItems[key].thumb, "https://taught.example/cover.webp"); });
+    page.window.close();
+  }
+  {
     // The private-window Added Videos page borrows youtube.com/robots.txt: the feed engine stays out of it.
     const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/robots.txt#addorhide-added", siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
     await wait(200);
