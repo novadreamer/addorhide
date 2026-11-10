@@ -2406,6 +2406,12 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     return { title, thumbnail };
   }
 
+  // YouTube plays its ads in the same video element, so an ad would otherwise count as watching the video.
+  function adPlaying(video) {
+    const player = video && video.closest ? video.closest(".html5-video-player") : null;
+    return Boolean(player && player.classList.contains("ad-showing"));
+  }
+
   function resumableUntil(duration) { return duration - Math.min(30, duration * .25); }
 
   function setBit(bitmap, index) {
@@ -2455,7 +2461,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   }
 
   function saveTracker(force = false) {
-    const tracker = playerTracker; if (!tracker || !tracker.video || !Number.isFinite(tracker.video.duration)) return;
+    const tracker = playerTracker; if (!tracker || !tracker.video || !Number.isFinite(tracker.video.duration) || adPlaying(tracker.video)) return;
     const rule = hostnameRule();
     if (!shouldRecordWatchProgress(rule, tracker.key)) return;
     // A user-picked video graduates to Continue Watching as soon as it is genuinely resumable.
@@ -2568,7 +2574,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     if (!video || !Number.isFinite(video.duration) || video.duration < 20 || playerTracker && playerTracker.video === video) return;
     playerTracker = { video, key: childFrame ? "" : watchKey(hostnameRule()), last: video.currentTime || 0, bits: HOA.bitmapBuckets(""), basePlayed: 0, covered: 0, bucketSeconds: Array(100).fill(0), resumed: false };
     resetTracker(playerTracker, playerTracker.key);
-    const update = () => { const tracker = playerTracker; if (!tracker || tracker.video !== video) return; syncTrackerKey(tracker); const now = video.currentTime || 0; if (!shouldRecordWatchProgress(undefined, tracker.key)) { tracker.last = now; return; } if (video.paused || video.playbackRate > 2) return; const delta = now - tracker.last; tracker.last = now; if (delta <= 0 || delta > 2.5) return; const slice = video.duration / 100; const from = now - delta; tracker.covered += delta; for (let index = Math.min(99, Math.floor(from / slice)); index <= Math.min(99, Math.floor(now / slice)); index += 1) { const overlap = Math.min(now, (index + 1) * slice) - Math.max(from, index * slice); if (overlap <= 0) continue; tracker.bucketSeconds[index] += overlap; if (tracker.bucketSeconds[index] >= slice * .7) tracker.bits = setBit(tracker.bits, index); } saveTracker(false); };
+    const update = () => { const tracker = playerTracker; if (!tracker || tracker.video !== video) return; syncTrackerKey(tracker); const now = video.currentTime || 0; if (adPlaying(video)) { tracker.last = now; return; } if (!shouldRecordWatchProgress(undefined, tracker.key)) { tracker.last = now; return; } if (video.paused || video.playbackRate > 2) return; const delta = now - tracker.last; tracker.last = now; if (delta <= 0 || delta > 2.5) return; const slice = video.duration / 100; const from = now - delta; tracker.covered += delta; for (let index = Math.min(99, Math.floor(from / slice)); index <= Math.min(99, Math.floor(now / slice)); index += 1) { const overlap = Math.min(now, (index + 1) * slice) - Math.max(from, index * slice); if (overlap <= 0) continue; tracker.bucketSeconds[index] += overlap; if (tracker.bucketSeconds[index] >= slice * .7) tracker.bits = setBit(tracker.bits, index); } saveTracker(false); };
     video.addEventListener("timeupdate", update); video.addEventListener("loadedmetadata", () => syncTrackerKey(playerTracker)); video.addEventListener("pause", () => saveTracker(true)); video.addEventListener("ended", () => saveTracker(true));
     video.addEventListener("play", () => { playerTracker.last = video.currentTime || 0; maybeResume(playerTracker); });
   }

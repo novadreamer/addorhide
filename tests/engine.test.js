@@ -629,6 +629,14 @@ const CASES = [
     again.window.close();
   }
   {
+    const key = "https://www.youtube.com/watch?v=abc123def45";
+    const page = await load({ html: '<div id="movie_player" class="html5-video-player ad-showing"></div>', url: key, watchLater: { [key]: { title: "T", thumb: "", ts: 1 } }, testSeam: true });
+    const video = fakeVideo(page, { duration: 30 }); page.document.getElementById("movie_player").appendChild(video);
+    video.play(30); await wait(30);
+    check("a YouTube ad does not count as watching the video", () => { assert.equal((page.store.watchProgress || {})[key], undefined); assert.ok(page.store.watchLater[key]); });
+    page.window.close();
+  }
+  {
     // The private-window Added Videos page borrows youtube.com/robots.txt: the feed engine stays out of it.
     const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/robots.txt#addorhide-added", siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
     await wait(200);
