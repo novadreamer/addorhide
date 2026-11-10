@@ -653,6 +653,41 @@ const CASES = [
     late.window.close();
   }
   {
+    const xumoHtml = '<div class="cardList"><ul class="listRow"><li class="card titleCard" id="xu"><a aria-label="Secret Window" href="/free-movies/secret-window/XM0EUS9EFUGFJT"><span class="card-image"><img alt="Secret Window" src="https://image.xumo.com/a.webp"><span class="card-nowPlaying">Now Playing</span></span></a></li></ul></div>';
+    const key = "https://play.xumo.com/free-movies/secret-window/XM0EUS9EFUGFJT"; const siteRules = { "play.xumo.com": { enabled: true } };
+    const named = await load({ html: xumoHtml, url: "https://play.xumo.com/free-movies", siteRules });
+    named.document.querySelector('#xu .hoa-actions [data-action="add"]').click(); await wait(30);
+    check("a title in a link's label beats the Now Playing text inside it", () => assert.equal(named.store.addedItems[key].title, "Secret Window"));
+    named.window.close();
+    const healed = await load({ html: xumoHtml, url: "https://play.xumo.com/free-movies", siteRules, addedItems: { [key]: { title: "Now Playing", thumb: "", ts: 1 } } });
+    await wait(950);
+    check("a video already saved under a badge gets its name and picture from its card", () => { assert.equal(healed.store.addedItems[key].title, "Secret Window"); assert.equal(healed.store.addedItems[key].thumb, "https://image.xumo.com/a.webp"); });
+    healed.window.close();
+    const kept = await load({ html: xumoHtml, url: "https://play.xumo.com/free-movies", siteRules, addedItems: { [key]: { title: "My own name", thumb: "https://image.xumo.com/mine.webp", ts: 1 } } });
+    await wait(950);
+    check("a saved video with a proper name and picture is left alone", () => { assert.equal(kept.store.addedItems[key].title, "My own name"); assert.equal(kept.store.addedItems[key].thumb, "https://image.xumo.com/mine.webp"); });
+    kept.window.close();
+    const lazyHtml = '<li class="card titleCard" id="xu"><a aria-label="Lazy" href="/free-movies/lazy/XM1"><span class="card-image"><img alt="Lazy" src="data:image/gif;base64,R0lGOD" data-src="https://image.xumo.com/lazy.webp"></span></a></li>';
+    const lazy = await load({ html: lazyHtml, url: "https://play.xumo.com/free-movies", siteRules });
+    lazy.document.querySelector('#xu .hoa-actions [data-action="add"]').click(); await wait(30);
+    check("a picture the site hasn't loaded yet is still saved", () => assert.equal(Object.values(lazy.store.addedItems)[0].thumb, "https://image.xumo.com/lazy.webp"));
+    lazy.window.close();
+    const grow = await load({ html: xumoHtml, url: "https://play.xumo.com/free-movies", siteRules, testSeam: true });
+    const card = grow.document.getElementById("xu"); const bar = card.querySelector(".hoa-actions");
+    card.getBoundingClientRect = () => ({ left: 0, top: 0, right: 200, bottom: 300, width: 200, height: 300, x: 0, y: 0 }); grow.test.apply(); const rest = bar.style.left;
+    const nativeMatches = card.matches.bind(card); card.matches = selector => selector === ":hover" || nativeMatches(selector);
+    card.getBoundingClientRect = () => ({ left: 0, top: 0, right: 320, bottom: 420, width: 320, height: 420, x: 0, y: 0 });
+    card.dispatchEvent(new grow.window.MouseEvent("mouseenter")); grow.test.apply();
+    check("buttons stay put when a card grows under the pointer", () => { assert.ok(rest); assert.equal(bar.style.left, rest); });
+    card.matches = nativeMatches; grow.window.close();
+    const back = await load({ html: xumoHtml, url: "https://play.xumo.com/free-movies", siteRules, hiddenItems: { [key]: { title: "Secret Window", thumb: "", listed: true, ts: 1 } } });
+    let resized = 0; back.window.addEventListener("resize", () => { resized += 1; });
+    check("the hidden card starts hidden", () => assert.ok(back.document.getElementById("xu").classList.contains("hoa-removed")));
+    back.window.chrome.storage.local.set({ hiddenItems: {} }); await wait(120);
+    check("a restored card appears and the page is told its layout changed", () => { assert.ok(!back.document.getElementById("xu").classList.contains("hoa-removed")); assert.ok(resized >= 1); });
+    back.window.close();
+  }
+  {
     // The private-window Added Videos page borrows youtube.com/robots.txt: the feed engine stays out of it.
     const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/robots.txt#addorhide-added", siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
     await wait(200);

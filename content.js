@@ -505,6 +505,44 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     return "";
   }
 
+  let restoredInPass = false;
+  function afterRestore() {
+    if (!restoredInPass) return;
+    restoredInPass = false;
+    window.requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+  }
+
+  const healedSaved = new Set();
+  const pendingHeals = new Map();
+  let healTimer = 0;
+
+  function healSaved(card, rule, data) {
+    const saved = added[data.key] || hidden[data.key];
+    if (!saved || healedSaved.has(data.key) || data.kind === "channel" || data.kind === "category") return;
+    healedSaved.add(data.key);
+    const link = getLink(card, rule);
+    const badge = link ? HOA.cleanTitle(textFrom(link)) : "";
+    const patch = {};
+    if (data.title && data.title !== saved.title && (saved.title === badge || saved.title === HOA.siteOf(data.key))) patch.title = data.title;
+    if (!saved.thumb) { const picture = data.thumb || cardPicture(card); if (picture) patch.thumb = picture; }
+    if (!Object.keys(patch).length) return;
+    pendingHeals.set(data.key, patch);
+    if (healTimer) return;
+    healTimer = window.setTimeout(() => {
+      healTimer = 0;
+      const heals = new Map(pendingHeals);
+      pendingHeals.clear();
+      HOA.readLists(lists => {
+        const next = { added: { ...lists.added }, hidden: { ...lists.hidden } };
+        const changed = {};
+        heals.forEach((patch, key) => ["added", "hidden"].forEach(name => {
+          if (next[name][key]) { next[name][key] = { ...next[name][key], ...patch }; changed[name] = next[name]; }
+        }));
+        if (Object.keys(changed).length) HOA.writeLists(changed);
+      });
+    }, 800);
+  }
+
   function healChannelName(identity) {
     if (!identity || !identity.linkKey || !identity.name || healedChannels.has(identity.linkKey)) return;
     const old = channels[identity.linkKey] || Object.values(channels).find(entry => entry && entry.linkKey === identity.linkKey);
@@ -1186,9 +1224,10 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       .sort((left, right) => right.length - left.length)[0] || "";
   }
 
-  function candidateText(element) {
-    if (element && element.matches("img")) return (element.getAttribute("alt") || "").trim();
-    return textFrom(element);
+  function candidateText(element, selector = "") {
+    const attribute = String(selector).match(/\[(alt|aria-label|title)\]/);
+    const value = element && attribute ? (element.getAttribute(attribute[1]) || "").trim() : "";
+    return value || (element && element.matches("img") ? "" : textFrom(element));
   }
 
   function textFrom(element) {
@@ -1266,7 +1305,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
         } catch (error) {
           candidate = null;
         }
-        title = candidateText(candidate);
+        title = candidateText(candidate, selector);
         if (title) {
           break;
         }
@@ -1369,8 +1408,30 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     return /^https?:\/\//i.test(href) && href.length <= HOA.MAX_URL ? href : "";
   }
 
+  function cardPicture(card) {
+    const web = value => (typeof value === "string" && /^https?:\/\//i.test(value) && value.length <= HOA.MAX_URL ? value : "");
+    const firstOfSet = value => web(String(value || "").split(",")[0].trim().split(/\s+/)[0]);
+    const images = Array.from(card.querySelectorAll("img")).filter(image => !image.closest(".hoa-actions"));
+    const area = image => { const box = image.getBoundingClientRect(); return box.width * box.height; };
+    // The largest first, so a channel avatar or a badge isn't taken for the picture.
+    for (const image of images.map(node => [node, area(node)]).sort((left, right) => right[1] - left[1]).map(([node]) => node)) {
+      const found = web(image.currentSrc) || web(image.src) || web(image.getAttribute("data-src")) || web(image.getAttribute("data-lazy-src"))
+        || web(image.getAttribute("data-original")) || firstOfSet(image.getAttribute("srcset")) || firstOfSet(image.getAttribute("data-srcset"));
+      if (found) return found;
+    }
+    const source = card.querySelector("picture source[srcset]");
+    const fromSource = source && firstOfSet(source.getAttribute("srcset"));
+    if (fromSource) return fromSource;
+    for (const node of [card, ...card.querySelectorAll('[style*="background"]')]) {
+      const match = String(node.style && node.style.backgroundImage || "").match(/url\(["']?(https?:[^"')]+)/i);
+      if (match && web(match[1])) return match[1];
+    }
+    return "";
+  }
+
   function cardMeta(card, rule, key) {
     const meta = { type: HOA.typeOf(key), icon: cardIcon(key) };
+    if (!HOA.youtubeThumb(key)) { const picture = cardPicture(card); if (picture) meta.thumb = picture; }
     const ruleMeta = rule && rule.meta || {};
     const texts = [];
     const addTexts = selectors => (selectors || []).forEach(selector => {
@@ -1670,6 +1731,8 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   }
 
   function placeActions(card, actions, rule) {
+    // A card that grows while it is pointed at must not carry the buttons away from under the pointer.
+    if (actions.hoaPlacementSize && card.matches(":hover")) return;
     const cardRect = card.getBoundingClientRect();
     const size = `${Math.round(cardRect.width)}x${Math.round(cardRect.height)}`;
     if (!cardRect.width || !cardRect.height || actions.hoaPlacementSize === size) {
@@ -2112,7 +2175,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       target.classList.remove(ACTIVE_CLASS);
       let title = "";
       for (const selector of variant.titleCandidates || []) {
-        try { title = candidateText(card.querySelector(selector)); } catch (error) { title = ""; }
+        try { title = candidateText(card.querySelector(selector), selector); } catch (error) { title = ""; }
         if (title) break;
       }
       const image = title ? null : card.querySelector("img[alt]");
@@ -2127,6 +2190,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       return;
     }
     migrateFormerKey(data);
+    healSaved(card, variant, data);
     if (Object.keys(channels).length) healChannelName(channelIdentity(card, variant));
     const isWatched = watchedCard(card, variant, data);
     const cardCategories = isWatched && watchedShown[data.key]
@@ -2165,7 +2229,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
         filtered.add(target);
         card.dataset.hoaWhy = "filter";
       } else {
-        if (target.classList.contains(ACTIVE_CLASS) || target.classList.contains(FILTER_CLASS)) target.classList.remove(ACTIVE_CLASS, FILTER_CLASS);
+        if (target.classList.contains(ACTIVE_CLASS) || target.classList.contains(FILTER_CLASS)) { target.classList.remove(ACTIVE_CLASS, FILTER_CLASS); restoredInPass = true; }
         if (card.dataset.hoaWhy !== undefined) delete card.dataset.hoaWhy;
         ensureWatchedLabel(card, variant, isWatched, data);
         ensureContinueProgress(card, variant, data);
@@ -2345,10 +2409,11 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
         // A stale optional selector should not affect the normal feed.
       }
     }
-    document.querySelectorAll(`.${FILTER_CLASS}`).forEach(node => { if (!filtered.has(node)) node.classList.remove(FILTER_CLASS); });
+    document.querySelectorAll(`.${FILTER_CLASS}`).forEach(node => { if (!filtered.has(node)) { node.classList.remove(FILTER_CLASS); restoredInPass = true; } });
     filtered.forEach(node => node.classList.add(FILTER_CLASS));
     collapseEmptySections(rule, variants, filtered, cards);
     compensateCarousels();
+    afterRestore();
   }
 
   function scheduleApply() {
