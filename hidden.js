@@ -223,13 +223,14 @@
     info.appendChild(rowStatus);
     row.appendChild(info);
     const actions = element("div", "hidden-actions");
-    const restore = iconButton("restore-button", RESTORE_ICON, "Restore: show this video in the feed again");
+    const what = (entry.type || HOA.typeOf(key)) === "person" ? "person" : "video";
+    const restore = iconButton("restore-button", RESTORE_ICON, `Restore: show this ${what} in the feed again`);
     restore.id = `hidden-restore-${index}`;
     restore.addEventListener("click", () => {
       rowStatus.textContent = "Returned to feed.";
       restoreEntries([key], "Returned to feed.");
     });
-    const remove = iconButton("remove-button", REMOVE_ICON, "Remove from this list (the video stays hidden)");
+    const remove = iconButton("remove-button", REMOVE_ICON, `Remove from this list (the ${what} stays hidden)`);
     remove.id = `hidden-remove-${index}`;
     remove.addEventListener("click", () => {
       rowStatus.textContent = "Removed from the list; videos remain hidden.";

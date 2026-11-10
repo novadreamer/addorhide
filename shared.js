@@ -270,7 +270,7 @@ var HOA = Object.freeze((() => {
   const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com"]);
   const YOUTUBE_MEDIA_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"]);
   const TRACKING_PARAMS = new Set(["fbclid", "gclid", "igshid", "si", "pp", "feature", "ab_channel"]);
-  const TYPES = ["video", "short", "movie", "tv", "live", "music", "sport", "other"];
+  const TYPES = ["video", "short", "movie", "tv", "live", "music", "sport", "person", "other"];
   const SORT_KEYS = ["added", "published", "views", "votes", "score", "duration", "title", "year", "channel"];
   const TYPE_LABELS = Object.freeze({
     video: "Video",
@@ -280,6 +280,7 @@ var HOA = Object.freeze((() => {
     live: "Live",
     music: "Music",
     sport: "Sport",
+    person: "Person",
     other: "Other"
   });
   const SITE_NAMES = Object.freeze({
@@ -518,13 +519,28 @@ var HOA = Object.freeze((() => {
     "category", "categories", "browse", "genre", "genres", "tag", "tags", "topic", "topics", "collection", "collections",
     "channel", "channels", "user", "profile"]);
 
+  const PERSON_PATHS = new Set(["person", "people", "persons", "actor", "actors", "director", "directors", "celebrity", "celebrities", "talent"]);
+
+  // An actor's or director's page: /person/name, also after a language or country part (/en-GB/person/name), and IMDb's /name/nm123.
+  function isPersonUrl(value) {
+    try {
+      const segments = new URL(value).pathname.split("/").filter(Boolean).map(segment => segment.toLowerCase());
+      const start = /^[a-z]{2}(?:-[a-z]{2})?$/.test(segments[0] || "") ? 1 : 0;
+      if (!segments[start + 1]) return false;
+      return segments[start] === "name" ? /^nm\d+$/.test(segments[start + 1]) : PERSON_PATHS.has(segments[start]);
+    } catch (error) {
+      return false;
+    }
+  }
+
   function kindOf(url) {
     const known = kindCache.get(url);
     if (known) return known;
     let kind = "video";
     try {
       const parsed = new URL(url);
-      if (isCategoryUrl(parsed.href)) kind = "category";
+      if (isPersonUrl(parsed.href)) kind = "person";
+      else if (isCategoryUrl(parsed.href)) kind = "category";
       else if (isChannelUrl(parsed.href)) kind = "channel";
       else if (YOUTUBE_HOSTS.has(parsed.hostname.toLowerCase()) && parsed.pathname.startsWith("/shorts/")) kind = "short";
       else {
@@ -587,6 +603,7 @@ var HOA = Object.freeze((() => {
   }
 
   function typeOf(url) {
+    if (isPersonUrl(url)) return "person";
     try {
       const parsed = new URL(url);
       const path = parsed.pathname.toLowerCase();
@@ -1521,7 +1538,7 @@ var HOA = Object.freeze((() => {
     if (mode === "type") {
       return TYPES.map(type => ({
         id: type,
-        label: { movie: "Movies", tv: "TV shows" }[type] || typeLabel(type),
+        label: { movie: "Movies", tv: "TV shows", person: "People" }[type] || typeLabel(type),
         entries: pairs.filter(pair => entryType(pair) === type)
       })).filter(group => group.entries.length);
     }

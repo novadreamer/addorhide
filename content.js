@@ -1186,6 +1186,11 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       .sort((left, right) => right.length - left.length)[0] || "";
   }
 
+  function candidateText(element) {
+    if (element && element.matches("img")) return (element.getAttribute("alt") || "").trim();
+    return textFrom(element);
+  }
+
   function textFrom(element) {
     if (!element) {
       return "";
@@ -1261,7 +1266,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
         } catch (error) {
           candidate = null;
         }
-        title = textFrom(candidate);
+        title = candidateText(candidate);
         if (title) {
           break;
         }
@@ -2107,7 +2112,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       target.classList.remove(ACTIVE_CLASS);
       let title = "";
       for (const selector of variant.titleCandidates || []) {
-        try { title = textFrom(card.querySelector(selector)); } catch (error) { title = ""; }
+        try { title = candidateText(card.querySelector(selector)); } catch (error) { title = ""; }
         if (title) break;
       }
       const image = title ? null : card.querySelector("img[alt]");
@@ -2361,6 +2366,8 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     }
     const variants = variantsForRule(rule);
     passFeaturedCarousel = new WeakMap();
+    passCardText = new WeakMap();
+    passFilterText = new WeakMap();
     const categories = activeCategories(rule);
     const filtered = new Set();
     const handled = new Set();

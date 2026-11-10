@@ -637,6 +637,22 @@ const CASES = [
     page.window.close();
   }
   {
+    const card = inner => `<div class="carousel-default-styles__item--V3tCG" id="fan"><a href="/content/browse/details/Tombstone/12580">${inner}</a></div>`;
+    const filled = '<img src="https://images2.vudu.com/p.jpg" alt="Tombstone"><div class="promo">Free to Watch</div>';
+    const rules = { "athome.fandango.com": { enabled: true, hideKinds: ["free"] } };
+    const named = await load({ html: card(filled), url: "https://athome.fandango.com/", siteRules: { "athome.fandango.com": { enabled: true } } });
+    named.document.querySelector('#fan .hoa-actions [data-action="add"]').click(); await wait(30);
+    check("a card's title is its poster's name, not the Free to Watch badge in its link", () => assert.equal(Object.values(named.store.addedItems)[0].title, "Tombstone"));
+    named.window.close();
+    const late = await load({ html: card(""), url: "https://athome.fandango.com/", siteRules: rules });
+    const link = late.document.querySelector("#fan a");
+    await wait(60);
+    link.insertAdjacentHTML("beforeend", '<span></span>'); await wait(5);
+    link.insertAdjacentHTML("beforeend", filled); await wait(5);
+    check("a card that fills in after it appears is hidden by type at once", () => assert.ok(late.document.getElementById("fan").classList.contains("hoa-filtered")));
+    late.window.close();
+  }
+  {
     // The private-window Added Videos page borrows youtube.com/robots.txt: the feed engine stays out of it.
     const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/robots.txt#addorhide-added", siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
     await wait(200);

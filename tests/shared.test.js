@@ -86,6 +86,12 @@ check("player site names", () => assert.deepEqual([
   HOA.playerSiteName("https://www.twitch.tv/directory"),
   HOA.playerSiteName(watch)
 ], ["IMDb", "Dailymotion", "Tubi", "TMDB", "Twitch", "YouTube"]));
+check("actors' and directors' pages are people, not videos", () => {
+  ["https://watch.plex.tv/person/michael-c-hall", "https://watch.plex.tv/en-GB/person/michael-c-hall", "https://www.themoviedb.org/person/287-brad-pitt", "https://www.imdb.com/name/nm0000093/", "https://letterboxd.com/actor/tom-hanks/", "https://www.rottentomatoes.com/celebrity/tom_hanks"]
+    .forEach(url => { assert.equal(HOA.kindOf(url), "person", url); assert.equal(HOA.typeOf(url), "person", url); });
+});
+check("a person type is kept and labelled", () => { assert.equal(HOA.typeLabel("person"), "Person"); assert.equal(HOA.groupEntries([["https://watch.plex.tv/person/a", { type: "person", ts: 1 }]], "type")[0].label, "People"); });
+check("ordinary paths are not mistaken for people", () => ["https://www.imdb.com/name/", "https://example.com/person", "https://example.com/watch/people", "https://www.imdb.com/title/tt0111161/", "https://tubitv.com/movies/1/people-like-us"].forEach(url => assert.notEqual(HOA.kindOf(url), "person", url)));
 check("kind short", () => assert.equal(HOA.kindOf(short), "short"));
 check("kind video", () => assert.equal(HOA.kindOf(watch), "video"));
 check("kind table keeps unknown slugs playable and recognizes title, category and channel paths", () => {
