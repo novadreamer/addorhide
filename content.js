@@ -2406,6 +2406,8 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     return { title, thumbnail };
   }
 
+  function resumableUntil(duration) { return duration - Math.min(30, duration * .25); }
+
   function setBit(bitmap, index) {
     const digits = HOA.bitmapBuckets(bitmap).split(""); const at = Math.floor(index / 4); const mask = 1 << (3 - index % 4);
     digits[at] = (Number.parseInt(digits[at], 16) | mask).toString(16); return digits.join("");
@@ -2413,7 +2415,9 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
 
   function progressEntry(key, values) {
     if (!key || !Number.isFinite(values.duration) || values.duration < 20) return null;
-    const old = watchProgress[key] || {}; const duration = values.duration;
+    const saved = watchProgress[key] || {}; const duration = values.duration;
+    // Saved to Watch Later after being watched: this is a new watch, so the old one doesn't count towards it.
+    const old = saved.watched && watchLater[key] ? { ...saved, buckets: HOA.bitmapBuckets(""), covered: 0, watched: false } : saved;
     const merged = HOA.mergeProgressEntry(old, { buckets: values.buckets, covered: values.covered });
     const watched = HOA.bucketCount(merged.buckets) >= 90;
     const played = Math.max(0, Number(values.played) || 0);
@@ -2459,7 +2463,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     // send the same eligible sample immediately; the top page owns the chosen-list decision.
     const position = Math.max(0, Number(tracker.video.currentTime) || 0);
     const pendingLater = !childFrame && tracker.key && watchLater[tracker.key];
-    const eligibleLater = tracker.covered >= 3 && position >= HOA.MIN_RESUME_SECONDS && position < tracker.video.duration - 30
+    const eligibleLater = tracker.covered >= 3 && position >= HOA.MIN_RESUME_SECONDS && position < resumableUntil(tracker.video.duration)
       && (childFrame || pendingLater);
     // Before that point there is nothing useful to persist for a chosen item: it remains on Watch Later.
     // Holding these short samples also prevents an older queued progress write from racing the atomic move.
@@ -2487,15 +2491,23 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const chosen = nextLater[entry.url];
     let moved = entry.watched && !(watchProgress[entry.url] && watchProgress[entry.url].watched);
     if (entry.watched && chosen) delete nextLater[entry.url];
+    let clearedAuto = false;
+    // Never in both lists: anything else that made it a Continue Watching video moves it too.
     if (chosen && !entry.watched
-      && entry.position >= HOA.MIN_RESUME_SECONDS && entry.position < entry.duration - 30 && covered >= 3) {
+      && (entry.cw || (entry.position >= HOA.MIN_RESUME_SECONDS && entry.position < resumableUntil(entry.duration) && covered >= 3))) {
       delete nextLater[entry.url];
       entry = { ...entry, cw: "later" };
       moved = true;
+      // Being watched again: it isn't in Watched while it is in Continue Watching.
+      if (hidden[entry.url] && hidden[entry.url].reason === "watched") {
+        hidden = { ...hidden };
+        delete hidden[entry.url];
+        clearedAuto = true;
+      }
     }
     watchProgress = { ...watchProgress, [entry.url]: entry };
     watchLater = nextLater;
-    if (chosen && !nextLater[entry.url]) HOA.writeLists({ watchProgress, watchLater });
+    if (chosen && !nextLater[entry.url]) HOA.writeLists({ watchProgress, watchLater, ...(clearedAuto ? { hidden } : {}) });
     else HOA.writeProgress(entry.url, entry);
     updateWatchLaterButton();
     // Show the new label for a moment even if the pointer is elsewhere: this is the user's sign that it moved.
@@ -2507,7 +2519,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   function maybeResume(tracker) {
     if (isIncognitoContext() && !chosenVideo(tracker.key)) return;
     const entry = tracker.key && watchProgress[tracker.key];
-    if (!entry || !entry.cw || (watchSettings.continueWatching === "off" && entry.cw !== "later") || entry.position < HOA.MIN_RESUME_SECONDS || entry.position >= entry.duration - 30 || tracker.resumed || Math.abs(entry.duration - tracker.video.duration) > entry.duration * .05 || tracker.video.currentTime >= HOA.MIN_RESUME_SECONDS) return;
+    if (!entry || !entry.cw || (watchSettings.continueWatching === "off" && entry.cw !== "later") || entry.position < HOA.MIN_RESUME_SECONDS || entry.position >= resumableUntil(entry.duration) || tracker.resumed || Math.abs(entry.duration - tracker.video.duration) > entry.duration * .05 || tracker.video.currentTime >= HOA.MIN_RESUME_SECONDS) return;
     tracker.resumed = true; tracker.video.currentTime = Math.max(0, entry.position - 5);
     showToast(tracker.key, `Resumed at ${HOA.formatDuration(Math.floor(entry.position))}`, () => { tracker.video.currentTime = 0; }, "Start over");
   }
@@ -2923,7 +2935,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
         const entry = frameEntry(message.progress);
         const prior = entry && watchProgress[entry.url];
         if (entry) saveProgressEntry(entry, Math.max(0, Number(message.progress.covered) || 0));
-        if (!frameResumeSent && prior && prior.cw && (prior.cw === "later" || watchSettings.continueWatching !== "off") && prior.position >= HOA.MIN_RESUME_SECONDS && prior.position < prior.duration - 30 && Math.abs(prior.duration - entry.duration) <= prior.duration * .05 && entry.position < HOA.MIN_RESUME_SECONDS) {
+        if (!frameResumeSent && prior && prior.cw && (prior.cw === "later" || watchSettings.continueWatching !== "off") && prior.position >= HOA.MIN_RESUME_SECONDS && prior.position < resumableUntil(prior.duration) && Math.abs(prior.duration - entry.duration) <= prior.duration * .05 && entry.position < HOA.MIN_RESUME_SECONDS) {
           const seekTo = Math.max(0, prior.position - 5);
           frameResumeSent = true;
           showToast(entry.url, `Resumed at ${HOA.formatDuration(Math.floor(prior.position))}`, () => chrome.runtime.sendMessage({ type: "hoa-frame-seek", seekTo: 0 }), "Start over");

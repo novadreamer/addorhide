@@ -612,6 +612,23 @@ const CASES = [
     page.window.close();
   }
   {
+    const key = "https://www.youtube.com/watch?v=abc123def45"; const later = { [key]: { title: "T", thumb: "", ts: 1 } };
+    const state = page => { const entry = (page.store.watchProgress || {})[key] || {}; return { later: Boolean((page.store.watchLater || {})[key]), continuing: Boolean(entry.cw && !entry.watched), watched: Boolean(entry.watched) }; };
+    const clip = await load({ html: "", url: key, watchLater: later, testSeam: true });
+    const clipVideo = fakeVideo(clip, { duration: 40 }); clipVideo.play(12); await wait(30);
+    check("a short clip moves from Watch Later to Continue Watching and is never in both", () => assert.deepEqual(state(clip), { later: false, continuing: true, watched: false }));
+    clipVideo.play(25); await wait(30);
+    check("a short clip finished moves on to Watched", () => assert.deepEqual(state(clip), { later: false, continuing: false, watched: true }));
+    clip.window.close();
+    const done = { [key]: { site: "youtube.com", title: "T", url: key, thumbnail: "", duration: 300, position: 299, played: 299, buckets: "f".repeat(25), watched: true, ts: 1, updated: 1 } };
+    const again = await load({ html: "", url: key, watchLater: later, watchProgress: done, hiddenItems: { [key]: { title: "T", thumb: "", reason: "watched", listed: true, ts: 1 } }, testSeam: true });
+    const againVideo = fakeVideo(again, { duration: 300 }); againVideo.play(13); await wait(30);
+    check("a watched video saved to Watch Later again moves through Continue Watching as a new watch", () => { assert.deepEqual(state(again), { later: false, continuing: true, watched: false }); assert.equal(again.store.hiddenItems[key], undefined); });
+    againVideo.play(280); await wait(30);
+    check("finishing the new watch returns it to Watched", () => assert.deepEqual(state(again), { later: false, continuing: false, watched: true }));
+    again.window.close();
+  }
+  {
     // The private-window Added Videos page borrows youtube.com/robots.txt: the feed engine stays out of it.
     const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/robots.txt#addorhide-added", siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
     await wait(200);
