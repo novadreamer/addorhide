@@ -531,7 +531,8 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     if (wrongName && data.title && data.title !== saved.title && data.title !== HOA.siteOf(data.key)) patch.title = data.title;
     if (!saved.thumb) { const picture = data.thumb || cardPicture(card); if (picture) patch.thumb = picture; }
     if (!Object.keys(patch).length) return;
-    healedSaved.add(data.key);
+    // A picture can arrive before the badge that shows the name is wrong, so only a repaired name is final.
+    if (patch.title) healedSaved.add(data.key);
     pendingHeals.set(data.key, patch);
     if (healTimer) return;
     healTimer = window.setTimeout(() => {
