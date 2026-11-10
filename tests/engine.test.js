@@ -663,6 +663,12 @@ const CASES = [
     await wait(950);
     check("a video already saved under a badge gets its name and picture from its card", () => { assert.equal(healed.store.addedItems[key].title, "Secret Window"); assert.equal(healed.store.addedItems[key].thumb, "https://image.xumo.com/a.webp"); });
     healed.window.close();
+    const filling = await load({ html: '<li class="card titleCard" id="xu"><a href="/free-movies/secret-window/XM0EUS9EFUGFJT"></a></li>', url: "https://play.xumo.com/free-movies", siteRules, addedItems: { [key]: { title: "Now Playing", thumb: "", ts: 1 } } });
+    await wait(40);
+    const fillingLink = filling.document.querySelector("#xu a"); fillingLink.setAttribute("aria-label", "Secret Window");
+    fillingLink.insertAdjacentHTML("beforeend", '<img alt="Secret Window" src="https://image.xumo.com/a.webp"><span>Now Playing</span>'); await wait(950);
+    check("a saved video is repaired even when its card fills in late", () => assert.equal(filling.store.addedItems[key].title, "Secret Window"));
+    filling.window.close();
     const kept = await load({ html: xumoHtml, url: "https://play.xumo.com/free-movies", siteRules, addedItems: { [key]: { title: "My own name", thumb: "https://image.xumo.com/mine.webp", ts: 1 } } });
     await wait(950);
     check("a saved video with a proper name and picture is left alone", () => { assert.equal(kept.store.addedItems[key].title, "My own name"); assert.equal(kept.store.addedItems[key].thumb, "https://image.xumo.com/mine.webp"); });

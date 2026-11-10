@@ -519,13 +519,19 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   function healSaved(card, rule, data) {
     const saved = added[data.key] || hidden[data.key];
     if (!saved || healedSaved.has(data.key) || data.kind === "channel" || data.kind === "category") return;
-    healedSaved.add(data.key);
     const link = getLink(card, rule);
     const badge = link ? HOA.cleanTitle(textFrom(link)) : "";
+    const wrongName = saved.title === HOA.siteOf(data.key) || (badge && saved.title === badge);
+    if (!wrongName && saved.thumb) {
+      // An empty link may be a card still filling in, so only a card with something to compare is settled.
+      if (badge) healedSaved.add(data.key);
+      return;
+    }
     const patch = {};
-    if (data.title && data.title !== saved.title && (saved.title === badge || saved.title === HOA.siteOf(data.key))) patch.title = data.title;
+    if (wrongName && data.title && data.title !== saved.title && data.title !== HOA.siteOf(data.key)) patch.title = data.title;
     if (!saved.thumb) { const picture = data.thumb || cardPicture(card); if (picture) patch.thumb = picture; }
     if (!Object.keys(patch).length) return;
+    healedSaved.add(data.key);
     pendingHeals.set(data.key, patch);
     if (healTimer) return;
     healTimer = window.setTimeout(() => {
