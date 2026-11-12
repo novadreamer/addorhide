@@ -261,7 +261,7 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "roku", carousels: true, name: "The Roku Channel", builtIn: false, hosts: Object.freeze(["app.roku.com", "therokuchannel.roku.com"]), subdomains: false,
-      cardSelector: "li.movie, li.series, li.featured, li[data-row][data-col]", removeClosest: "li.movie, li.series, li.featured, li[data-row][data-col]", featuredSelector: "li.featured", linkSelector: 'a[itemprop="url"]', titleCandidates: Object.freeze(['meta[itemprop="name"]', "[aria-label]"]),
+      cardSelector: "li.movie, li.series, li.featured, li[data-row][data-col], .grid-items > div.group", removeClosest: "li.movie, li.series, li.featured, li[data-row][data-col], .grid-items > div.group", featuredSelector: "li.featured", linkSelector: 'a[itemprop="url"]', titleCandidates: Object.freeze(['meta[itemprop="name"]', "[aria-label]"]),
       typeByCard: Object.freeze([["li.movie", "movie"], ["li.series", "tv"]]),
       meta: Object.freeze({ texts: Object.freeze([".title-label", '[data-test-id="content-indicator-container"]']) }),
       sections: Object.freeze([{ container: "div.roku-collection-row", title: ".roku-collection-row__title", titleAttribute: "data-row-title" }]),
