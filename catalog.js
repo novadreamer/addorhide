@@ -279,6 +279,28 @@ var HOA_CATALOG = Object.freeze((() => {
       ])
     }),
     Object.freeze({
+      id: "prime", carousels: true, name: "Prime Video", builtIn: false, hosts: Object.freeze(["amazon.com", "primevideo.com"]), subdomains: true,
+      // Prime has several card kinds: "card" (ordinary and Top 10), "super-carousel-card" (Featured Originals and
+      // channel offers) and "top-hero-card" (the big rotating banner). Every one ends in "card".
+      cardSelector: 'article[data-testid$="card"]', removeClosest: "li", featuredSelector: 'article[data-testid="top-hero-card"], article[data-testid="super-carousel-card"]',
+      linkSelector: 'a[href*="/detail/"]', titleCandidates: Object.freeze(["a[aria-label]", 'a[href*="/detail/"]', "button[aria-label]", "img[alt]"]),
+      typeByCard: Object.freeze([['[data-card-entity-type="Movie"]', "movie"], ['[data-card-entity-type="TV Show"]', "tv"]]),
+      // Each row is a container named after its kind of carousel (standard, super, beard-supported...) or the Top 10 chart.
+      sections: Object.freeze([{ container: 'div[data-testid$="carousel"], section[data-testid$="carousel"], div[data-testid="charts-container"]', title: 'h2, [data-testid="collection-header"]' }]),
+      categories: Object.freeze([
+        { id: "movies", label: "Movies", hint: "Movie tiles", card: { is: '[data-card-entity-type="Movie"]' } },
+        { id: "tv", label: "TV shows", hint: "Series tiles", card: { is: '[data-card-entity-type="TV Show"]' } },
+        { id: "live", label: "Live TV & events", hint: "Live channels and events, and rows such as On now and Live: News", card: { is: '[data-card-entity-type="EVENT"]' }, shelfTitle: "^(?:Live\\b|On now\\b|Sports and events\\b)" },
+        { id: "unentitled", label: "Not in your plan", hint: "Titles you would have to rent, buy or subscribe to a channel for", card: { is: '[data-card-entitlement="Unentitled"]' } },
+        // Banner and Featured carousel cards carry no movie/TV marking, so they get a type of their own.
+        { id: "featured", label: "Banner & featured carousels", hint: "The big rotating banner at the top and rows such as Featured Originals and Exclusives", card: { is: 'article[data-testid="top-hero-card"], article[data-testid="super-carousel-card"]' } },
+        { id: "free", label: "Free with ads rows", hint: "Rows such as Free comedy movies and Amazon Originals – Free with ads", shelfTitle: "^Free\\b|Free with ads" },
+        { id: "recommended", label: "Recommended", hint: "Rows and cards picked for you: Recommended, For You, Because you watched…", shelfTitle: RECOMMENDED_SHELF_TITLE },
+        { id: "foreign", label: "Foreign titles, anywhere", hint: "Hides foreign-language titles wherever they appear on the page, in any row, not only foreign rows (Spanish, anime, subtitled films). To hide one row only, use Rows by name.", card: { text: FOREIGN_TEXT }, shelfTitle: FOREIGN_SHELF_TITLE },
+        { id: "genres", label: "Rows by name", hint: "Hide rows by their heading — genres, collections, channels' picks" }
+      ])
+    }),
+    Object.freeze({
       id: "fandango", carousels: true, name: "Fandango at Home", builtIn: false, hosts: Object.freeze(["athome.fandango.com", "fandangoathome.com", "vudu.com"]), subdomains: true,
       cardSelector: '[class*="carousel-default-styles__item"]', removeClosest: '[class*="carousel-default-styles__item"]', linkSelector: 'a[href*="/content/browse/details/"]', titleCandidates: Object.freeze(["img[alt]", "a[aria-label]"]),
       sections: Object.freeze([{ container: '[class*="sectionContainer__sectionContainer"]', title: '[class*="sectionContainer__sectionTitle"] h2' }]),
