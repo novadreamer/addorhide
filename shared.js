@@ -303,6 +303,15 @@ var HOA = Object.freeze((() => {
     "dailymotion.com": "Dailymotion",
     "play.xumo.com": "Xumo Play",
     "therokuchannel.roku.com": "The Roku Channel",
+    "app.roku.com": "The Roku Channel",
+    "amazon.com": "Prime Video",
+    "watch.plex.tv": "Plex",
+    "plex.tv": "Plex",
+    "cartoony.net": "Cartoony",
+    "carateen.tv": "Carateen",
+    "filmrise.com": "FilmRise",
+    "fawesome.tv": "Fawesome",
+    "tubitv.com": "Tubi",
     "athome.fandango.com": "Fandango at Home",
     "fandangoathome.com": "Fandango at Home",
     "vudu.com": "Fandango at Home",
@@ -316,6 +325,8 @@ var HOA = Object.freeze((() => {
     "rottentomatoes.com": "Rotten Tomatoes",
     "letterboxd.com": "Letterboxd"
   });
+
+  const HOST_ALIASES = Object.freeze({ "therokuchannel.roku.com": "app.roku.com" });
 
   function isObject(value) {
     return value && typeof value === "object" && !Array.isArray(value);
@@ -338,6 +349,7 @@ var HOA = Object.freeze((() => {
 
     url.hash = "";
     url.hostname = url.hostname.toLowerCase();
+    if (HOST_ALIASES[url.hostname]) url.hostname = HOST_ALIASES[url.hostname];
     const hostname = url.hostname;
     const imdb = hostname === "imdb.com" || hostname === "www.imdb.com" || hostname === "m.imdb.com";
     if (imdb) {
@@ -608,7 +620,7 @@ var HOA = Object.freeze((() => {
       const parsed = new URL(url);
       const path = parsed.pathname.toLowerCase();
       // The Roku Channel plays a movie at /watch; a series opens a page of seasons and episodes at /details.
-      if (parsed.hostname.toLowerCase() === "therokuchannel.roku.com") {
+      if (["therokuchannel.roku.com", "app.roku.com"].includes(parsed.hostname.toLowerCase())) {
         if (path.startsWith("/watch/")) return "movie";
         if (path.startsWith("/details/")) return "tv";
       }
@@ -842,9 +854,15 @@ var HOA = Object.freeze((() => {
     return value.replace(/^www\./, "");
   }
 
+  // A site's own name, not its address: known ones by name, others from the address ("cartoony.net" is Cartoony).
   function siteDisplayName(site) {
     const hostname = siteHostname(site);
-    return SITE_NAMES[hostname] || hostname;
+    if (SITE_NAMES[hostname]) return SITE_NAMES[hostname];
+    const parts = String(hostname || "").split(".").filter(Boolean);
+    if (parts.length < 2 || /^\d+$/.test(parts[parts.length - 1])) return hostname;
+    const names = parts.slice(0, -1).filter(part => !["www", "app", "watch", "play", "m", "tv", "web", "en", "co", "com"].includes(part));
+    const name = names[names.length - 1] || parts[parts.length - 2];
+    return name ? name.charAt(0).toUpperCase() + name.slice(1) : hostname;
   }
 
   // "... and N websites" when a website count is given (the popup and the Hidden window), e.g.
@@ -1175,11 +1193,14 @@ var HOA = Object.freeze((() => {
     if (!isObject(value)) {
       return normalized;
     }
-    Object.keys(value).forEach(key => {
+    Object.keys(value).forEach(savedKey => {
+      // Saved under an address the site has since moved from: kept, under the new one.
+      const moved = canonicalUrl(savedKey);
+      const key = moved && moved !== savedKey && HOST_ALIASES[siteHostname(savedKey)] ? moved : savedKey;
       if (canonicalUrl(key) !== key && !isHoaCardKey(key)) {
         return;
       }
-      const raw = value[key];
+      const raw = value[savedKey];
       if (!isObject(raw) || !Number.isFinite(raw.ts)) {
         return;
       }
@@ -1296,7 +1317,9 @@ var HOA = Object.freeze((() => {
     if (!isObject(value)) return normalized;
     Object.keys(value).forEach(key => {
       const ts = typeof value[key] === "number" ? value[key] : value[key] && value[key].ts;
-      if (canonicalUrl(key) === key && Number.isFinite(ts)) normalized[key] = ts;
+      const moved = canonicalUrl(key);
+      const target = moved && moved !== key && HOST_ALIASES[siteHostname(key)] ? moved : key;
+      if (canonicalUrl(target) === target && Number.isFinite(ts)) normalized[target] = ts;
     });
     const keys = Object.keys(normalized);
     if (keys.length > MAX_WATCHED_SHOWN) keys.sort((a, b) => normalized[a] - normalized[b] || a.localeCompare(b))
@@ -2181,6 +2204,7 @@ var HOA = Object.freeze((() => {
     playerSiteName,
     siteOf,
     cardKey,
+    isHoaCardKey,
     normalizeCardLinks,
     kindOf,
     chooseCardLink,

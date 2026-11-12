@@ -711,6 +711,40 @@ const CASES = [
     page.window.close();
   }
   {
+    const taught = { "taught.example": { enabled: true, pickedSelectors: ["div.tile"] } };
+    const tile = (id, href, inner) => `<div class="tile" id="${id}"><a href="${href}">${inner}</a></div>`;
+    const html = '<h1>Welcome to Plex!</h1><div class="row">'
+      + tile("plex", "/show/snowpiercer/season/2/episode/1", '<img alt="" src="https://taught.example/s.jpg"><span class="title">Snowpiercer - Season 2 • Episode 1 - The Time of the Gun</span>')
+      + tile("actor", "/person/norman-reedus", '<img alt="" src="https://taught.example/n.jpg"><span class="title">Norman Reedus • Scud</span>')
+      + tile("meta", "/details/hangar-10", '<img alt="" src="https://taught.example/h.jpg"><span class="title">2014 • UR • 1h 47mDetails</span>')
+      + '<div class="tile" id="vim"><a href="/123456"><img alt="" src="https://taught.example/v.jpg"></a></div><a href="/123456" class="caption">A Vimeo short</a></div>';
+    const page = await load({ url: "https://taught.example/", siteRules: taught, html });
+    ["plex", "actor", "meta", "vim"].forEach(id => page.document.querySelector(`#${id} .hoa-actions [data-action="add"]`).click()); await wait(40);
+    const titles = Object.fromEntries(Object.entries(page.store.addedItems).map(([key, entry]) => [key.replace("https://taught.example", ""), entry.title]));
+    check("a full episode name gets no page heading in front of it", () => assert.equal(titles["/show/snowpiercer/season/2/episode/1"], "Snowpiercer - Season 2 • Episode 1 - The Time of the Gun"));
+    check("a person is saved by name, without the role they play", () => assert.equal(titles["/person/norman-reedus"], "Norman Reedus"));
+    check("a details line is never a name", () => assert.ok(!/UR|Details/.test(titles["/details/hangar-10"])));
+    check("a name beside the picture, in another link to the same page, is found", () => assert.equal(titles["/123456"], "A Vimeo short"));
+    page.window.close();
+    const key = "https://taught.example/details/hangar-10";
+    const pageHtml = '<html><head><title>Hangar 10 | Taught</title><meta property="og:image" content="/posters/hangar.jpg"><script type="application/ld+json">{"@context":"https://schema.org","@type":"Movie","name":"Hangar 10","datePublished":"2014-06-01"}</script></head><body></body></html>';
+    const fetched = [];
+    const rich = await load({ url: "https://taught.example/", siteRules: taught, html: tile("meta", "/details/hangar-10", '<span class="title">2014 • UR • 1h 47mDetails</span>'),
+      setup: window => { window.fetch = async url => { fetched.push(String(url)); return { ok: true, headers: { get: () => "text/html" }, text: async () => pageHtml }; }; } });
+    rich.document.querySelector('#meta .hoa-actions [data-action="add"]').click(); await wait(200);
+    check("a saved video takes its name, year, type and picture from its own page", () => {
+      const entry = rich.store.addedItems[key];
+      assert.deepEqual([entry.title, entry.year, entry.type, entry.thumb], ["Hangar 10", 2014, "movie", "https://taught.example/posters/hangar.jpg"]);
+      assert.deepEqual(fetched, [key]);
+    });
+    rich.window.close();
+    const outside = await load({ url: "https://taught.example/", siteRules: taught, addedItems: { "https://other.example/x": { title: "other.example", thumb: "", ts: 1 } }, html: "",
+      setup: window => { window.fetch = async url => { fetched.push(String(url)); throw new Error("no"); }; } });
+    await wait(100);
+    check("only the open site's own pages are ever read", () => assert.ok(!fetched.some(url => url.startsWith("https://other.example"))));
+    outside.window.close();
+  }
+  {
     // The private-window Added Videos page borrows youtube.com/robots.txt: the feed engine stays out of it.
     const page = await load({ fixture: "youtube.html", url: "https://www.youtube.com/robots.txt#addorhide-added", siteRules: { "www.youtube.com": { hideKinds: ["watched"] } } });
     await wait(200);
@@ -963,16 +997,17 @@ const CASES = [
     buttons(movie, "add").click(); await wait(25);
     buttons(series, "add").click(); await wait(25);
     check("Roku Add follows a movie's WatchAction door but leaves a series on details", () => {
-      assert.ok(page.store.addedItems["https://therokuchannel.roku.com/watch/c0734dbe498259cf87ec6f049b015eed"]);
-      assert.strictEqual(page.store.addedItems["https://therokuchannel.roku.com/watch/c0734dbe498259cf87ec6f049b015eed"].title, "Coraline");
-      assert.strictEqual(page.store.addedItems["https://therokuchannel.roku.com/watch/c0734dbe498259cf87ec6f049b015eed"].type, "movie");
-      assert.ok(page.store.addedItems["https://therokuchannel.roku.com/details/f0cbab7bd40e550eb7181f772ae798a6/bewitched"]);
+      assert.ok(page.store.addedItems["https://app.roku.com/watch/c0734dbe498259cf87ec6f049b015eed"]);
+      assert.strictEqual(page.store.addedItems["https://app.roku.com/watch/c0734dbe498259cf87ec6f049b015eed"].title, "Coraline");
+      assert.strictEqual(page.store.addedItems["https://app.roku.com/watch/c0734dbe498259cf87ec6f049b015eed"].type, "movie");
+      assert.ok(page.store.addedItems["https://app.roku.com/details/f0cbab7bd40e550eb7181f772ae798a6/bewitched"]);
     });
     page.window.close();
   }
   {
     const former = "https://therokuchannel.roku.com/details/c0734dbe498259cf87ec6f049b015eed/coraline";
-    const current = "https://therokuchannel.roku.com/watch/c0734dbe498259cf87ec6f049b015eed";
+    // Saved before The Roku Channel moved: it now lives at app.roku.com.
+    const current = "https://app.roku.com/watch/c0734dbe498259cf87ec6f049b015eed";
     const page = await load({ fixture: "sites/roku.html", url: "https://therokuchannel.roku.com/",
       siteRules: { "therokuchannel.roku.com": { enabled: true } }, testSeam: true,
       hiddenItems: { [former]: { title: "Coraline", thumb: "", ts: 1, listed: true } },

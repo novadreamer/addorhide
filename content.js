@@ -1078,6 +1078,28 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     containerFilterCache = { key: cacheKey, nodes };
   }
 
+  const tileCache = new WeakMap();
+  // A taught card can be just the picture; its name and details sit beside it in the same tile. The tile is the
+  // largest box around it that holds no other card and is not much bigger than the card itself.
+  function wholeTile(card, rule, target) {
+    if (!rule.userPicked || rule.catalog) return target;
+    const cached = tileCache.get(card);
+    if (cached && cached.isConnected && cached.contains(card)) return cached;
+    const box = target.getBoundingClientRect();
+    let tile = target;
+    if (box.width && box.height) {
+      for (let parent = tile.parentElement, level = 0; parent && level < 4 && !["BODY", "HTML", "MAIN"].includes(parent.tagName); parent = parent.parentElement, level += 1) {
+        let cards = 2;
+        try { cards = parent.querySelectorAll(rule.cardSelector).length; } catch (error) { cards = 2; }
+        const outer = parent.getBoundingClientRect();
+        if (cards !== 1 || outer.width > box.width * 1.6 || outer.height > box.height * 2.6) break;
+        tile = parent;
+      }
+    }
+    tileCache.set(card, tile);
+    return tile;
+  }
+
   function removalTarget(card, rule) {
     if (rule.removeSlot) {
       let target = card;
@@ -1186,7 +1208,19 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   // Thumbnail links carry only a duration badge ("2:13", "1:02:03") or "LIVE"; never use that as a title.
   function looksLikeBadge(text) {
     return /^(\d{1,2}:){1,2}\d{2}$/.test(text) || /^(live|new|shorts?)$/i.test(text)
-      || /^(?:video(?: card| thumbnail)?|card|thumbnail|poster|image|play(?: video| now)?|watch(?: now| video)?|more info|details|now playing|free to watch|trending|most liked|new episodes?)$/i.test(text);
+      || /^(?:video(?: card| thumbnail)?|card|thumbnail|poster|image|play(?: video| now)?|watch(?: now| video)?|more info|details|now playing|free to watch|trending|most liked|new episodes?)$/i.test(text)
+      || metadataOnly(text);
+  }
+
+  // Nothing but a year, a rating, a length and the like: a card's details line, not its name.
+  function metadataOnly(text) {
+    const rest = String(text || "")
+      .replace(/\b(?:19|20)\d{2}\b/g, " ")
+      .replace(/\b\d+\s*h(?:rs?|ours?)?(?![a-z])|\b\d+\s*m(?:ins?|inutes?)?(?![a-ce-z])/gi, " ")
+      .replace(/\b(?:G|PG|PG-13|R|NC-17|NR|UR|TV-?(?:Y7?|Y7-?FV|G|PG|14|MA)|Unrated|Not Rated|HD|4K|UHD|CC|AD)\b/gi, " ")
+      .replace(/(?:Details|More info|Watch now|Trailer|Season[s]?\s*\d*|\d+\s*Seasons?)/gi, " ")
+      .replace(/[\s•·|,/-]+/g, "");
+    return /\d/.test(text) && rest.length < 2;
   }
 
   function plausiblePickedTitle(value) {
@@ -1236,6 +1270,18 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       .sort((left, right) => right.length - left.length)[0] || "";
   }
 
+  function siblingLinkTitle(card, link) {
+    const href = link.getAttribute("href");
+    if (!href || href.length > 500) return "";
+    let others = [];
+    try { others = Array.from(document.querySelectorAll(`a[href="${CSS.escape(href)}"]`)).filter(other => !card.contains(other)).slice(0, 4); } catch (error) { others = []; }
+    for (const other of others) {
+      const text = plausiblePickedTitle(other.getAttribute("aria-label")) || plausiblePickedTitle(other.getAttribute("title")) || plausiblePickedTitle(textFrom(other));
+      if (text) return text;
+    }
+    return "";
+  }
+
   // The heading of the row a card sits in, which a site sometimes repeats inside its cards.
   function rowHeading(card) {
     for (let node = card.parentElement, level = 0; node && node !== document.body && level < 5; node = node.parentElement, level += 1) {
@@ -1249,7 +1295,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   const EPISODE_LABEL = /\bepisode\b|\bep\.?\s*\d|\bS\d+\s*:?\s*E\d+\b|^E\d+\b|الحلقة|حلقة|épisode|episodio|\bfolge\b|bölüm|серия/i;
   // "Episode 3" on a show's page: the show's name is the page's heading, so the saved name carries it.
   function withShowName(title) {
-    if (!title || !EPISODE_LABEL.test(title)) return title;
+    if (!title || !EPISODE_LABEL.test(title) || title.split(/\s+/).length > 4) return title;
     const heading = document.querySelector("h1");
     const show = HOA.cleanTitle((heading && heading.textContent) || pageTitle()).slice(0, 120);
     return show && !title.includes(show) && !show.includes(title) ? `${show} – ${title}` : title;
@@ -1367,7 +1413,9 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
         title = plausiblePickedTitle(image && image.getAttribute("alt")) || "";
       }
       title = withShowName(title);
+      if (kind === "person") title = title.split(/\s+[•·|/]\s+|\n/)[0].trim();
     }
+    if (!title && link) title = siblingLinkTitle(card, link);
     title = HOA.cleanTitle(title || HOA.siteOf(key)).slice(0, HOA.MAX_TITLE);
 
     let thumb = HOA.youtubeThumb(key);
@@ -1665,6 +1713,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       retire(false);
       return;
     }
+    if (needsEnrich(entry, data.key) && !isIncognitoContext()) queueEnrich(data.key);
     showToast(data.key);
     lastApplyAt = 0;
     scheduleApply(true);
@@ -1736,6 +1785,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       return;
     }
     const isAdded = Boolean(added[data.key]);
+    if (isAdded && needsEnrich(added[data.key], data.key) && !isIncognitoContext()) queueEnrich(data.key);
     button.textContent = isAdded ? "Added" : "Add";
     button.setAttribute("aria-label", isAdded ? "Added" : "Add");
     button.setAttribute("aria-pressed", String(isAdded));
@@ -2203,7 +2253,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       if (isAd(card, variant)) removeActions(card);
       return;
     }
-    const target = removalTarget(card, variant);
+    const target = wholeTile(card, variant, removalTarget(card, variant));
     // A Xumo Featured promo may point at a row (#id), not a video.  It follows that row's visibility and has
     // no hover controls or stored-item identity of its own.
     const promoLink = variant.id === "xumo" && card.matches(".promoCard") && getLink(card, variant);
@@ -2368,6 +2418,113 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       });
   }
 
+  const enrichQueue = [];
+  const enrichSeen = new Set();
+  let enriching = false;
+
+  function weakName(title, key) {
+    return !title || title === HOA.siteOf(key) || looksLikeBadge(title);
+  }
+
+  function needsEnrich(entry, key) {
+    const kind = HOA.kindOf(key);
+    return Boolean(entry) && kind !== "channel" && kind !== "category" && !HOA.isHoaCardKey(key)
+      && (!entry.thumb || (!entry.year && kind !== "person") || weakName(entry.title, key) || / – /.test(entry.title || ""));
+  }
+
+  function queueEnrich(key) {
+    let url;
+    try { url = new URL(key); } catch (error) { return; }
+    if (url.origin !== location.origin || enrichSeen.has(key) || enrichSeen.size > 400) return;
+    enrichSeen.add(key);
+    enrichQueue.push(key);
+    runEnrich();
+  }
+
+  async function runEnrich() {
+    if (enriching) return;
+    enriching = true;
+    while (enrichQueue.length && ensureContext()) {
+      const key = enrichQueue.shift();
+      try {
+        const response = await fetch(key, { credentials: "include", redirect: "follow" });
+        if (response.ok && /html/i.test(response.headers.get("content-type") || "")) {
+          const html = (await response.text()).slice(0, 3000000);
+          applyEnrich(key, pageInfo(new DOMParser().parseFromString(html, "text/html"), key));
+        }
+      } catch (error) { /* the page could not be read: the entry keeps what it has */ }
+      await new Promise(resolve => setTimeout(resolve, 1200));
+    }
+    enriching = false;
+  }
+
+  // Name, year, type and picture as the page states them for search engines and link previews.
+  function pageInfo(doc, key) {
+    const info = {};
+    const meta = selector => { const node = doc.querySelector(selector); return node ? (node.getAttribute("content") || "").trim() : ""; };
+    const absolute = value => { try { const url = new URL(value, key); return /^https?:$/.test(url.protocol) && url.href.length <= HOA.MAX_URL ? url.href : ""; } catch (error) { return ""; } };
+    const items = [];
+    doc.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
+      try {
+        const walk = value => { if (Array.isArray(value)) value.forEach(walk); else if (value && typeof value === "object") { items.push(value); if (value["@graph"]) walk(value["@graph"]); } };
+        walk(JSON.parse(script.textContent));
+      } catch (error) { /* not JSON */ }
+    });
+    const typeOf = item => [].concat(item["@type"] || []).map(String);
+    const main = items.find(item => typeOf(item).some(type => /^(Movie|TVSeries|TVSeason|TVEpisode|Episode|VideoObject|Person|CreativeWork|Clip)$/.test(type))) || {};
+    const types = typeOf(main);
+    if (types.some(type => type === "Movie")) info.type = "movie";
+    else if (types.some(type => /^(TVSeries|TVSeason|TVEpisode|Episode)$/.test(type))) info.type = "tv";
+    else if (types.includes("Person")) info.type = "person";
+    const name = typeof main.name === "string" ? main.name : "";
+    const ogTitle = meta('meta[property="og:title"]') || meta('meta[name="twitter:title"]') || (doc.title || "");
+    info.title = HOA.cleanTitle(name || ogTitle.replace(/\s+[|–—-]\s+[^|–—-]+$/, "")).slice(0, HOA.MAX_TITLE);
+    const date = [main.datePublished, main.dateCreated, main.startDate, main.uploadDate, main.releaseDate, main.copyrightYear,
+      main.releasedEvent && main.releasedEvent.startDate, meta('meta[itemprop="datePublished"]'), meta('meta[property="video:release_date"]')]
+      .map(value => String(value || "")).find(value => /\b(?:18|19|20)\d{2}\b/.test(value));
+    const year = date ? Number(date.match(/\b(?:18|19|20)\d{2}\b/)[0]) : 0;
+    // A date past next year is when the site stops offering it, not when it came out.
+    if (year && year <= new Date().getFullYear() + 1) info.year = year;
+    const image = [].concat(main.image || []).map(value => (value && typeof value === "object" ? value.url : value)).find(value => typeof value === "string");
+    info.thumb = absolute(image || meta('meta[property="og:image"]') || meta('meta[name="twitter:image"]'));
+    return info;
+  }
+
+  function applyEnrich(key, info) {
+    HOA.readLists(lists => {
+      const changed = {};
+      ["added", "hidden"].forEach(name => {
+        const saved = lists[name][key];
+        if (!saved) return;
+        const patch = {};
+        const plain = String(saved.title || "").replace(/…$/, "");
+        const ours = / – (.+)$/.exec(plain);
+        const better = info.title && !weakName(info.title, key) && info.title !== saved.title
+          && (weakName(saved.title, key) || plain.includes(info.title) || (ours && (info.title.startsWith(ours[1]) || ours[1].startsWith(info.title))));
+        if (better) patch.title = info.title;
+        const year = patch.year || saved.year || info.year;
+        // "Name (2022)" with the year saved beside it: the name alone.
+        const named = patch.title || saved.title || "";
+        if (year && named.endsWith(` (${year})`)) patch.title = named.slice(0, -` (${year})`.length);
+        if (!saved.year && Number.isInteger(info.year) && info.year >= 1870 && info.year <= 2100) patch.year = info.year;
+        if (!saved.thumb && info.thumb) patch.thumb = info.thumb;
+        if (info.type && (!saved.type || saved.type === "video")) patch.type = info.type;
+        if (Object.keys(patch).length) changed[name] = { ...lists[name], [key]: { ...saved, ...patch } };
+      });
+      if (Object.keys(changed).length) HOA.writeLists(changed);
+    });
+  }
+
+  // Saved videos of this site that still lack something: read a few of their pages while the site is open.
+  let savedEnrichDone = false;
+  function enrichSaved() {
+    if (savedEnrichDone || isIncognitoContext()) return;
+    savedEnrichDone = true;
+    [...Object.entries(added), ...Object.entries(hidden)]
+      .filter(([key, entry]) => HOA.siteOf(key) === HOA.siteOf(location.href) && needsEnrich(entry, key))
+      .slice(0, 8).forEach(([key]) => queueEnrich(key));
+  }
+
   let pageHealHref = "";
   function healFromPage() {
     if (pageHealHref === location.href) return;
@@ -2400,6 +2557,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     scheduled = 0;
     if (!listsReady || !siteRulesReady) return;
     healFromPage();
+    enrichSaved();
     syncPlayerWatchedTag();
     if (!document.body) {
       if (!waitingForBody) {

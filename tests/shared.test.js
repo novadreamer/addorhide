@@ -285,7 +285,16 @@ check("type tv", () => assert.equal(HOA.typeOf("https://example.com/tv-shows/tit
 check("type live", () => assert.equal(HOA.typeOf("https://example.com/live/title"), "live"));
 check("type default", () => assert.equal(HOA.typeOf("https://example.com/watch/title"), "video"));
 check("known site display name", () => assert.equal(HOA.siteDisplayName("www.youtube.com"), "YouTube"));
-check("unknown site display name", () => assert.equal(HOA.siteDisplayName("www.example.com"), "example.com"));
+check("sites show their own name, not their address", () => {
+  assert.equal(HOA.siteDisplayName("www.example.com"), "Example");
+  [["cartoony.net", "Cartoony"], ["app.roku.com", "The Roku Channel"], ["therokuchannel.roku.com", "The Roku Channel"], ["watch.plex.tv", "Plex"], ["amazon.com", "Prime Video"], ["www.filmrise.com", "FilmRise"], ["play.newsite.tv", "Newsite"], ["127.0.0.1", "127.0.0.1"]]
+    .forEach(([site, name]) => assert.equal(HOA.siteDisplayName(site), name, site));
+});
+check("The Roku Channel's old address is its new one", () => {
+  assert.equal(HOA.canonicalUrl("https://therokuchannel.roku.com/details/abc/a-film"), "https://app.roku.com/details/abc/a-film");
+  const moved = HOA.normalizeItems({ "https://therokuchannel.roku.com/watch/abc": { title: "A film", thumb: "", ts: 1 } });
+  assert.deepEqual(Object.keys(moved), ["https://app.roku.com/watch/abc"]); assert.equal(moved["https://app.roku.com/watch/abc"].title, "A film");
+});
 check("hidden summary empty and invalid", () => assert.deepEqual(
   [HOA.hiddenSummaryText(0), HOA.hiddenSummaryText(-1), HOA.hiddenSummaryText("1")],
   ["No hidden videos.", "No hidden videos.", "No hidden videos."]));

@@ -196,7 +196,7 @@ async function load(initial = {}) {
   assert.equal(crowded.document.querySelector(".added-more-panel"), null, "Escape closes the panel");
   assert.equal(crowded.document.activeElement, moreButton(), "focus returns to More sites");
   moreButton().click(); await wait(5);
-  const pick = Array.from(crowded.document.querySelectorAll(".added-more-item")).find(item => item.textContent.includes("site0")); pick.click(); await wait(30);
+  const pick = Array.from(crowded.document.querySelectorAll(".added-more-item")).find(item => /site0/i.test(item.textContent)); pick.click(); await wait(30);
   assert.equal(crowded.store.addedViewPrefs.__page.selectedTab, "site0.example", "picking a site selects it");
   assert.equal(crowded.document.querySelector("#added-tab-site0-example").getAttribute("aria-selected"), "true", "a picked site gets a visible tab");
   assert.ok(crowded.document.querySelector(".site-group[data-site='site0.example']"), "a picked site shows its videos");

@@ -1,6 +1,6 @@
 # AddOrHide Privacy Policy
 
-**Effective date:** October 9, 2026 (updated November 6, 2026)
+**Effective date:** October 9, 2026 (updated November 11, 2026)
 **Developer:** Ashraf Mustafa
 **Contact:** mybrainnoor@gmail.com
 
@@ -17,6 +17,7 @@ The extension stores the following in your browser's local extension storage:
 - **Watch Later.** When you click **Add to Watch Later**, the extension saves that video's address, title, thumbnail address, site name, length and the time you added it.
 - **Row names.** The names of the rows a site shows, so you can pick rows to hide under Rows by name. If you press **Find all rows**, the extension also opens up to 12 of that site's own genre pages in a hidden frame to read their row names. Like any page you open, those pages are loaded from that site.
 - **Addresses of cards with no link.** Some sites keep a card's address out of the page. When you click **Add** or **Hide** on such a card, the extension clicks the card itself, reads the address the site tries to open, cancels the move and saves that address for the card. The site may count this as a click on that card.
+- **Names, years and pictures of saved videos.** When you add or hide a video, the extension may load that video's own page from the same site in the background to read its name, release year, type and picture, as the page states them for link previews. While a site is open, it may do the same for a few videos you saved from that site that are still missing these details. Only pages on the site you are on are read, and what is read stays in your lists on your device.
 - **Site settings.** The sites where you turned the extension on, the card pattern (a CSS selector) learned when you use the card picker, and your "hide the whole feed" switches.
 - **Page preferences.** How you sorted, grouped or collapsed things on the Added Videos and Hidden Videos pages, and your Watching settings.
 
