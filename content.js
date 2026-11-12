@@ -1417,6 +1417,9 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     }
     if (!title && link) title = siblingLinkTitle(card, link);
     title = HOA.cleanTitle(title || HOA.siteOf(key)).slice(0, HOA.MAX_TITLE);
+    // "Name (2022)": the year is kept as the year, not as part of the name.
+    const namedYear = title.match(/^(.{2,}?)\s*\(((?:18|19|20)\d{2})\)$/);
+    if (namedYear) title = namedYear[1];
 
     let thumb = HOA.youtubeThumb(key);
     if (!thumb) {
@@ -1430,7 +1433,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const formerHref = former && former !== link && ((rule.linkAttribute && former.getAttribute(rule.linkAttribute)) || former.href || former.getAttribute("href"));
     const candidateKey = formerHref && keyForHref(formerHref, rule);
     const formerKey = candidateKey && HOA.kindOf(candidateKey) !== "channel" ? candidateKey : "";
-    return { key, title, thumb, kind, site: HOA.siteOf(key), ts: Date.now(), ...(formerKey && formerKey !== key ? { formerKey } : {}), ...(pageData ? { pageData } : {}) };
+    return { key, title, thumb, kind, site: HOA.siteOf(key), ts: Date.now(), ...(namedYear ? { year: Number(namedYear[2]) } : {}), ...(formerKey && formerKey !== key ? { formerKey } : {}), ...(pageData ? { pageData } : {}) };
   }
 
   function elementText(element) {
