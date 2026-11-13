@@ -17,6 +17,25 @@ const now = Date.UTC(2026, 0, 31);
 
 check("canonical YouTube short URL", () => assert.equal(HOA.canonicalUrl(`https://youtu.be/${id}?utm_source=x`), watch));
 check("canonical YouTube tracking params", () => assert.equal(HOA.canonicalUrl(`${watch}&list=abc&index=2#comments`), watch));
+check("canonical YouTube playlist retains its list", () => assert.equal(HOA.canonicalUrl("https://www.youtube.com/playlist?list=PL123&si=tracking"), "https://www.youtube.com/playlist?list=PL123"));
+check("playlist and category types are labelled", () => {
+  assert.equal(HOA.typeOf("https://www.youtube.com/playlist?list=PL123"), "playlist");
+  assert.equal(HOA.typeOf("https://example.com/playlists/featured"), "playlist");
+  assert.equal(HOA.typeOf("https://example.com/category/action"), "category");
+  assert.equal(HOA.typeLabel("playlist"), "Playlist");
+  assert.equal(HOA.typeLabel("category"), "Category");
+});
+check("text comparison ignores leading display decoration and sorts numbers naturally", () => {
+  assert(HOA.compareText("\u200f( The 2)", "The 10") < 0);
+  assert(HOA.compareText("\uFD3EAlpha\uFD3F", "Beta") < 0);
+});
+check("text comparison provides stable natural ordering across Arabic and Latin labels", () => {
+  assert.deepEqual(["ب", "ا", "Zebra", "apple", "١٠", "٣"].sort(HOA.compareText), ["apple", "Zebra", "٣", "١٠", "ا", "ب"]);
+});
+check("legacy category kinds migrate to the Category type", () => {
+  const items = HOA.normalizeItems({ "https://example.com/category/films": { title: "Films", thumb: "", kind: "category", type: "video", ts: 1 } });
+  assert.equal(items["https://example.com/category/films"].type, "category");
+});
 check("canonical short", () => assert.equal(HOA.canonicalUrl(`${short}?si=abc#x`), short));
 check("canonical generic URL", () => assert.equal(HOA.canonicalUrl("https://example.com/path/?b=2&utm_source=x&a=1#hash"), "https://example.com/path?a=1&b=2"));
 check("canonical IMDb title URL", () => assert.equal(HOA.canonicalUrl("https://m.imdb.com/title/tt31450459/?ref_=chtmvm_i_1&foo=ignored#hash"), "https://www.imdb.com/title/tt31450459"));
@@ -297,17 +316,17 @@ check("The Roku Channel's old address is its new one", () => {
 });
 check("hidden summary empty and invalid", () => assert.deepEqual(
   [HOA.hiddenSummaryText(0), HOA.hiddenSummaryText(-1), HOA.hiddenSummaryText("1")],
-  ["No hidden videos.", "No hidden videos.", "No hidden videos."]));
-check("hidden summary singular", () => assert.equal(HOA.hiddenSummaryText(1), "There is 1 hidden video."));
-check("hidden summary plural", () => assert.equal(HOA.hiddenSummaryText(3), "There are 3 hidden videos."));
+  ["No hidden items.", "No hidden items.", "No hidden items."]));
+check("hidden summary singular", () => assert.equal(HOA.hiddenSummaryText(1), "There is 1 hidden item."));
+check("hidden summary plural", () => assert.equal(HOA.hiddenSummaryText(3), "There are 3 hidden items."));
 check("added count empty", () => assert.deepEqual([HOA.addedCountText(0), HOA.addedCountText(-1), HOA.addedCountText("1")],
   ["No added videos.", "No added videos.", "No added videos."]));
 check("added count singular", () => assert.equal(HOA.addedCountText(1), "There is 1 added video."));
 check("added count plural", () => assert.equal(HOA.addedCountText(4), "There are 4 added videos."));
 check("counts with websites", () => assert.deepEqual(
   [HOA.addedCountText(3, 1), HOA.addedCountText(1, 1), HOA.hiddenSummaryText(5, 2), HOA.hiddenSummaryText(0, 2), HOA.addedCountText(2, 0)],
-  ["There are 3 added videos and 1 website.", "There is 1 added video and 1 website.", "There are 5 hidden videos and 2 websites.",
-   "No hidden videos.", "There are 2 added videos."]));
+   ["There are 3 added videos and 1 website.", "There is 1 added video and 1 website.", "There are 5 hidden items and 2 websites.",
+    "No hidden items.", "There are 2 added videos."]));
 check("site monogram stable", () => assert.deepEqual(HOA.siteMonogram("example.com"), HOA.siteMonogram("example.com")));
 check("site monogram hue", () => assert.ok(HOA.siteMonogram("example.com").hue >= 0 && HOA.siteMonogram("example.com").hue <= 359));
 check("type labels", () => assert.equal(HOA.typeLabel("tv"), "TV"));
@@ -722,6 +741,20 @@ check("player surface distinguishes real players from thumbnail and hover-previe
   assert.equal(HOA.isPlayerSurface(channelOnly, "https://rumble.com/shorts/one"), true);
   const small = { ...player, querySelectorAll: selector => selector === "video" ? [{ ...video, getBoundingClientRect: () => rect(0, 0, 20, 20) }] : [] };
   assert.equal(HOA.isPlayerSurface(small, "https://rumble.com/shorts/one"), false);
+});
+
+check("Prime Video titles drop the row code, and saves under the old address move to the clean one", () => {
+  const old = "https://www.amazon.com/gp/video/detail/B0HKXZ6P14?jic=16%7CCgNhbGw&ref_=atv_hm";
+  assert.equal(HOA.canonicalUrl(old), "https://www.amazon.com/gp/video/detail/B0HKXZ6P14");
+  const items = HOA.normalizeItems({ [old]: { title: "Other Mommy", thumb: "", ts: Date.now(), site: "amazon.com" } });
+  assert.deepEqual(Object.keys(items), ["https://www.amazon.com/gp/video/detail/B0HKXZ6P14"]);
+  assert.equal(items["https://www.amazon.com/gp/video/detail/B0HKXZ6P14"].title, "Other Mommy");
+});
+
+check("a trailing [TV Series] or [Movie] is not part of the name", () => {
+  assert.equal(HOA.cleanTitle("Anna Pigeon [TV Series]"), "Anna Pigeon");
+  assert.equal(HOA.cleanTitle("Clueless [Movie]"), "Clueless");
+  assert.equal(HOA.cleanTitle("Band [Live]"), "Band [Live]");
 });
 
 console.log(`shared.test.js: ${passed} passed, 0 failed`);

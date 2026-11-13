@@ -70,8 +70,8 @@
       site,
       name: HOA.siteDisplayName(site),
       entries: siteEntries
-    })).sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" })
-      || left.site.localeCompare(right.site));
+    })).sort((left, right) => HOA.compareText(left.name, right.name)
+      || HOA.compareText(left.site, right.site));
   }
 
   function makeMonogram(tile, site) {
@@ -212,9 +212,8 @@
     } else {
       info.appendChild(element("span", "hidden-title", entry.title || key));
     }
-    if (entry.kind === "short") {
-      info.appendChild(element("span", "hidden-kind", "Short"));
-    }
+    const type = entry.type || HOA.typeOf(key);
+    if (type !== "video") info.appendChild(element("span", "hidden-kind", HOA.typeLabel(type)));
     if (entry.reason === "watched" || entry.watched === true) {
       info.appendChild(element("span", "hidden-kind hidden-watched", "Watched"));
     }
@@ -223,7 +222,7 @@
     info.appendChild(rowStatus);
     row.appendChild(info);
     const actions = element("div", "hidden-actions");
-    const what = (entry.type || HOA.typeOf(key)) === "person" ? "person" : "video";
+    const what = HOA.typeLabel(entry.type || HOA.typeOf(key)).toLowerCase();
     const restore = iconButton("restore-button", RESTORE_ICON, `Restore: show this ${what} in the feed again`);
     restore.id = `hidden-restore-${index}`;
     restore.addEventListener("click", () => {
@@ -413,7 +412,7 @@
     if (collapsed) return section;
     const body = element("div", "site-group-body");
     const sorted = view.sort === "added" && view.dir === "desc" ? channelEntries : view.sort === "site"
-      ? channelEntries.slice().sort((left, right) => String(left[1].site || "").localeCompare(String(right[1].site || "")) * (view.dir === "asc" ? 1 : -1))
+      ? channelEntries.slice().sort((left, right) => HOA.compareText(String(left[1].site || ""), String(right[1].site || "")) * (view.dir === "asc" ? 1 : -1))
       : HOA.sortEntries(channelEntries, view.sort, view.dir);
     const subgroups = view.group === "none" ? [{ label: "", entries: sorted }]
       : HOA.orderGroupsBySort(HOA.groupEntries(sorted, view.group), sorted, view.group);
@@ -463,7 +462,7 @@
     // Watched but with no hidden record. Restored or removed ones stay off; a record of any kind speaks for itself.
     const watchOnly = HOA.watchedOnlyKeys(watchProgress, hidden, watchedShown, siteRules).map(key => [key, watchProgress[key]]).map(([key, entry]) => [key, { title: entry.title, thumb: entry.thumbnail || "", site: entry.site, kind: HOA.kindOf(key), ts: entry.updated, listed: false, watched: true, reason: "watched" }]);
     watchedEntries.push(...watchOnly);
-    watchedEntries.sort((left, right) => (Number(right[1].ts) || 0) - (Number(left[1].ts) || 0) || left[0].localeCompare(right[0]));
+    watchedEntries.sort((left, right) => (Number(right[1].ts) || 0) - (Number(left[1].ts) || 0) || HOA.compareText(left[0], right[0]));
     const everyEntry = [...entries, ...watchOnly];
     const groups = groupsFor(entries.filter(([, entry]) => entry.reason !== "watched" && entry.watched !== true));
     const channelEntries = Object.entries(channels).map(([key, entry]) => [key, { ...entry, title: channelTitle(key, entry) }]);

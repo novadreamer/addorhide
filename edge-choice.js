@@ -13,10 +13,10 @@ function bindButtonControls(toggle, edgeGroup) {
     button.classList.add("is-pressed");
   };
   const showEnabled = enabled => {
-    // The ring describes the current state: green while the hover buttons show, red while they are hidden.
+    // The tile colour describes the current state: green while the hover buttons show, red while they are hidden.
     // The note below names the action, and screen readers get it from the label.
     if (!toggle.querySelector("svg")) {
-      toggle.innerHTML = '<svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><defs><linearGradient id="hoa-power-ring" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--power-ring-light)"/><stop offset="1" stop-color="var(--power-ring-dark)"/></linearGradient><linearGradient id="hoa-power-disc" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#eef0f1"/><stop offset="1" stop-color="#aeb5b9"/></linearGradient></defs><circle cx="32" cy="32" r="31.5" fill="url(#hoa-power-ring)"/><circle cx="32" cy="32" r="29.9" fill="none" stroke="rgba(255,255,255,.72)" stroke-width=".8"/><circle cx="32" cy="32" r="23.2" fill="url(#hoa-power-disc)" stroke="#fff" stroke-width="1.5"/><path d="M32 18.2v13.2M24.2 22.2a12.6 12.6 0 1 0 15.6 0" fill="none" stroke="#47525a" stroke-width="4" stroke-linecap="round"/><path d="M31.2 18.2v13.2M23.6 21.8a13.2 13.2 0 1 0 16.8 0" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".8" stroke-linecap="round"/></svg>';
+      toggle.innerHTML = '<svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><defs><linearGradient id="hoa-power-tile" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--power-ring-light)"/><stop offset="1" stop-color="var(--power-ring-dark)"/></linearGradient></defs><rect width="64" height="64" rx="19" fill="url(#hoa-power-tile)"/><path d="M41.96 26.64A13 13 0 1 1 22.04 26.64" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M32 15.5v10" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg>';
     }
     toggle.setAttribute("aria-label", enabled ? "Turn off" : "Turn on");
     toggle.dataset.enabled = String(enabled);

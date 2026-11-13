@@ -537,6 +537,16 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     flushHeals();
   }
 
+  function rereadPicture(card, key) {
+    if (!card) return;
+    [1500, 5000].forEach(delay => window.setTimeout(() => {
+      const saved = added[key] || hidden[key];
+      if (!saved || saved.thumb || !card.isConnected) return;
+      const picture = cardPicture(card);
+      if (picture) { pendingHeals.set(key, { ...(pendingHeals.get(key) || {}), thumb: picture }); flushHeals(); }
+    }, delay));
+  }
+
   function flushHeals() {
     if (healTimer) return;
     healTimer = window.setTimeout(() => {
@@ -634,6 +644,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const watched = (rule.categories || []).find(category => category.id === "watched");
     if (!watched) return false;
     const current = data || cardData(card, rule);
+    if (current && HOA.typeOf(current.key) === "playlist") return false;
     const progress = current && watchProgress[current.key];
     // An explicit untag wins over YouTube's own resume bar until a fresh full watch replaces it.
     if (progress && progress.untagged) return false;
@@ -662,6 +673,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
 
   function shouldRecordWatchProgress(rule = hostnameRule(), key = "") {
     if (!watchSettingsReady || !siteRulesReady) return false;
+    if (key && HOA.typeOf(key) === "playlist") return false;
     if (chosenVideo(key)) return true;
     return !isIncognitoContext() && (watchSettings.tagWatched || watchSettings.continueWatching !== "off"
       || childFrame || Boolean(rule && watchedEnabled(activeCategories(rule))));
@@ -1302,7 +1314,8 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   }
 
   function candidateText(element, selector = "") {
-    const attribute = String(selector).match(/\[(alt|aria-label|title)\]/);
+    // "img[alt]", "a[aria-label]", Rumble's "[video-title]": the name is in that attribute, not in the card's text.
+    const attribute = String(selector).match(/\[([a-z][\w-]*)\]\s*$/i);
     const value = element && attribute ? (element.getAttribute(attribute[1]) || "").trim() : "";
     return value || (element && element.matches("img") ? "" : textFrom(element));
   }
@@ -1336,6 +1349,22 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     return HOA.canonicalUrl(href, location.href);
   }
 
+  function playlistKeyForCard(card, href, key) {
+    if (!key || !/[?&]list=/.test(String(href || ""))) return key;
+    try {
+      const url = new URL(href, location.href);
+      const host = url.hostname.toLowerCase().replace(/^www\./, "");
+      const list = host === "youtube.com" && url.searchParams.get("list");
+      // Only cards YouTube itself draws as a playlist or mix (stacked thumbnail); a video played inside a playlist
+      // also links with list=, and stays a video.
+      const shapes = "yt-collection-thumbnail-view-model, ytd-playlist-renderer, ytd-grid-playlist-renderer, ytd-compact-playlist-renderer, ytd-radio-renderer, ytd-compact-radio-renderer";
+      const collection = url.pathname === "/playlist" || card.matches(shapes) || Boolean(card.querySelector(shapes));
+      return list && collection ? `https://www.youtube.com/playlist?list=${encodeURIComponent(list)}` : key;
+    } catch (error) {
+      return key;
+    }
+  }
+
   function watchKey(rule) {
     if (rule && rule.watchPath) {
       try { if (!(new RegExp(rule.watchPath).test(location.pathname))) return null; } catch (error) { return null; }
@@ -1367,7 +1396,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
         ...(key !== formerKey ? { formerKey } : {}) };
     }
     const href = (rule.linkAttribute && link.getAttribute(rule.linkAttribute)) || link.href || link.getAttribute("href");
-    const key = keyForHref(href, rule);
+    const key = playlistKeyForCard(card, href, keyForHref(href, rule));
     if (!key) {
       return null;
     }
@@ -1717,6 +1746,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       return;
     }
     if (needsEnrich(entry, data.key) && !isIncognitoContext()) queueEnrich(data.key);
+    if (!(added[data.key] || hidden[data.key] || {}).thumb) rereadPicture(data.card, data.key);
     showToast(data.key);
     lastApplyAt = 0;
     scheduleApply(true);
@@ -1789,6 +1819,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     }
     const isAdded = Boolean(added[data.key]);
     if (isAdded && needsEnrich(added[data.key], data.key) && !isIncognitoContext()) queueEnrich(data.key);
+    if (!(added[data.key] || hidden[data.key] || {}).thumb) rereadPicture(data.card, data.key);
     button.textContent = isAdded ? "Added" : "Add";
     button.setAttribute("aria-label", isAdded ? "Added" : "Add");
     button.setAttribute("aria-pressed", String(isAdded));
@@ -2431,7 +2462,8 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
 
   function needsEnrich(entry, key) {
     const kind = HOA.kindOf(key);
-    return Boolean(entry) && kind !== "channel" && kind !== "category" && !HOA.isHoaCardKey(key)
+    const type = HOA.typeOf(key);
+    return Boolean(entry) && kind !== "channel" && kind !== "category" && type !== "playlist" && !HOA.isHoaCardKey(key)
       && (!entry.thumb || (!entry.year && kind !== "person") || weakName(entry.title, key) || / – /.test(entry.title || ""));
   }
 
@@ -2450,15 +2482,57 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     while (enrichQueue.length && ensureContext()) {
       const key = enrichQueue.shift();
       try {
-        const response = await fetch(key, { credentials: "include", redirect: "follow" });
-        if (response.ok && /html/i.test(response.headers.get("content-type") || "")) {
-          const html = (await response.text()).slice(0, 3000000);
-          applyEnrich(key, pageInfo(new DOMParser().parseFromString(html, "text/html"), key));
+        const fandango = fandangoInfoUrl(key);
+        if (fandango) {
+          const response = await fetch(fandango, { credentials: "omit" });
+          if (response.ok) applyEnrich(key, fandangoInfo(await response.text()));
+        } else {
+          const html = await readPage(key);
+          if (html) applyEnrich(key, pageInfo(new DOMParser().parseFromString(html, "text/html"), key));
         }
       } catch (error) { /* the page could not be read: the entry keeps what it has */ }
       await new Promise(resolve => setTimeout(resolve, 1200));
     }
     enriching = false;
+  }
+
+  // The page itself; a link that moves to a sister site (Cartoony's specials open on carateen.tv) is read by the
+  // background page, which can follow it only to a site you have turned AddOrHide on for.
+  async function readPage(key) {
+    try {
+      const response = await fetch(key, { credentials: "include", redirect: "follow" });
+      return response.ok && /html/i.test(response.headers.get("content-type") || "") ? (await response.text()).slice(0, 3000000) : "";
+    } catch (error) {
+      return new Promise(resolve => {
+        try {
+          chrome.runtime.sendMessage({ type: "hoa-read-page", url: key }, reply => {
+            void chrome.runtime.lastError;
+            resolve(reply && typeof reply.html === "string" ? reply.html : "");
+          });
+        } catch (sendError) { resolve(""); }
+      });
+    }
+  }
+
+  function fandangoInfoUrl(key) {
+    const match = /^https:\/\/(?:athome\.fandango\.com|(?:www\.)?fandangoathome\.com|(?:www\.)?vudu\.com)\/content\/(?:browse|movies)\/details\/[^/]+\/(\d+)/i.exec(key);
+    return match ? `https://apicache.vudu.com/api2/?_type=contentSearch&contentId=${match[1]}&format=application/json` : "";
+  }
+
+  function fandangoInfo(text) {
+    const start = text.indexOf("{"); const end = text.lastIndexOf("}");
+    let content = {};
+    try { content = (JSON.parse(text.slice(start, end + 1)).content || [])[0] || {}; } catch (error) { return {}; }
+    const first = value => (Array.isArray(value) ? value[0] : value) || "";
+    const info = {};
+    const title = String(first(content.title)); if (title) info.title = HOA.cleanTitle(title).slice(0, HOA.MAX_TITLE);
+    const year = Number((String(first(content.releaseTime)).match(/^(?:18|19|20)\d{2}/) || [])[0]);
+    if (year && year <= new Date().getFullYear() + 1) info.year = year;
+    const type = String(first(content.type)).toLowerCase();
+    if (type === "program") info.type = "movie"; else if (/^(?:series|season|episode)$/.test(type)) info.type = "tv";
+    const poster = String(first(content.posterUrl)).replace(/^http:/, "https:");
+    if (/^https:\/\//.test(poster)) info.thumb = poster;
+    return info;
   }
 
   // Name, year, type and picture as the page states them for search engines and link previews.
@@ -2479,12 +2553,30 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     if (types.some(type => type === "Movie")) info.type = "movie";
     else if (types.some(type => /^(TVSeries|TVSeason|TVEpisode|Episode)$/.test(type))) info.type = "tv";
     else if (types.includes("Person")) info.type = "person";
+    // Prime Video says it in its own page data: "titleType":"movie", or "season"/"episode" for a series.
+    if (!info.type) { const titleType = (Array.from(doc.querySelectorAll("script:not([src])")).map(script => script.textContent || "").join(" ").slice(0, 2000000).match(/"titleType"\s*:\s*"(movie|season|episode|series|show|tv_?show)"/i) || [])[1];
+      if (titleType) info.type = /^movie$/i.test(titleType) ? "movie" : "tv"; }
     const name = typeof main.name === "string" ? main.name : "";
     const ogTitle = meta('meta[property="og:title"]') || meta('meta[name="twitter:title"]') || (doc.title || "");
     info.title = HOA.cleanTitle(name || ogTitle.replace(/\s+[|–—-]\s+[^|–—-]+$/, "")).slice(0, HOA.MAX_TITLE);
-    const date = [main.datePublished, main.dateCreated, main.startDate, main.uploadDate, main.releaseDate, main.copyrightYear,
-      main.releasedEvent && main.releasedEvent.startDate, meta('meta[itemprop="datePublished"]'), meta('meta[property="video:release_date"]')]
-      .map(value => String(value || "")).find(value => /\b(?:18|19|20)\d{2}\b/.test(value));
+    // In order of trust: the page's structured data, a release-year badge (Prime), a release key in the page's own
+    // data (Prime, Xumo, Fandango-style JSON), a "Year 2011" label (FilmRise), and last the upload date, which on a
+    // streaming site is when it was added, not when it came out.
+    const scripts = () => Array.from(doc.querySelectorAll("script:not([src])")).map(script => script.textContent || "").join("\n").slice(0, 2000000);
+    // The page's words with a space between boxes ("Year" and "2011" in separate cells), scripts left out.
+    const pageText = () => { if (!doc.body) return ""; const parts = []; let size = 0; const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node && size < 300000; node = walker.nextNode()) { if (node.parentElement && node.parentElement.closest("script, style, noscript")) continue; parts.push(node.nodeValue); size += node.nodeValue.length; }
+      return parts.join(" ").replace(/\s+/g, " "); };
+    const yearIn = (text, pattern) => { const match = String(text || "").match(pattern); return match ? match[1] : ""; };
+    const badge = doc.querySelector('[data-automation-id="release-year-badge"], [data-testid="release-year-badge"]');
+    const date = [main.datePublished, main.dateCreated, main.startDate, main.releaseDate, main.copyrightYear,
+      main.releasedEvent && main.releasedEvent.startDate, meta('meta[itemprop="datePublished"]'), meta('meta[property="video:release_date"]'),
+      badge && badge.textContent,
+      () => yearIn(scripts(), /"(?:releaseYear|release_year|productionYear|production_year|releaseDate|release_date|originalReleaseDate|premiereDate|firstAirDate|first_air_date|releaseTime)"\s*:\s*\[?\s*"?((?:18|19|20)\d{2})\b/),
+      () => yearIn(pageText(), /\b(?:Release(?:d| year| date)?|Year|Premiered|First aired)\s*:?\s*((?:18|19|20)\d{2})\b/i),
+      () => yearIn(scripts(), /"year"\s*:\s*"?((?:18|19|20)\d{2})\b/),
+      main.uploadDate]
+      .map(value => String((typeof value === "function" ? value() : value) || "")).find(value => /\b(?:18|19|20)\d{2}\b/.test(value));
     const year = date ? Number(date.match(/\b(?:18|19|20)\d{2}\b/)[0]) : 0;
     // A date past next year is when the site stops offering it, not when it came out.
     if (year && year <= new Date().getFullYear() + 1) info.year = year;

@@ -307,3 +307,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return undefined;
 });
 showButtonsState();
+
+// A saved video's page that moved to another site (a sister site's address). Only links from the page that asked
+// are read, and the browser lets this through only to sites AddOrHide has been turned on for.
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.type !== "hoa-read-page" || !sender.tab || sender.tab.incognito) return undefined;
+  let url;
+  try { url = new URL(message.url); } catch (error) { sendResponse({}); return undefined; }
+  let from;
+  try { from = new URL(sender.url || sender.tab.url || ""); } catch (error) { sendResponse({}); return undefined; }
+  if (!/^https?:$/.test(url.protocol) || url.origin !== from.origin) { sendResponse({}); return undefined; }
+  fetch(url.href, { credentials: "include", redirect: "follow" })
+    .then(response => response.ok && /html/i.test(response.headers.get("content-type") || "") ? response.text() : "")
+    .then(html => sendResponse({ html: html.slice(0, 3000000) }))
+    .catch(() => sendResponse({}));
+  return true;
+});

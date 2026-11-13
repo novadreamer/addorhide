@@ -194,12 +194,12 @@ body.popup main { display: flex; flex-direction: column; min-height: 0; }
 .button-controls .control-label { font-weight: 600; }
 .position-buttons { display: grid; gap: 6px; }
 .position-pill { display: block; width: 20px; height: 8px; margin: -1px auto; border: 2px solid var(--edge-outline, #47525a); border-radius: 999px; }
-/* The current state lives in the power button's coloured ring: green when the hover controls show, red when off. */
+/* The current state is the power tile's colour: green when the hover controls show, red when off. */
 .button-controls .press-button.toggle-button {
-  --power-ring-light: #43c984; --power-ring-dark: #137447;
+  --power-ring-light: #55d69a; --power-ring-dark: #087047;
   display: grid; width: 60px; height: 60px; min-width: 0; min-height: 0; margin-bottom: 6px; padding: 0; place-items: center;
-  background: transparent; border: 0; border-radius: 50%; color: transparent; font-size: 0;
-  box-shadow: 0 7px 13px rgba(24, 38, 42, .28), 0 2px 4px rgba(0, 0, 0, .16);
+  background: transparent; border: 0; border-radius: 18px; color: transparent; font-size: 0;
+  box-shadow: 0 8px 15px rgba(24, 38, 42, .26), 0 2px 4px rgba(0, 0, 0, .16);
   transition: transform 100ms ease-out, box-shadow 100ms ease-out, filter 150ms ease-out;
 }
 .button-controls .press-button.toggle-button[data-enabled="true"] {

@@ -148,29 +148,15 @@ async function load(initial = {}) {
     [categoryTwo]: { site: "example.com", title: "Films", thumb: "", kind: "category", ts: 10 },
     "https://www.youtube.com/watch?v=abcdefghijk": { site: "youtube.com", title: "Video", thumb: "", ts: 1 }
   }, watchProgress: {}, watchLater: {} });
-  assert.deepEqual(Array.from(categories.document.querySelectorAll(".site-group")).map(section => section.dataset.site), ["added-channels", "added-categories", "youtube.com"], "Categories follows Channels and is excluded from website sections");
-  const categorySection = categories.document.querySelector(".added-categories");
-  assert.ok(categorySection.querySelector(".category-card"), "category cards use their own portrait card treatment");
-  assert.ok(categorySection.querySelector("#added-direction-added-categories"), "two categories can be sorted");
+  assert.deepEqual(Array.from(categories.document.querySelectorAll(".site-group")).map(section => section.dataset.site), ["added-channels", "example.com", "twitch.tv", "youtube.com"], "Categories remain in their website sections");
+  assert.equal(categories.document.querySelector(".added-categories"), null, "Categories has no dedicated section");
+  assert.match(categories.document.querySelector('[data-site="twitch.tv"]').textContent, /Category/, "category cards carry a Category tag");
   const oneCategory = await load({ addedItems: { [categoryOne]: { site: "twitch.tv", title: "Just Chatting", thumb: "", kind: "category", ts: 20 } } });
-  const lone = oneCategory.document.querySelector(".added-categories");
-  assert.ok(lone.querySelector(".category-card"), "a single category is still listed");
+  const lone = oneCategory.document.querySelector('[data-site="twitch.tv"]');
+  assert.ok(lone.querySelector(".added-card"), "a single category is listed in its site");
   assert.equal(lone.querySelector("select[id^='added-sort-']"), null, "one category has no sort menu");
   assert.equal(lone.querySelector(".direction-button"), null, "one category has no sort direction");
   assert.ok(lone.querySelector(".site-delete-all"), "one category keeps its delete button");
-  assert.ok(categorySection.querySelector(".hoa-placeholder svg"), "categories without art use the four-square placeholder");
-  const categorySort = categorySection.querySelector("select"); assert.deepEqual(Array.from(categorySort.options).map(option => option.value), ["added", "title", "site"], "category controls offer Date added, Name, and Site sorting");
-  categorySort.value = "site"; categorySort.dispatchEvent(new categories.window.Event("change", { bubbles: true })); await wait(25);
-  assert.equal(categories.store.addedViewPrefs["added-categories"].sort, "site", "category sort persists separately");
-  const categoryGroup = categories.document.querySelector(".added-categories select[id^='added-group-']"); categoryGroup.value = "site"; categoryGroup.dispatchEvent(new categories.window.Event("change", { bubbles: true })); await wait(25);
-  assert.equal(categories.store.addedViewPrefs["added-categories"].group, "site", "category site grouping persists");
-  categories.document.querySelector(".added-categories .collapse-button").click(); await wait(25);
-  assert.equal(categories.document.querySelector(".added-categories .added-card-grid"), null, "category section collapses");
-  categories.document.querySelector(".added-categories .collapse-button").click(); await wait(25);
-  categories.document.querySelector(".added-categories .remove-button").click(); await wait(25);
-  assert.equal(Object.values(categories.store.addedItems).filter(entry => entry.kind === "category").length, 1, "category remove edits added items only");
-  const categoryClear = categories.document.querySelector(".added-categories .site-delete-all"); categoryClear.click(); await wait(5); categories.document.querySelector(".added-categories .site-delete-all").click(); await wait(25);
-  assert.equal(Object.values(categories.store.addedItems).filter(entry => entry.kind === "category").length, 0, "category delete-all uses the shared two-click control");
   categories.window.close();
   const manySites = {}; for (let index = 0; index < 12; index += 1) { const site = `site${index}.example`; for (let copy = 0; copy <= index; copy += 1) manySites[`https://${site}/v/${copy}`] = { site, title: `Video ${index}-${copy}`, thumb: "", kind: "video", ts: index + 1 }; }
   const crowded = await load({ addedItems: manySites, addedViewPrefs: { __page: { grouping: "tabs" } } });

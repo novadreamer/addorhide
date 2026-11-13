@@ -270,17 +270,36 @@ var HOA = Object.freeze((() => {
   const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com"]);
   const YOUTUBE_MEDIA_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"]);
   const TRACKING_PARAMS = new Set(["fbclid", "gclid", "igshid", "si", "pp", "feature", "ab_channel"]);
-  const TYPES = ["video", "short", "movie", "tv", "live", "music", "sport", "person", "other"];
+  const TEXT_COLLATOR = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
+  const LEADING_SORT_DECORATION = /^[\s\p{Cf}"'“”‘’`()[\]{}<>«»‹›〈〉《》「」『』【】〔〕﴾﴿]+/u;
+
+  function compareText(left, right) {
+    const leftRaw = String(left == null ? "" : left);
+    const rightRaw = String(right == null ? "" : right);
+    const leftText = leftRaw.replace(LEADING_SORT_DECORATION, "");
+    const rightText = rightRaw.replace(LEADING_SORT_DECORATION, "");
+    // Keep Latin site/title labels together before Arabic labels; the collator still
+    // supplies locale-aware, numeric ordering within either script.
+    const script = text => /^[\u0600-\u06ff]/u.test(text) ? 1 : 0;
+    const scriptComparison = script(leftText) - script(rightText);
+    if (scriptComparison) return scriptComparison;
+    const comparison = TEXT_COLLATOR.compare(leftText, rightText);
+    if (comparison) return comparison;
+    return leftRaw < rightRaw ? -1 : leftRaw > rightRaw ? 1 : 0;
+  }
+  const TYPES = ["video", "short", "playlist", "movie", "tv", "live", "music", "sport", "person", "category", "other"];
   const SORT_KEYS = ["added", "published", "views", "votes", "score", "duration", "title", "year", "channel"];
   const TYPE_LABELS = Object.freeze({
     video: "Video",
     short: "Short",
+    playlist: "Playlist",
     movie: "Movie",
     tv: "TV",
     live: "Live",
     music: "Music",
     sport: "Sport",
     person: "Person",
+    category: "Category",
     other: "Other"
   });
   const SITE_NAMES = Object.freeze({
@@ -336,6 +355,10 @@ var HOA = Object.freeze((() => {
     return YOUTUBE_HOSTS.has(url.hostname) && url.pathname === "/watch";
   }
 
+  const PRIME_DETAIL = /^https?:\/\/(?:www\.)?(?:amazon\.com\/(?:gp\/video\/)?detail\/|primevideo\.com\/(?:[^/]+\/)?detail\/)/i;
+  // Addresses that changed shape: entries saved under the old one move to the new one.
+  const movesKey = key => Boolean(HOST_ALIASES[siteHostname(key)] || PRIME_DETAIL.test(key));
+
   function canonicalUrl(href, base) {
     let url;
     try {
@@ -351,6 +374,8 @@ var HOA = Object.freeze((() => {
     url.hostname = url.hostname.toLowerCase();
     if (HOST_ALIASES[url.hostname]) url.hostname = HOST_ALIASES[url.hostname];
     const hostname = url.hostname;
+    // Prime Video titles: the code after "?" only says which row the link was in.
+    if (PRIME_DETAIL.test(url.href)) url.search = "";
     const imdb = hostname === "imdb.com" || hostname === "www.imdb.com" || hostname === "m.imdb.com";
     if (imdb) {
       url.hostname = "www.imdb.com";
@@ -374,6 +399,11 @@ var HOA = Object.freeze((() => {
     }
 
     if (YOUTUBE_HOSTS.has(hostname)) {
+      if (url.pathname === "/playlist") {
+        const list = url.searchParams.get("list");
+        if (!list) return null;
+        return `https://www.youtube.com/playlist?list=${encodeURIComponent(list)}`;
+      }
       if (url.pathname === "/watch") {
         const id = url.searchParams.get("v");
         if (!id || !VIDEO_ID_RE.test(id)) {
@@ -614,8 +644,19 @@ var HOA = Object.freeze((() => {
       || candidates.find(link => isSameDoor(link) && hasPlayEvidence(link)) || preferred;
   }
 
+  const typeCache = new Map();
   function typeOf(url) {
+    const known = typeCache.get(url);
+    if (known) return known;
+    const type = linkType(url);
+    if (typeCache.size >= 2000) typeCache.clear();
+    typeCache.set(url, type);
+    return type;
+  }
+
+  function linkType(url) {
     if (isPersonUrl(url)) return "person";
+    if (isCategoryUrl(url)) return "category";
     try {
       const parsed = new URL(url);
       const path = parsed.pathname.toLowerCase();
@@ -626,6 +667,10 @@ var HOA = Object.freeze((() => {
       }
       const youtube = YOUTUBE_HOSTS.has(parsed.hostname.toLowerCase())
         || parsed.hostname.toLowerCase().endsWith(".youtube.com");
+      if ((youtube && parsed.pathname === "/playlist" && parsed.searchParams.get("list"))
+        || /^\/playlists?\/[^/]+/i.test(parsed.pathname)) {
+        return "playlist";
+      }
       if (youtube && /(^|\/)shorts(?:\/|$)/.test(path)) {
         return "short";
       }
@@ -876,9 +921,9 @@ var HOA = Object.freeze((() => {
 
   function hiddenSummaryText(count, sites) {
     if (!Number.isInteger(count) || count <= 0) {
-      return "No hidden videos.";
+      return "No hidden items.";
     }
-    return withSites(count === 1 ? "There is 1 hidden video" : `There are ${count} hidden videos`, sites);
+    return withSites(count === 1 ? "There is 1 hidden item" : `There are ${count} hidden items`, sites);
   }
 
   // The popup's line under Added Videos, worded like the one under Hidden Videos.
@@ -1059,7 +1104,8 @@ var HOA = Object.freeze((() => {
       return "";
     }
     const value = text.trim().replace(/\s+/g, " ");
-    return value.replace(/^(?:\d{1,3}\. |#\d+ )/, "");
+    // "Anna Pigeon [TV Series]" (Fandango at Home): the bracket says what it is, which the type already does.
+    return value.replace(/^(?:\d{1,3}\. |#\d+ )/, "").replace(/\s*\[(?:TV Series|TV Show|Series|Movie|Film|TV Movie)\]$/i, "");
   }
 
   function formatAge(timestamp, nowMs) {
@@ -1196,7 +1242,7 @@ var HOA = Object.freeze((() => {
     Object.keys(value).forEach(savedKey => {
       // Saved under an address the site has since moved from: kept, under the new one.
       const moved = canonicalUrl(savedKey);
-      const key = moved && moved !== savedKey && HOST_ALIASES[siteHostname(savedKey)] ? moved : savedKey;
+      const key = moved && moved !== savedKey && movesKey(savedKey) ? moved : savedKey;
       if (canonicalUrl(key) !== key && !isHoaCardKey(key)) {
         return;
       }
@@ -1221,6 +1267,7 @@ var HOA = Object.freeze((() => {
       };
       addOptionalFields(normalized[key], raw);
       // Items saved before their site's types were known say "video"; the link can tell better.
+      if (raw.kind === "category") normalized[key].type = "category";
       if (!normalized[key].type || normalized[key].type === "video") {
         const linkType = typeOf(key);
         if (linkType !== "video") normalized[key].type = linkType;
@@ -1318,7 +1365,7 @@ var HOA = Object.freeze((() => {
     Object.keys(value).forEach(key => {
       const ts = typeof value[key] === "number" ? value[key] : value[key] && value[key].ts;
       const moved = canonicalUrl(key);
-      const target = moved && moved !== key && HOST_ALIASES[siteHostname(key)] ? moved : key;
+      const target = moved && moved !== key && movesKey(key) ? moved : key;
       if (canonicalUrl(target) === target && Number.isFinite(ts)) normalized[target] = ts;
     });
     const keys = Object.keys(normalized);
@@ -1477,8 +1524,7 @@ var HOA = Object.freeze((() => {
     const titleCompare = (left, right) => {
       const leftTitle = left[1] && typeof left[1].title === "string" ? left[1].title : "";
       const rightTitle = right[1] && typeof right[1].title === "string" ? right[1].title : "";
-      return leftTitle.localeCompare(rightTitle, undefined, { sensitivity: "base" })
-        || String(left[0]).localeCompare(String(right[0]));
+      return compareText(leftTitle, rightTitle) || compareText(String(left[0]), String(right[0]));
     };
     return pairs.map((pair, index) => ({ pair, index, value: valueFor(pair[1]), now }))
       .sort((left, right) => {
@@ -1490,7 +1536,7 @@ var HOA = Object.freeze((() => {
         if (!leftMissing) {
           let comparison;
           if (key === "title" || key === "channel") {
-            comparison = String(left.value).localeCompare(String(right.value), undefined, { sensitivity: "base" });
+            comparison = compareText(String(left.value), String(right.value));
           } else {
             comparison = left.value < right.value ? -1 : left.value > right.value ? 1 : 0;
           }
@@ -1576,7 +1622,7 @@ var HOA = Object.freeze((() => {
         }
         grouped.get(id).entries.push(pair);
       });
-      return Array.from(grouped.values()).sort((left, right) => left.label.localeCompare(right.label, undefined, { sensitivity: "base" }));
+      return Array.from(grouped.values()).sort((left, right) => compareText(left.label, right.label));
     }
     if (mode === "channel") {
       const grouped = new Map();
@@ -1586,7 +1632,7 @@ var HOA = Object.freeze((() => {
         if (!grouped.has(id)) grouped.set(id, { id, label, entries: [] });
         grouped.get(id).entries.push(pair);
       });
-      return Array.from(grouped.values()).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+      return Array.from(grouped.values()).sort((a, b) => compareText(a.label, b.label));
     }
     if (mode === "added-date") {
       const now = Date.now(); const day = 86400000;
@@ -1607,7 +1653,7 @@ var HOA = Object.freeze((() => {
         if (!grouped.has(site)) grouped.set(site, { id: site, label, entries: [] });
         grouped.get(site).entries.push(pair);
       });
-      return Array.from(grouped.values()).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+      return Array.from(grouped.values()).sort((a, b) => compareText(a.label, b.label));
     }
     if (mode === "decade" || mode === "rating") {
       const grouped = new Map();
@@ -1738,8 +1784,7 @@ var HOA = Object.freeze((() => {
       const sorted = sortEntries(entries, "added", "desc");
       const iconEntry = sorted.find(([, entry]) => entry && typeof entry.icon === "string" && entry.icon);
       return { site, name: siteDisplayName(site), icon: iconEntry ? iconEntry[1].icon : "", entries: sorted };
-    }).sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" })
-      || left.site.localeCompare(right.site));
+    }).sort((left, right) => compareText(left.name, right.name) || compareText(left.site, right.site));
   }
 
   function looksLikeHostname(site) {
@@ -1760,12 +1805,12 @@ var HOA = Object.freeze((() => {
       if (site !== "__page" && siteCount >= 200) {
         continue;
       }
-      if ((!looksLikeHostname(site) && !["continue-watching", "watch-later", "added-channels", "added-categories", "__page"].includes(site)) || !isObject(value[site])) {
+      if ((!looksLikeHostname(site) && !["continue-watching", "watch-later", "added-channels", "__page"].includes(site)) || !isObject(value[site])) {
         continue;
       }
       const raw = value[site];
       if (site === "__page") {
-        const selectedTab = typeof raw.selectedTab === "string" && (["continue-watching", "watch-later", "channels", "categories"].includes(raw.selectedTab) || looksLikeHostname(raw.selectedTab))
+        const selectedTab = typeof raw.selectedTab === "string" && (["continue-watching", "watch-later", "channels"].includes(raw.selectedTab) || looksLikeHostname(raw.selectedTab))
           ? raw.selectedTab : "";
         Object.defineProperty(result, site, { value: {
           grouping: raw.grouping === "tabs" ? "tabs" : "none",
@@ -2200,6 +2245,7 @@ var HOA = Object.freeze((() => {
     PLAYER_URL,
     SUPPORT_URL,
     canonicalUrl,
+    compareText,
     playerFor,
     playerSiteName,
     siteOf,

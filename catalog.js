@@ -67,11 +67,11 @@ var HOA_CATALOG = Object.freeze((() => {
       ]),
       // Cards everywhere ytd-rich-item-renderer is used (home, subscriptions, a creator's Videos/Shorts/Live
       // tabs). Everywhere else YouTube uses the card types below, on every page (home layouts YouTube is testing,
-      // search, a creator's Home tab, the watch-page sidebar, history). Playlists and mixes are left alone; a card
+      // search, a creator's Home tab, the watch-page sidebar, history). Playlists and mixes are saved as playlists; a card
       // inside ytd-rich-item-renderer is handled once, through that wrapper.
       variants: Object.freeze([
         Object.freeze({
-          cardSelector: 'yt-lockup-view-model:has(a[href*="/watch?v="]):not(:has(yt-collection-thumbnail-view-model)), ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer, ytd-rich-grid-media, ytd-playlist-video-renderer',
+          cardSelector: 'yt-lockup-view-model:has(a[href*="/watch?v="]), ytd-playlist-renderer, ytd-grid-playlist-renderer, ytd-compact-playlist-renderer, ytd-radio-renderer, ytd-compact-radio-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer, ytd-rich-grid-media, ytd-playlist-video-renderer',
           linkSelector: YOUTUBE_LINK,
           titleCandidates: YOUTUBE_TITLES,
           // Hide the card's own slot too (a wrapper holding only this card), so the row closes the gap.
@@ -282,7 +282,7 @@ var HOA_CATALOG = Object.freeze((() => {
       id: "prime", carousels: true, name: "Prime Video", builtIn: false, hosts: Object.freeze(["amazon.com", "primevideo.com"]), subdomains: true,
       // Prime has several card kinds: "card" (ordinary and Top 10), "super-carousel-card" (Featured Originals and
       // channel offers) and "top-hero-card" (the big rotating banner). Every one ends in "card".
-      cardSelector: 'article[data-testid$="card"]', removeClosest: "li", featuredSelector: 'article[data-testid="top-hero-card"], article[data-testid="super-carousel-card"]',
+      cardSelector: 'article[data-testid$="card"]', removeClosest: "li", stripQuery: true, featuredSelector: 'article[data-testid="top-hero-card"], article[data-testid="super-carousel-card"]',
       linkSelector: 'a[href*="/detail/"]', titleCandidates: Object.freeze(["a[aria-label]", 'a[href*="/detail/"]', "button[aria-label]", "img[alt]"]),
       typeByCard: Object.freeze([['[data-card-entity-type="Movie"]', "movie"], ['[data-card-entity-type="TV Show"]', "tv"]]),
       // Each row is a container named after its kind of carousel (standard, super, beard-supported...) or the Top 10 chart.
@@ -354,7 +354,7 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "rumble", name: "Rumble", builtIn: false, hosts: Object.freeze(["rumble.com"]), subdomains: true,
-      cardSelector: "rum-video-thumbnail", removeClosest: "rum-video-thumbnail", linkSelector: 'a[href*=".html"], a[href*="/shorts/"]', linkAttribute: "url", stripQuery: true, titleCandidates: Object.freeze(["[video-title]"]),
+      cardSelector: "rum-video-thumbnail", removeClosest: "rum-video-thumbnail", adMarkers: Object.freeze(['rum-video-thumbnail[hints~="boosted"]', 'rum-video-thumbnail[url*="ads.rmbl.ws"]']), linkSelector: 'a[href*=".html"], a[href*="/shorts/"]', linkAttribute: "url", stripQuery: true, titleCandidates: Object.freeze(["[video-title]"]),
       channelHrefAttribute: "creator-url", channelNameAttribute: "name",
       sections: Object.freeze([{ container: "section.homepage-section", title: 'rum-text[variant="h3"]' }]),
       categories: Object.freeze([

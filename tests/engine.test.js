@@ -448,6 +448,28 @@ const CASES = [
     window.close();
   }
   {
+    const playlist = await load({
+      html: '<yt-lockup-view-model><yt-collection-thumbnail-view-model></yt-collection-thumbnail-view-model><a href="/watch?v=dQw4w9WgXcQ&list=PLmix123">My Mix</a></yt-lockup-view-model>',
+      url: "https://www.youtube.com/",
+      siteRules: { "www.youtube.com": { enabled: true, cardSelector: "yt-lockup-view-model", linkSelector: "a[href]", bulkHide: false } }
+    });
+    const card = playlist.document.querySelector("yt-lockup-view-model");
+    buttons(card, "add").click();
+    await wait(60);
+    check("YouTube playlist cards save under their playlist key", () => {
+      const [key, entry] = firstEntry(playlist.store.addedItems) || [];
+      assert.strictEqual(key, "https://www.youtube.com/playlist?list=PLmix123");
+      assert.strictEqual(entry.type, "playlist");
+    });
+    buttons(card, "hide").click();
+    await wait(80);
+    check("hiding a YouTube playlist card removes its playlist key", () => {
+      assert.ok(card.classList.contains("hoa-removed"));
+      assert.ok(playlist.store.hiddenItems["https://www.youtube.com/playlist?list=PLmix123"]);
+    });
+    playlist.window.close();
+  }
+  {
     const page = await load({ fixture: "youtube-watch-shorts.html", url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
       siteRules: { "www.youtube.com": { hideKinds: ["shorts"] } } });
     check("filters: Shorts hide captured Shorts cards", () => assert.strictEqual(
