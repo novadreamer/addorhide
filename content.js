@@ -1942,7 +1942,11 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       x = clampX(preferredX);
       y = fallbackY;
     }
-    Object.assign(actions.style, { top: `${Math.round(y)}px`, left: `${Math.round(x)}px` });
+    // Plain centre: held by layout, so a card that grows on hover (Prime grows edge cards inward) keeps its
+    // buttons in its middle without measuring again, and nothing jumps while it grows.
+    const centred = !sidePicture && Math.abs(x - (cardRect.width - width) / 2) < 1;
+    Object.assign(actions.style, centred ? { top: `${Math.round(y)}px`, left: "50%", transform: "translateX(-50%)" }
+      : { top: `${Math.round(y)}px`, left: `${Math.round(x)}px` });
     actions.style.visibility = previousVisibility;
   }
 
