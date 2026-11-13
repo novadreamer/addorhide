@@ -386,7 +386,7 @@ const groupedPairs = [
 check("none groups videos and shorts", () => assert.deepEqual(HOA.groupEntries(groupedPairs, "none").map(group => group.label), ["Videos", "Shorts"]));
 check("none group without shorts has blank label", () => assert.deepEqual(HOA.groupEntries([groupedPairs[0]], "none"), [{ id: "video", label: "", entries: [groupedPairs[0]] }]));
 check("type groups in label order", () => assert.deepEqual(HOA.groupEntries(groupedPairs, "type").map(group => group.id), ["video", "short", "movie"]));
-check("genre groups alphabetically", () => assert.deepEqual(HOA.groupEntries(groupedPairs, "genre").map(group => group.label), ["Comedy", "Drama", "No genre"]));
+check("genre groups alphabetically", () => assert.deepEqual(HOA.groupEntries(groupedPairs, "genre").map(group => group.label), ["Comedy", "Drama", "No Genre"]));
 check("available groups", () => assert.deepEqual(HOA.availableGroups(groupedPairs), ["none", "type", "genre"]));
 check("Roku: a movie link and a series link are told apart and By type is offered", () => {
   const items = HOA.normalizeItems({
@@ -396,7 +396,7 @@ check("Roku: a movie link and a series link are told apart and By type is offere
   const pairs = Object.entries(items);
   assert.deepEqual(pairs.map(pair => pair[1].type).sort(), ["movie", "tv"]);
   assert.ok(HOA.availableGroups(pairs).includes("type"));
-  assert.deepEqual(HOA.groupEntries(pairs, "type").map(group => group.label), ["Movies", "TV shows"]);
+  assert.deepEqual(HOA.groupEntries(pairs, "type").map(group => group.label), ["Movies", "TV Shows"]);
 });
 check("videos and shorts only: By type adds nothing", () => assert.deepEqual(
   HOA.availableGroups(groupedPairs.slice(0, 2).map(([key, entry]) => [key, { ...entry, genres: ["Drama"] }])), ["none"]));
@@ -466,11 +466,11 @@ const genrePairs = [
 const sortedByDuration = HOA.sortEntries(genrePairs, "duration", "desc");
 check("groups follow the sort", () => assert.deepEqual(
   HOA.orderGroupsBySort(HOA.groupEntries(sortedByDuration, "genre"), sortedByDuration, "genre").map(group => group.label),
-  ["Drama", "Action", "No genre"]));
+  ["Drama", "Action", "No Genre"]));
 const sortedAsc = HOA.sortEntries(genrePairs, "duration", "asc");
 check("reversing the sort reverses the groups", () => assert.deepEqual(
   HOA.orderGroupsBySort(HOA.groupEntries(sortedAsc, "genre"), sortedAsc, "genre").map(group => group.label),
-  ["Action", "Drama", "No genre"]));
+  ["Action", "Drama", "No Genre"]));
 
 const backupData = {
   hidden: { [watch]: { title: "Hidden video", thumb: "", ts: 10, listed: true } },

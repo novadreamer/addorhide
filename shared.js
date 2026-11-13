@@ -1608,6 +1608,40 @@ var HOA = Object.freeze((() => {
     });
   }
 
+  // Group headings read as Title Case ("Science Fiction", "Voice Actors", "This Week"). Only a word's first
+  // letter is raised, so names such as "TV" or "iCarly"-style spellings keep their own capitals; short joining
+  // words stay lower case unless they open or close the heading.
+  const TITLE_SMALL_WORDS = new Set(["a", "an", "and", "as", "at", "but", "by", "for", "in", "nor", "of", "on", "or", "the", "to", "vs", "with"]);
+  function titleCase(text) {
+    const words = String(text || "").split(" ");
+    return words.map((word, index) => word.split("-").map((part, partIndex) => {
+      const edge = index === 0 || index === words.length - 1 || partIndex > 0;
+      if (!edge && TITLE_SMALL_WORDS.has(part.toLocaleLowerCase())) return part.toLocaleLowerCase();
+      return part.charAt(0).toLocaleUpperCase() + part.slice(1);
+    }).join("-")).join(" ");
+  }
+
+  // "Director of photography" -> "Directors of photography": the noun before "of"/"for"/"in" is the one
+  // that takes the plural. Already-plural roles ("Guests") keep their spelling.
+  function pluralNoun(word) {
+    const lower = word.toLocaleLowerCase();
+    const irregular = { person: "people", self: "selves", child: "children" };
+    if (irregular[lower]) return word.charAt(0) + irregular[lower].slice(1);
+    if (/(wo)?man$/i.test(word)) return word.replace(/an$/i, match => match[0] === "A" ? "EN" : "en");
+    if (/s$/i.test(word)) return word;
+    if (/[^aeiou]y$/i.test(word)) return word.slice(0, -1) + "ies";
+    if (/(x|z|ch|sh)$/i.test(word)) return `${word}es`;
+    return `${word}s`;
+  }
+  function pluralRole(role) {
+    const match = /^(.*?)(\s+(?:of|for|in|on|at|to|with)\s.*)$/i.exec(role);
+    const head = match ? match[1] : role;
+    const tail = match ? match[2] : "";
+    const words = head.split(" ");
+    words[words.length - 1] = pluralNoun(words[words.length - 1]);
+    return words.join(" ") + tail;
+  }
+
   function groupEntries(entries, mode) {
     const pairs = Array.isArray(entries) ? entries.slice() : [];
     if (!pairs.length) {
@@ -1627,13 +1661,13 @@ var HOA = Object.freeze((() => {
     if (mode === "type") {
       const nonPeople = TYPES.filter(type => type !== "person").map(type => ({
         id: type,
-        label: { movie: "Movies", tv: "TV shows", past: "Past broadcasts", clip: "Clips" }[type] || typeLabel(type),
+        label: { movie: "Movies", tv: "TV Shows", past: "Past Broadcasts", clip: "Clips" }[type] || typeLabel(type),
         entries: pairs.filter(pair => entryType(pair) === type)
       })).filter(group => group.entries.length);
       const people = new Map();
       pairs.filter(pair => entryType(pair) === "person").forEach(pair => {
         const role = pair[1] && typeof pair[1].role === "string" && pair[1].role.trim() ? pair[1].role.trim() : "Person";
-        const label = role === "Person" ? "People" : `${role}${/s$/i.test(role) ? "" : "s"}`;
+        const label = role === "Person" ? "People" : titleCase(pluralRole(role));
         if (!people.has(label)) people.set(label, { id: `person:${role.toLocaleLowerCase()}`, label, entries: [] });
         people.get(label).entries.push(pair);
       });
@@ -1643,10 +1677,10 @@ var HOA = Object.freeze((() => {
       const grouped = new Map();
       pairs.forEach(pair => {
         const genres = pair[1] && Array.isArray(pair[1].genres) ? pair[1].genres : [];
-        const label = genres[0] || "No genre";
+        const label = genres[0] ? titleCase(genres[0]) : "No Genre";
         const id = label.toLocaleLowerCase();
         if (!grouped.has(id)) {
-          grouped.set(id, { id: label, label, entries: [] });
+          grouped.set(id, { id: genres[0] || "No genre", label, entries: [] });
         }
         grouped.get(id).entries.push(pair);
       });
@@ -1655,7 +1689,7 @@ var HOA = Object.freeze((() => {
     if (mode === "channel") {
       const grouped = new Map();
       pairs.forEach(pair => {
-        const label = pair[1] && typeof pair[1].channel === "string" && pair[1].channel.trim() ? pair[1].channel.trim() : "No channel";
+        const label = pair[1] && typeof pair[1].channel === "string" && pair[1].channel.trim() ? pair[1].channel.trim() : "No Channel";
         const id = label.toLocaleLowerCase();
         if (!grouped.has(id)) grouped.set(id, { id, label, entries: [] });
         grouped.get(id).entries.push(pair);
@@ -1664,13 +1698,13 @@ var HOA = Object.freeze((() => {
     }
     if (mode === "added-date") {
       const now = Date.now(); const day = 86400000;
-      const buckets = [["today", "Today"], ["week", "This week"], ["month", "This month"], ["earlier", "Earlier"]].map(([id, label]) => ({ id, label, entries: [] }));
+      const buckets = [["today", "Today"], ["week", "This Week"], ["month", "This Month"], ["earlier", "Earlier"]].map(([id, label]) => ({ id, label, entries: [] }));
       pairs.forEach(pair => { const age = now - Number(pair[1] && pair[1].ts || 0); const at = age < day ? 0 : age < day * 7 ? 1 : age < day * 31 ? 2 : 3; buckets[at].entries.push(pair); });
       return buckets.filter(group => group.entries.length);
     }
     if (mode === "watched-date") {
       const now = Date.now(); const day = 86400000;
-      const buckets = [["today", "Today"], ["week", "This week"], ["earlier", "Earlier"]].map(([id, label]) => ({ id, label, entries: [] }));
+      const buckets = [["today", "Today"], ["week", "This Week"], ["earlier", "Earlier"]].map(([id, label]) => ({ id, label, entries: [] }));
       pairs.forEach(pair => { const age = now - Number(pair[1] && pair[1].updated || 0); const at = age < day ? 0 : age < day * 7 ? 1 : 2; buckets[at].entries.push(pair); });
       return buckets.filter(group => group.entries.length);
     }
@@ -1687,7 +1721,7 @@ var HOA = Object.freeze((() => {
       const grouped = new Map();
       pairs.forEach(pair => {
         const raw = pair[1] && pair[1][mode === "decade" ? "year" : "rating"];
-        const label = mode === "decade" && Number.isInteger(raw) ? `${Math.floor(raw / 10) * 10}s` : (typeof raw === "string" && raw ? raw : mode === "decade" ? "Unknown decade" : "Unrated");
+        const label = mode === "decade" && Number.isInteger(raw) ? `${Math.floor(raw / 10) * 10}s` : (typeof raw === "string" && raw ? raw : mode === "decade" ? "Unknown Decade" : "Unrated");
         if (!grouped.has(label)) grouped.set(label, { id: label, label, entries: [] });
         grouped.get(label).entries.push(pair);
       });
@@ -1718,7 +1752,7 @@ var HOA = Object.freeze((() => {
 
   // Grouped views follow the chosen sort: groups are ordered by where their first video falls in the
   // sorted list (otherwise one-video genre groups made every sort look like it did nothing). The default
-  // Videos/Shorts split and a "No genre" group keep their fixed places.
+  // Videos/Shorts split and a "No Genre" group keep their fixed places.
   function orderGroupsBySort(groups, sortedPairs, mode) {
     if (mode === "none" || !Array.isArray(groups)) {
       return groups;
@@ -1726,7 +1760,7 @@ var HOA = Object.freeze((() => {
     const position = new Map((sortedPairs || []).map((pair, index) => [pair[0], index]));
     const first = group => Math.min(...group.entries.map(pair => position.has(pair[0]) ? position.get(pair[0]) : Infinity));
     const ordered = groups.slice().sort((left, right) => first(left) - first(right));
-    const noGenre = ordered.filter(group => mode === "genre" && group.label === "No genre");
+    const noGenre = ordered.filter(group => mode === "genre" && group.label === "No Genre");
     return ordered.filter(group => !noGenre.includes(group)).concat(noGenre);
   }
 
