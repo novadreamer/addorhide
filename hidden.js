@@ -213,7 +213,7 @@
       info.appendChild(element("span", "hidden-title", entry.title || key));
     }
     const type = entry.type || HOA.typeOf(key);
-    if (type !== "video") info.appendChild(element("span", "hidden-kind", HOA.typeLabel(type)));
+    if (type !== "video") info.appendChild(element("span", "hidden-kind", HOA.roleLabel(entry, type)));
     if (entry.reason === "watched" || entry.watched === true) {
       info.appendChild(element("span", "hidden-kind hidden-watched", "Watched"));
     }
@@ -222,7 +222,7 @@
     info.appendChild(rowStatus);
     row.appendChild(info);
     const actions = element("div", "hidden-actions");
-    const what = HOA.typeLabel(entry.type || HOA.typeOf(key)).toLowerCase();
+    const what = HOA.roleLabel(entry, entry.type || HOA.typeOf(key)).toLowerCase();
     const restore = iconButton("restore-button", RESTORE_ICON, `Restore: show this ${what} in the feed again`);
     restore.id = `hidden-restore-${index}`;
     restore.addEventListener("click", () => {

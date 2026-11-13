@@ -287,7 +287,7 @@ var HOA = Object.freeze((() => {
     if (comparison) return comparison;
     return leftRaw < rightRaw ? -1 : leftRaw > rightRaw ? 1 : 0;
   }
-  const TYPES = ["video", "short", "playlist", "movie", "tv", "live", "music", "sport", "person", "category", "other"];
+  const TYPES = ["video", "short", "playlist", "movie", "tv", "live", "past", "clip", "music", "sport", "person", "category", "other"];
   const SORT_KEYS = ["added", "published", "views", "votes", "score", "duration", "title", "year", "channel"];
   const TYPE_LABELS = Object.freeze({
     video: "Video",
@@ -296,6 +296,8 @@ var HOA = Object.freeze((() => {
     movie: "Movie",
     tv: "TV",
     live: "Live",
+    past: "Past broadcast",
+    clip: "Clip",
     music: "Music",
     sport: "Sport",
     person: "Person",
@@ -561,7 +563,7 @@ var HOA = Object.freeze((() => {
     "category", "categories", "browse", "genre", "genres", "tag", "tags", "topic", "topics", "collection", "collections",
     "channel", "channels", "user", "profile"]);
 
-  const PERSON_PATHS = new Set(["person", "people", "persons", "actor", "actors", "director", "directors", "celebrity", "celebrities", "talent"]);
+  const PERSON_PATHS = new Set(["person", "people", "persons", "actor", "actors", "director", "directors", "producer", "producers", "writer", "writers", "composer", "composers", "cinematography", "editor", "editors", "crew", "celebrity", "celebrities", "talent", "filmography"]);
 
   // An actor's or director's page: /person/name, also after a language or country part (/en-GB/person/name), and IMDb's /name/nm123.
   function isPersonUrl(value) {
@@ -569,7 +571,8 @@ var HOA = Object.freeze((() => {
       const segments = new URL(value).pathname.split("/").filter(Boolean).map(segment => segment.toLowerCase());
       const start = /^[a-z]{2}(?:-[a-z]{2})?$/.test(segments[0] || "") ? 1 : 0;
       if (!segments[start + 1]) return false;
-      return segments[start] === "name" ? /^nm\d+$/.test(segments[start + 1]) : PERSON_PATHS.has(segments[start]);
+      if (segments[start] === "name") return /^nm\d+$/.test(segments[start + 1]);
+      return segments.some((segment, index) => PERSON_PATHS.has(segment) && Boolean(segments[index + 1]));
     } catch (error) {
       return false;
     }
@@ -660,6 +663,13 @@ var HOA = Object.freeze((() => {
     try {
       const parsed = new URL(url);
       const path = parsed.pathname.toLowerCase();
+      const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+      if (host === "twitch.tv") {
+        if (/^\/videos\/\d+(?:\/|$)/.test(path)) return "past";
+        if (/^\/[^/]+\/clip\/[^/]+(?:\/|$)/.test(path)) return "clip";
+        if (/^\/[^/]+\/?$/.test(path) && isChannelUrl(parsed.href)) return "live";
+      }
+      if (host === "clips.twitch.tv" && /^\/[^/]+\/?$/.test(path)) return "clip";
       // The Roku Channel plays a movie at /watch; a series opens a page of seasons and episodes at /details.
       if (["therokuchannel.roku.com", "app.roku.com"].includes(parsed.hostname.toLowerCase())) {
         if (path.startsWith("/watch/")) return "movie";
@@ -1047,6 +1057,12 @@ var HOA = Object.freeze((() => {
     return TYPE_LABELS[type] || "Other";
   }
 
+  function roleLabel(entry, fallbackType) {
+    const type = entry && entry.type || fallbackType || "";
+    if (type === "person" && entry && typeof entry.role === "string" && entry.role.trim()) return entry.role.trim();
+    return typeLabel(type);
+  }
+
   function formatDuration(seconds) {
     if (!Number.isInteger(seconds) || seconds < 1) {
       return "";
@@ -1222,6 +1238,10 @@ var HOA = Object.freeze((() => {
       if (rating.length >= 1 && rating.length <= 12) {
         target.rating = rating;
       }
+    }
+    if (typeof raw.role === "string") {
+      const role = raw.role.trim();
+      if (role.length >= 1 && role.length <= 80) target.role = role;
     }
     if (typeof raw.channel === "string") {
       const channel = raw.channel.trim();
@@ -1605,11 +1625,19 @@ var HOA = Object.freeze((() => {
       ].filter(Boolean);
     }
     if (mode === "type") {
-      return TYPES.map(type => ({
+      const nonPeople = TYPES.filter(type => type !== "person").map(type => ({
         id: type,
-        label: { movie: "Movies", tv: "TV shows", person: "People" }[type] || typeLabel(type),
+        label: { movie: "Movies", tv: "TV shows", past: "Past broadcasts", clip: "Clips" }[type] || typeLabel(type),
         entries: pairs.filter(pair => entryType(pair) === type)
       })).filter(group => group.entries.length);
+      const people = new Map();
+      pairs.filter(pair => entryType(pair) === "person").forEach(pair => {
+        const role = pair[1] && typeof pair[1].role === "string" && pair[1].role.trim() ? pair[1].role.trim() : "Person";
+        const label = role === "Person" ? "People" : `${role}${/s$/i.test(role) ? "" : "s"}`;
+        if (!people.has(label)) people.set(label, { id: `person:${role.toLocaleLowerCase()}`, label, entries: [] });
+        people.get(label).entries.push(pair);
+      });
+      return [...nonPeople, ...Array.from(people.values()).sort((a, b) => compareText(a.label, b.label))];
     }
     if (mode === "genre") {
       const grouped = new Map();
@@ -1663,7 +1691,15 @@ var HOA = Object.freeze((() => {
         if (!grouped.has(label)) grouped.set(label, { id: label, label, entries: [] });
         grouped.get(label).entries.push(pair);
       });
-      return Array.from(grouped.values()).sort((a, b) => a.label.localeCompare(b.label));
+      const ratingOrder = ["G", "TV-Y", "TV-Y7", "TV-G", "PG", "TV-PG", "PG-13", "TV-14", "R", "TV-MA", "NC-17"];
+      const compare = (a, b) => {
+        if (mode !== "rating") return compareText(a.label, b.label);
+        const left = ratingOrder.indexOf(a.label); const right = ratingOrder.indexOf(b.label);
+        const leftOrder = left < 0 ? (a.label === "Unrated" ? 1000 : 100) : left;
+        const rightOrder = right < 0 ? (b.label === "Unrated" ? 1000 : 100) : right;
+        return leftOrder - rightOrder || compareText(a.label, b.label);
+      };
+      return Array.from(grouped.values()).sort(compare);
     }
     return [{ id: "all", label: "", entries: pairs }];
   }
@@ -2253,6 +2289,7 @@ var HOA = Object.freeze((() => {
     isHoaCardKey,
     normalizeCardLinks,
     kindOf,
+    isPersonUrl,
     chooseCardLink,
     isChannelUrl,
     isCategoryUrl,
@@ -2272,6 +2309,7 @@ var HOA = Object.freeze((() => {
     addedSummaryText,
     siteMonogram,
     typeLabel,
+    roleLabel,
     formatDuration,
     formatViews,
     formatScore,

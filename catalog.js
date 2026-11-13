@@ -144,7 +144,7 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "imdb", name: "IMDb", builtIn: false, hosts: Object.freeze(["imdb.com"]), subdomains: true,
-      cardSelector: "li.ipc-metadata-list-summary-item", linkSelector: "a.ipc-title-link-wrapper",
+      cardSelector: "li.ipc-metadata-list-summary-item", linkSelector: 'a.ipc-title-link-wrapper, a[href*="/name/nm"]',
       titleCandidates: Object.freeze([".ipc-title__text"]),
       meta: Object.freeze({ texts: Object.freeze([".ipc-inline-list__item"]), score: ".ipc-rating-star--rating", votes: ".ipc-rating-star--voteCount" }),
       categories: Object.freeze([
@@ -174,7 +174,7 @@ var HOA_CATALOG = Object.freeze((() => {
     Object.freeze({
       id: "tmdb", name: "TMDB", builtIn: false, hosts: Object.freeze(["themoviedb.org"]), subdomains: true,
       cardSelector: "#media-list .media-list-results > div[data-object-id]",
-      linkSelector: 'a[href^="/movie/"], a[href^="/tv/"]', titleCandidates: Object.freeze(["h2"]),
+      linkSelector: 'a[href^="/movie/"], a[href^="/tv/"], a[href^="/person/"]', titleCandidates: Object.freeze(["h2"]),
       meta: Object.freeze({ date: ".release_date" }),
       categories: Object.freeze([
         { id: "movies", label: "Movies", hint: "Movie results", card: { href: "^/movie/" } },
@@ -212,7 +212,7 @@ var HOA_CATALOG = Object.freeze((() => {
       id: "twitch", name: "Twitch", builtIn: false, hosts: Object.freeze(["twitch.tv"]), subdomains: true,
       cardSelector: 'article:has(a[data-a-target="preview-card-image-link"]), .game-card:has(a[data-a-target="tw-box-art-card-link"])',
       linkSelector: 'a[data-a-target="preview-card-image-link"], a[data-a-target="tw-box-art-card-link"]', titleCandidates: Object.freeze(["h4", "h3", "h2"]),
-      typeFixed: "live", removeClimb: true,
+      removeClimb: true,
       meta: Object.freeze({ texts: Object.freeze(["*"]), genres: 'a[data-a-target="preview-card-game-link"]' }),
       channelLinkSelector: 'a[data-a-target="preview-card-channel-link"]', channelNameSelector: 'a[data-a-target="preview-card-channel-link"] p[title]',
       channelCandidates: Object.freeze(['a[data-a-target="preview-card-channel-link"] p[title]']),
@@ -302,7 +302,7 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "fandango", carousels: true, name: "Fandango at Home", builtIn: false, hosts: Object.freeze(["athome.fandango.com", "fandangoathome.com", "vudu.com"]), subdomains: true,
-      cardSelector: '[class*="carousel-default-styles__item"]', removeClosest: '[class*="carousel-default-styles__item"]', linkSelector: 'a[href*="/content/browse/details/"]', titleCandidates: Object.freeze(["img[alt]", "a[aria-label]"]),
+      cardSelector: '[class*="carousel-default-styles__item"]', removeClosest: '[class*="carousel-default-styles__item"]', linkSelector: 'a[href*="/content/browse/details/"], a[href*="/content/browse/filmography/"]', titleCandidates: Object.freeze(["img[alt]", "a[aria-label]"]),
       sections: Object.freeze([{ container: '[class*="sectionContainer__sectionContainer"]', title: '[class*="sectionContainer__sectionTitle"] h2' }]),
       categories: Object.freeze([
         { id: "free", label: "Free with ads", hint: "Free or Free to Watch titles", card: { text: "Free to Watch|\\bFree\\b" } },
@@ -407,7 +407,7 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "rottentomatoes", name: "Rotten Tomatoes", builtIn: false, hosts: Object.freeze(["rottentomatoes.com"]), subdomains: true,
-      cardSelector: "div.discovery-tiles__wrap > div.flex-container", removeClosest: "div.discovery-tiles__wrap > div.flex-container", linkSelector: 'a[href^="/m/"], a[href^="/tv/"]', titleCandidates: Object.freeze(["rt-img[alt]", "a[aria-label]"]),
+      cardSelector: "div.discovery-tiles__wrap > div.flex-container", removeClosest: "div.discovery-tiles__wrap > div.flex-container", linkSelector: 'a[href^="/m/"], a[href^="/tv/"], a[href^="/celebrity/"]', titleCandidates: Object.freeze(["rt-img[alt]", "a[aria-label]"]),
       categories: Object.freeze([
         { id: "movies", label: "Movies", hint: "Movie tiles", card: { href: "/m/" } },
         { id: "tv", label: "TV shows", hint: "TV tiles", card: { href: "/tv/" } },
@@ -416,7 +416,7 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "letterboxd", name: "Letterboxd", builtIn: false, hosts: Object.freeze(["letterboxd.com"]), subdomains: true,
-      cardSelector: "li.posteritem", removeClosest: "li.posteritem", linkSelector: 'a[href^="/film/"]', titleCandidates: Object.freeze(['[data-item-name]', "a[title]"]),
+      cardSelector: "li.posteritem", removeClosest: "li.posteritem", linkSelector: 'a[href^="/film/"], a[href^="/actor/"], a[href^="/director/"], a[href^="/producer/"], a[href^="/writer/"], a[href^="/composer/"], a[href^="/cinematography/"], a[href^="/editor/"], a[href^="/crew/"]', titleCandidates: Object.freeze(['[data-item-name]', "a[title]"]),
       categories: Object.freeze([{ id: "adult", label: "Adult themed", hint: "Adult-themed films", card: { has: '[data-resolvable-poster-path*="\\\"isAdultThemed\\\":true"]' } }])
     })
   ]);

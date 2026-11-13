@@ -339,7 +339,28 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const text = String(value || "").trim().toUpperCase();
     if (/^(?:NOT\s*RATED|UNRATED|NR|UR)$/.test(text)) return "NR";
     const normalized = text.replace(/[\s-]/g, "");
-    return /^(?:TVY7(?:FV)?|TVY|TVG|TVPG|TV14|TVMA|G|PG|PG13|R|NC17|X|12\+|16\+|18\+|7\+)$/.test(normalized) ? normalized : "";
+    if (!/^(?:TVY7(?:FV)?|TVY|TVG|TVPG|TV14|TVMA|G|PG|PG13|R|NC17|X|12\+|16\+|18\+|7\+)$/.test(normalized)) return "";
+    return ({ TVY: "TV-Y", TVY7: "TV-Y7", TVY7FV: "TV-Y7", TVG: "TV-G", TVPG: "TV-PG", TV14: "TV-14", TVMA: "TV-MA", PG13: "PG-13", NC17: "NC-17" })[normalized] || normalized;
+  }
+
+  const roleFromText = value => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const roles = { actor: "Actor", actress: "Actor", acting: "Actor", director: "Director", directing: "Director", writer: "Writer", writing: "Writer", producer: "Producer", production: "Producer", composer: "Composer", cinematographer: "Cinematographer", camera: "Cinematographer", editor: "Editor", editing: "Editor", creator: "Creator", host: "Host" };
+    const match = roles[text.toLowerCase()];
+    return match || "Actor";
+  };
+
+  function personRole(key, card) {
+    try {
+      const segments = new URL(key).pathname.split("/").filter(Boolean).map(value => value.toLowerCase());
+      const jobs = { actor: "Actor", actors: "Actor", director: "Director", directors: "Director", writer: "Writer", writers: "Writer", producer: "Producer", producers: "Producer", composer: "Composer", composers: "Composer", cinematography: "Cinematographer", editor: "Editor", editors: "Editor", crew: "Crew", creator: "Creator", host: "Host" };
+      const job = segments.map(segment => jobs[segment]).find(Boolean);
+      if (job) return job;
+    } catch (error) { /* malformed card link */ }
+    const lines = Array.from(card.querySelectorAll("p")).map(node => elementText(node)).filter(Boolean);
+    const parts = cardText(card).split(/\s+[•·]\s+/);
+    return roleFromText(lines[1] || parts[1]);
   }
 
   function cardRatings(card, rule, data) {
@@ -1462,7 +1483,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const formerHref = former && former !== link && ((rule.linkAttribute && former.getAttribute(rule.linkAttribute)) || former.href || former.getAttribute("href"));
     const candidateKey = formerHref && keyForHref(formerHref, rule);
     const formerKey = candidateKey && HOA.kindOf(candidateKey) !== "channel" ? candidateKey : "";
-    return { key, title, thumb, kind, site: HOA.siteOf(key), ts: Date.now(), ...(namedYear ? { year: Number(namedYear[2]) } : {}), ...(formerKey && formerKey !== key ? { formerKey } : {}), ...(pageData ? { pageData } : {}) };
+    return { key, title, thumb, kind, site: HOA.siteOf(key), ts: Date.now(), ...(kind === "person" ? { role: personRole(key, card) } : {}), ...(namedYear ? { year: Number(namedYear[2]) } : {}), ...(formerKey && formerKey !== key ? { formerKey } : {}), ...(pageData ? { pageData } : {}) };
   }
 
   function elementText(element) {
@@ -1618,9 +1639,11 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       meta.views = meta.views ?? firstParsed(texts, HOA.parseViews);
       meta.published = meta.published ?? firstParsed(texts, text => HOA.parseRelativeAge(text, Date.now()))
         ?? firstParsed(texts, HOA.parseDate);
-      const rating = texts.find(text => /^(G|PG|PG-13|R|NC-17|TV-(Y7?|G|PG|14|MA)|NR|UR)$/i.test(text));
+      const rating = texts.map(normalizeRating).find(Boolean);
       meta.rating = meta.rating ?? rating ?? null;
     }
+    const detectedRating = cardRatings(card, rule, { pageData: pageDataForCard(card, rule) })[0];
+    meta.rating = normalizeRating(meta.rating) || detectedRating || null;
     if (Array.isArray(rule.typeByCard)) {
       const match = rule.typeByCard.find(entry => card.matches(entry[0]));
       if (match) meta.type = match[1];
@@ -2459,6 +2482,8 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   const enrichQueue = [];
   const enrichSeen = new Set();
   let enriching = false;
+  const twitchLiveChecked = new Map();
+  let twitchLiveChecking = false;
 
   function weakName(title, key) {
     return !title || title === HOA.siteOf(key) || looksLikeBadge(title);
@@ -2468,7 +2493,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const kind = HOA.kindOf(key);
     const type = HOA.typeOf(key);
     return Boolean(entry) && kind !== "channel" && kind !== "category" && type !== "playlist" && !HOA.isHoaCardKey(key)
-      && (!entry.thumb || (!entry.year && kind !== "person") || weakName(entry.title, key) || / – /.test(entry.title || ""));
+      && (!entry.thumb || (!entry.year && kind !== "person") || ((!entry.rating || !Array.isArray(entry.genres)) && Boolean(fandangoInfoUrl(key) || rokuInfoUrl(key))) || weakName(entry.title, key) || / – /.test(entry.title || ""));
   }
 
   function queueEnrich(key) {
@@ -2487,9 +2512,13 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       const key = enrichQueue.shift();
       try {
         const fandango = fandangoInfoUrl(key);
+        const roku = rokuInfoUrl(key);
         if (fandango) {
           const response = await fetch(fandango, { credentials: "omit" });
           if (response.ok) applyEnrich(key, fandangoInfo(await response.text()));
+        } else if (roku) {
+          const response = await fetch(roku, { credentials: "include" });
+          if (response.ok) applyEnrich(key, rokuInfo(await response.text()));
         } else {
           const html = await readPage(key);
           if (html) applyEnrich(key, pageInfo(new DOMParser().parseFromString(html, "text/html"), key));
@@ -2519,8 +2548,31 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   }
 
   function fandangoInfoUrl(key) {
-    const match = /^https:\/\/(?:athome\.fandango\.com|(?:www\.)?fandangoathome\.com|(?:www\.)?vudu\.com)\/content\/(?:browse|movies)\/details\/[^/]+\/(\d+)/i.exec(key);
-    return match ? `https://apicache.vudu.com/api2/?_type=contentSearch&contentId=${match[1]}&format=application/json` : "";
+    try {
+      const url = new URL(key); const host = url.hostname.toLowerCase().replace(/^www\./, "");
+      if (!/(?:^|\.)(?:athome\.fandango\.com|fandangoathome\.com|vudu\.com)$/.test(host)) return ""; if (/\/filmography\//i.test(url.pathname)) return "";   // a person, not a title
+      const match = url.pathname.match(/\/(\d+)(?:\/|$)/) || (url.searchParams.get("contentId") || "").match(/^\d+$/);
+      const id = match && (match[1] || match[0]);
+      return id ? `https://apicache.vudu.com/api2/?_type=contentSearch&contentId=${id}&format=application/json` : "";
+    } catch (error) { return ""; }
+  }
+
+  async function recheckTwitchLives() {
+    if (twitchLiveChecking || isIncognitoContext() || !/(?:^|\.)twitch\.tv$/i.test(location.hostname)) return;
+    twitchLiveChecking = true;
+    const now = Date.now();
+    const keys = [...Object.entries(added), ...Object.entries(hidden)]
+      .filter(([key, entry]) => entry && entry.type === "live" && HOA.siteOf(key) === "twitch.tv" && now - (twitchLiveChecked.get(key) || 0) >= 600000)
+      .slice(0, 6).map(([key]) => key);
+    for (const key of keys) {
+      twitchLiveChecked.set(key, Date.now());
+      try {
+        const response = await fetch(key, { credentials: "include" });
+        if (response.ok && !/"isLiveBroadcast"\s*:\s*true/i.test(await response.text())) applyEnrich(key, { type: "past" });
+      } catch (error) { /* leave the saved status alone if Twitch is unavailable */ }
+      if (keys.indexOf(key) < keys.length - 1) await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+    twitchLiveChecking = false;
   }
 
   function fandangoInfo(text) {
@@ -2536,6 +2588,30 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     if (type === "program") info.type = "movie"; else if (/^(?:series|season|episode)$/.test(type)) info.type = "tv";
     const poster = String(first(content.posterUrl)).replace(/^http:/, "https:");
     if (/^https:\/\//.test(poster)) info.thumb = poster;
+    const rating = normalizeRating(first(content.mpaaRating) || first(content.contentRating));
+    if (rating) info.rating = rating;
+    const genres = HOA.splitGenres(Array.isArray(content.genres) ? content.genres.join(",") : first(content.genres));
+    if (genres.length) info.genres = genres.slice(0, 5);
+    return info;
+  }
+
+  function rokuInfoUrl(key) {
+    try {
+      const url = new URL(key); if (url.hostname.toLowerCase() !== "app.roku.com") return "";
+      const match = url.pathname.match(/^\/(?:details|watch)\/([^/]+)/i); if (!match) return "";
+      const content = `https://content.sr.roku.com/content/v1/roku-trc/${match[1]}?include=type,title,releaseYear,releaseDate,genres,parentalRatings,imageMap.detailPoster`;
+      return `/api/v2/homescreen/content/${encodeURIComponent(content)}`;
+    } catch (error) { return ""; }
+  }
+
+  function rokuInfo(text) {
+    let content = {}; try { content = JSON.parse(text); } catch (error) { return {}; }
+    const info = {}; const title = HOA.cleanTitle(content.title || ""); if (title) info.title = title.slice(0, HOA.MAX_TITLE);
+    const year = Number(content.releaseYear || String(content.releaseDate || "").slice(0, 4)); if (year >= 1870 && year <= new Date().getFullYear() + 1) info.year = year;
+    if (content.type === "movie") info.type = "movie"; else if (/^(series|season|episode)$/.test(content.type || "")) info.type = "tv";
+    const rating = normalizeRating(content.parentalRatings && content.parentalRatings[0] && content.parentalRatings[0].code); if (rating) info.rating = rating;
+    const genres = HOA.splitGenres(Array.isArray(content.genres) ? content.genres.join(",") : content.genres); if (genres.length) info.genres = genres.slice(0, 5);
+    const poster = content.imageMap && content.imageMap.detailPoster && content.imageMap.detailPoster.path; if (/^https:\/\//.test(poster || "")) info.thumb = poster;
     return info;
   }
 
@@ -2557,6 +2633,10 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     if (types.some(type => type === "Movie")) info.type = "movie";
     else if (types.some(type => /^(TVSeries|TVSeason|TVEpisode|Episode)$/.test(type))) info.type = "tv";
     else if (types.includes("Person")) info.type = "person";
+    if (types.includes("Person")) {
+      const job = String(main.jobTitle || "").trim();
+      if (job) info.role = roleFromText(job);
+    }
     // Prime Video says it in its own page data: "titleType":"movie", or "season"/"episode" for a series.
     if (!info.type) { const titleType = (Array.from(doc.querySelectorAll("script:not([src])")).map(script => script.textContent || "").join(" ").slice(0, 2000000).match(/"titleType"\s*:\s*"(movie|season|episode|series|show|tv_?show)"/i) || [])[1];
       if (titleType) info.type = /^movie$/i.test(titleType) ? "movie" : "tv"; }
@@ -2578,12 +2658,26 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       badge && badge.textContent,
       () => yearIn(scripts(), /"(?:releaseYear|release_year|productionYear|production_year|releaseDate|release_date|originalReleaseDate|premiereDate|firstAirDate|first_air_date|releaseTime)"\s*:\s*\[?\s*"?((?:18|19|20)\d{2})\b/),
       () => yearIn(pageText(), /\b(?:Release(?:d| year| date)?|Year|Premiered|First aired)\s*:?\s*((?:18|19|20)\d{2})\b/i),
+      () => yearIn(pageText(), /\b((?:18|19|20)\d{2})\s*[•·]/),
+      () => yearIn(pageText(), /\b((?:18|19|20)\d{2})\s*(?=[•·|]\s*(?:TV-?(?:Y7?|G|PG|14|MA)|G|PG|PG-?13|R|NC-?17)|\d+\s*(?:h|hr))/i),
       () => yearIn(scripts(), /"year"\s*:\s*"?((?:18|19|20)\d{2})\b/),
       main.uploadDate]
       .map(value => String((typeof value === "function" ? value() : value) || "")).find(value => /\b(?:18|19|20)\d{2}\b/.test(value));
     const year = date ? Number(date.match(/\b(?:18|19|20)\d{2}\b/)[0]) : 0;
     // A date past next year is when the site stops offering it, not when it came out.
     if (year && year <= new Date().getFullYear() + 1) info.year = year;
+    const scriptText = scripts();
+    const inlineRating = (scriptText.match(/"(?:contentRating|mpaaRating|maturityRating|rating)"\s*:\s*"([^"]+)"/i) || [])[1];
+    const rating = normalizeRating(main.contentRating || inlineRating);
+    if (rating) info.rating = rating;
+    const rawGenres = main.genre || (scriptText.match(/"(?:genres|genre)"\s*:\s*(\[[^\]]*\]|"[^"]+")/i) || [])[1];
+    const genres = HOA.splitGenres(Array.isArray(rawGenres) ? rawGenres.join(",") : String(rawGenres || "").replace(/[\[\]"]/g, ""))
+      .filter(genre => genre.length <= 40 && genre.split(/\s+/).length <= 4).slice(0, 5);
+    if (genres.length) info.genres = genres;
+    if (info.type === "person" && !info.role) {
+      const department = (scriptText.match(/"known_for_department"\s*:\s*"([^"]+)"/i) || [])[1];
+      if (department) info.role = roleFromText(department);
+    }
     const image = [].concat(main.image || []).map(value => (value && typeof value === "object" ? value.url : value)).find(value => typeof value === "string");
     info.thumb = absolute(image || meta('meta[property="og:image"]') || meta('meta[name="twitter:image"]'));
     return info;
@@ -2607,7 +2701,10 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
         if (year && named.endsWith(` (${year})`)) patch.title = named.slice(0, -` (${year})`.length);
         if (!saved.year && Number.isInteger(info.year) && info.year >= 1870 && info.year <= 2100) patch.year = info.year;
         if (!saved.thumb && info.thumb) patch.thumb = info.thumb;
-        if (info.type && (!saved.type || saved.type === "video")) patch.type = info.type;
+        if (info.type && (!saved.type || saved.type === "video" || (saved.type === "live" && info.type === "past"))) patch.type = info.type;
+        if (!saved.rating && info.rating) patch.rating = info.rating;
+        if ((!Array.isArray(saved.genres) || !saved.genres.length) && Array.isArray(info.genres) && info.genres.length) patch.genres = info.genres;
+        if (saved.type === "person" && !saved.role && info.role) patch.role = info.role;
         if (Object.keys(patch).length) changed[name] = { ...lists[name], [key]: { ...saved, ...patch } };
       });
       if (Object.keys(changed).length) HOA.writeLists(changed);
@@ -2619,9 +2716,11 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   function enrichSaved() {
     if (savedEnrichDone || isIncognitoContext()) return;
     savedEnrichDone = true;
-    [...Object.entries(added), ...Object.entries(hidden)]
+    const apiReader = key => Boolean(fandangoInfoUrl(key) || rokuInfoUrl(key));
+    const candidates = [...Object.entries(added), ...Object.entries(hidden)]
       .filter(([key, entry]) => HOA.siteOf(key) === HOA.siteOf(location.href) && needsEnrich(entry, key))
-      .slice(0, 8).forEach(([key]) => queueEnrich(key));
+    candidates.filter(([key]) => apiReader(key)).slice(0, 40).concat(candidates.filter(([key]) => !apiReader(key)).slice(0, 8)).forEach(([key]) => queueEnrich(key));
+    recheckTwitchLives();
   }
 
   let pageHealHref = "";
@@ -2641,6 +2740,10 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const image = document.querySelector('meta[property="og:image"]');
     if (!saved.thumb && image && /^https?:\/\//i.test(image.content || "")) patch.thumb = image.content;
     if (Object.keys(patch).length) { healedSaved.delete(key); pendingHeals.set(key, patch); flushHeals(); }
+    [2500, 6000].forEach(delay => window.setTimeout(() => {
+      if (!ensureContext() || location.href !== pageHealHref) return;
+      applyEnrich(key, pageInfo(document, key));
+    }, delay));
   }
 
   function plausibleName(value) {

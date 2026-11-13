@@ -1765,6 +1765,21 @@ const CASES = [
     refused.window.close();
   }
   {
+    const person = await load({ html: '<div class="carousel-default-styles__item"><a href="/content/browse/filmography/Stacey-Dash/560619" aria-label="Stacey Dash\n\nDionne Marie Davenport"><img alt="Stacey Dash"><p>Stacey Dash</p><p>Dionne Marie Davenport</p></a></div>', url: "https://athome.fandango.com/", siteRules: { "athome.fandango.com": { enabled: true } } });
+    person.document.querySelector("[data-action='add']").click(); await wait(35);
+    check("a Fandango filmography card saves as an Actor person", () => {
+      const entry = person.store.addedItems["https://athome.fandango.com/content/browse/filmography/Stacey-Dash/560619"];
+      assert.equal(entry.kind, "person"); assert.equal(entry.type, "person"); assert.equal(entry.role, "Actor");
+    });
+    person.window.close();
+  }
+  {
+    const twitch = await load({ html: '<article><a data-a-target="preview-card-image-link" href="/videos/123456789"><img alt="Past broadcast"></a><h3>Past broadcast</h3></article>', url: "https://www.twitch.tv/directory/all", siteRules: { "www.twitch.tv": { enabled: true } } });
+    twitch.document.querySelector("[data-action='add']").click(); await wait(35);
+    check("a Twitch videos card saves as a past broadcast", () => assert.equal(twitch.store.addedItems["https://www.twitch.tv/videos/123456789"].type, "past"));
+    twitch.window.close();
+  }
+  {
     const css = new JSDOM(`<!doctype html><style>${read("content.css")}</style><div class="hoa-actions"><button hidden>Hidden action</button></div>`, { pretendToBeVisual: true });
     check("Xumo action buttons with hidden state are not displayed", () => assert.equal(css.window.getComputedStyle(css.window.document.querySelector(".hoa-actions button")).display, "none"));
     css.window.close();

@@ -757,4 +757,24 @@ check("a trailing [TV Series] or [Movie] is not part of the name", () => {
   assert.equal(HOA.cleanTitle("Band [Live]"), "Band [Live]");
 });
 
+check("Twitch links distinguish live streams, past broadcasts and clips", () => {
+  assert.equal(HOA.typeOf("https://www.twitch.tv/streamer"), "live");
+  assert.equal(HOA.typeOf("https://www.twitch.tv/videos/123456789"), "past");
+  assert.equal(HOA.typeOf("https://www.twitch.tv/streamer/clip/Clip_Slug-123"), "clip");
+  assert.equal(HOA.typeOf("https://clips.twitch.tv/Clip_Slug-123"), "clip");
+});
+check("filmography and Letterboxd job paths are people", () => {
+  ["https://athome.fandango.com/content/browse/filmography/Stacey-Dash/560619", "https://letterboxd.com/director/greta-gerwig/"]
+    .forEach(url => assert.equal(HOA.isPersonUrl(url), true, url));
+});
+check("person roles label cards and groups", () => {
+  assert.equal(HOA.roleLabel({ type: "person", role: "Director" }), "Director");
+  assert.deepEqual(HOA.groupEntries([["a", { type: "person", role: "Actor" }], ["b", { type: "person", role: "Director" }]], "type").map(group => group.label), ["Actors", "Directors"]);
+});
+check("normalization keeps a person role and rating groups follow age", () => {
+  const items = HOA.normalizeItems({ [watch]: { title: "A", thumb: "", type: "person", role: "Actor", ts: 1 } });
+  assert.equal(items[watch].role, "Actor");
+  assert.deepEqual(HOA.groupEntries([["a", { rating: "R" }], ["b", { rating: "PG" }], ["c", { rating: "TV-14" }], ["d", {}]], "rating").map(group => group.label), ["PG", "TV-14", "R", "Unrated"]);
+});
+
 console.log(`shared.test.js: ${passed} passed, 0 failed`);
