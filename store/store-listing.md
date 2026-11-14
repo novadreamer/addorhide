@@ -1,6 +1,6 @@
 # AddOrHide: Chrome Web Store submission pack
 
-Release note: version 1.1.1 is the update to submit (1.1.0 plus Title Case group headings and the rhombus power button). Same permissions as 1.0.13, so users are not asked to approve anything new. Upload `dist/AddOrHide-1.1.1.zip`, replace all five screenshots and both promo tiles with the files in `store/assets/` (regenerated 2026-11-05), paste the detailed description below, and update the Privacy tab: the data disclosure and the policy changed because 1.1.0 tracks playback on the device. If 1.0.13 is still in review, cancel that review or wait for it to finish, because the dashboard takes one submission at a time.
+Release note: version 1.1.2 is the update to submit (1.1.0 plus Title Case group headings, the site fixes and details fill-in of 1.1.2, and the round neon power button). Same permissions as 1.0.13, so users are not asked to approve anything new. Upload `dist/AddOrHide-1.1.2.zip`, replace all five screenshots and both promo tiles with the files in `store/assets/` (regenerated 2026-11-05), paste the detailed description below, and update the Privacy tab: the data disclosure and the policy changed because 1.1.0 tracks playback on the device. If 1.0.13 is still in review, cancel that review or wait for it to finish, because the dashboard takes one submission at a time.
 
 All the placeholders have been filled in. Field limits and required assets below come from the current Chrome Web Store documentation, except where marked "(dashboard limit)", which are limits the dashboard enforces that the docs page does not state.
 
@@ -158,6 +158,6 @@ Note: browsers cannot open extension pages in private windows, so in a private w
 2. **Run the extension unpacked in Brave and Chrome** and complete the test instructions above yourself. Automation cannot click the browser's own permission prompt, so try **Enable on this site** once by hand.
 3. **Confirm private-window storage:** hide something in a private window, close it, and see whether it is still hidden in a normal window. The policy says it is. If your test shows otherwise, fix the "Private windows" paragraph.
 4. **Screenshots and promo images:** done, in `store/assets/`.
-5. **Version:** 1.1.1. Keep site names in the listing to one or two (1.0.0 was rejected for listing too many, "Yellow Argon"). Upload `dist/AddOrHide-1.1.1.zip` (rebuild it with `python tools/package.py` after any change).
+5. **Version:** 1.1.2. Keep site names in the listing to one or two (1.0.0 was rejected for listing too many, "Yellow Argon"). Upload `dist/AddOrHide-1.1.2.zip` (rebuild it with `python tools/package.py` after any change).
 6. **Expect a closer review:** requests for optional access to all sites, content scripts in all frames of enabled sites and a content script on youtube.com/robots.txt are unusual. The justifications above explain both; keep them as written.
 7. **Do not add** keywords such as "YouTube downloader", "ad blocker" or other site names to the listing text beyond the factual mentions above, and never use site logos.

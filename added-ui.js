@@ -19,7 +19,7 @@ const HOA_ADDED = (() => {
   const GROUP_LABELS = { none: "No grouping", type: "By type", genre: "By genre", channel: "By channel", "added-date": "By date added", decade: "By decade", rating: "By rating", site: "By site", "watched-date": "By date watched" };
   const TAG_TYPES = [
     ["video", "Video"], ["short", "Short"], ["playlist", "Playlist"], ["movie", "Movie"], ["tv", "TV"],
-    ["live", "Live"], ["past", "Past broadcast"], ["clip", "Clip"], ["music", "Music"], ["sport", "Sport"], ["person", "Person"], ["category", "Category"], ["other", "Other"]
+    ["live", "Live"], ["past", "Past broadcast"], ["clip", "Clip"], ["music", "Music"], ["sport", "Sport"], ["person", "Person"], ["category", "Category"], ["genre", "Genre"], ["other", "Other"]
   ];
   const siteDeleteConfirmations = new Map();
   const OPEN_BIN_ICON = '<svg class="bin-open" viewBox="0 0 34 24" aria-hidden="true" focusable="false"><path d="M4.6 7.4 18.2 3.9"/><path d="M9.3 6.2 8.9 4.6c-.2-.7.2-1.4.9-1.6l2.4-.6c.7-.2 1.4.2 1.6.9l.4 1.5"/><path d="M4.4 10.5h15.2"/><path d="M5.4 10.5l.9 9.3c.1 1 .9 1.7 1.9 1.7h7.6c1 0 1.8-.7 1.9-1.7l.9-9.3"/><path d="M10 13.5v5M14 13.5v5"/><g transform="translate(20.6 0)"><path class="q" d="M3.2 8.6c0-2.2 1.7-3.6 3.8-3.6s3.6 1.3 3.6 3.2c0 2.6-3.4 2.9-3.4 5.6"/><circle class="q-dot" cx="7.2" cy="18.6" r="1.25"/></g></svg>';
@@ -81,6 +81,7 @@ const HOA_ADDED = (() => {
     }
 
     let added = {};
+    let hidden = {};
     let watchProgress = {};
     let watchLater = {};
     let prefs = {};
@@ -174,7 +175,7 @@ const HOA_ADDED = (() => {
       return tile;
     }
 
-    function makeMeta(entry) {
+    function makeMeta(entry, key) {
       const meta = element("div", "added-meta");
       if (entry.type && entry.type !== "video") {
         meta.appendChild(element("span", "meta-chip type-chip", HOA.roleLabel(entry, entry.type)));
@@ -194,7 +195,11 @@ const HOA_ADDED = (() => {
           meta.appendChild(element("span", "meta-text", votes));
         }
       }
-      if (Number.isFinite(entry.published)) {
+      const titleEntry = entry.type === "movie" || entry.type === "tv" || HOA.kindOf(key) === "title";
+      if (titleEntry) {
+        const year = Number.isInteger(entry.year) ? entry.year : (Number.isFinite(entry.published) ? new Date(entry.published).getFullYear() : 0);
+        if (year >= 1870 && year <= new Date().getFullYear() + 1) meta.appendChild(element("span", "meta-text", String(year)));
+      } else if (Number.isFinite(entry.published)) {
         meta.appendChild(element("span", "meta-text", HOA.formatAge(entry.published, Date.now())));
       } else if (Number.isInteger(entry.year)) {
         meta.appendChild(element("span", "meta-text", String(entry.year)));
@@ -386,7 +391,7 @@ const HOA_ADDED = (() => {
       titleLink.title = `Added ${localDate(entry.ts)}`;
       title.appendChild(titleLink);
       body.appendChild(title);
-      body.appendChild(makeMeta(entry));
+      body.appendChild(makeMeta(entry, key));
       const addedTime = element("time", "added-date", `Added ${localDate(entry.ts)}`);
       addedTime.dateTime = Number.isFinite(entry.ts) ? new Date(entry.ts).toISOString() : "";
       const actions = element("div", "video-actions");
@@ -789,8 +794,9 @@ const HOA_ADDED = (() => {
       while (groupsRoot.firstChild) {
         groupsRoot.firstChild.remove();
       }
-      const channelEntries = Object.entries(added).filter(([key, entry]) => entry && (entry.kind === "channel" || HOA.kindOf(key) === "channel"));
-      const videoAdded = Object.fromEntries(Object.entries(added).filter(([key, entry]) => !entry || (entry.kind !== "channel" && HOA.kindOf(key) !== "channel")));
+      const isChannelEntry = (key, entry) => entry && (entry.kind ? entry.kind === "channel" : HOA.kindOf(key) === "channel");
+      const channelEntries = Object.entries(added).filter(([key, entry]) => isChannelEntry(key, entry));
+      const videoAdded = Object.fromEntries(Object.entries(added).filter(([key, entry]) => !isChannelEntry(key, entry)));
       const groups = HOA.groupBySite(videoAdded);
       const continuing = Object.entries(watchProgress).filter(([, entry]) => entry && entry.cw && !entry.watched).sort((a, b) => b[1].updated - a[1].updated);
       const later = Object.entries(watchLater);
@@ -876,13 +882,60 @@ const HOA_ADDED = (() => {
     function refresh() {
       HOA.readLists(lists => {
         added = lists.added;
+        hidden = lists.hidden;
         watchProgress = lists.watchProgress;
         watchLater = lists.watchLater;
         HOA.readPrefs(nextPrefs => {
           prefs = nextPrefs;
           render();
+          startBackfill();
         });
       });
+    }
+
+    let backfillStarted = false;
+    function permissionFor(origin) {
+      return new Promise(resolve => {
+        if (!chrome.permissions || typeof chrome.permissions.contains !== "function") { resolve(false); return; }
+        try { chrome.permissions.contains({ origins: [`${origin}/*`] }, result => resolve(result === true)); } catch (error) { resolve(false); }
+      });
+    }
+
+    async function enrichFromPage(key, name) {
+      let info = {};
+      try {
+        const response = await fetch(key, { credentials: "include" });
+        if (response.ok && /html/i.test(response.headers.get("content-type") || "")) {
+          info = HOA.pageInfo(new DOMParser().parseFromString(await response.text(), "text/html"), key);
+        }
+      } catch (error) { /* a failed fetch still gets a cooldown stamp */ }
+      await new Promise(resolve => HOA.readLists(lists => {
+        const current = lists[name][key];
+        if (!current) { resolve(); return; }
+        const patch = HOA.enrichPatch(current, info, key);
+        const next = { ...lists[name], [key]: { ...current, ...patch } };
+        HOA.writeLists({ [name]: next }, resolve);
+      }));
+    }
+
+    async function startBackfill() {
+      if (backfillStarted || (chrome.extension && chrome.extension.inIncognitoContext)) return;
+      backfillStarted = true;
+      const jobs = [];
+      const seen = new Set();
+      [...Object.entries(added).map(([key, entry]) => [key, entry, "added"]), ...Object.entries(hidden).map(([key, entry]) => [key, entry, "hidden"])]
+        .filter(([key, entry]) => !seen.has(key) && HOA.needsEnrich(entry, key)).slice(0, 30).forEach(([key, entry, name]) => {
+          seen.add(key);
+          try {
+            const origin = new URL(key).origin;
+            jobs.push(permissionFor(origin).then(allowed => allowed ? [key, name] : null));
+          } catch (error) { /* malformed saved key */ }
+        });
+      const permitted = (await Promise.all(jobs)).filter(Boolean);
+      for (let index = 0; index < permitted.length; index += 2) {
+        await Promise.all(permitted.slice(index, index + 2).map(([key, name]) => enrichFromPage(key, name)));
+        if (index + 2 < permitted.length) await new Promise(resolve => setTimeout(resolve, 800));
+      }
     }
 
     clearButton.addEventListener("click", () => {

@@ -335,22 +335,6 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     return match && match[1] ? map.get(match[1].toLowerCase()) || null : null;
   }
 
-  function normalizeRating(value) {
-    const text = String(value || "").trim().toUpperCase();
-    if (/^(?:NOT\s*RATED|UNRATED|NR|UR)$/.test(text)) return "NR";
-    const normalized = text.replace(/[\s-]/g, "");
-    if (!/^(?:TVY7(?:FV)?|TVY|TVG|TVPG|TV14|TVMA|G|PG|PG13|R|NC17|X|12\+|16\+|18\+|7\+)$/.test(normalized)) return "";
-    return ({ TVY: "TV-Y", TVY7: "TV-Y7", TVY7FV: "TV-Y7", TVG: "TV-G", TVPG: "TV-PG", TV14: "TV-14", TVMA: "TV-MA", PG13: "PG-13", NC17: "NC-17" })[normalized] || normalized;
-  }
-
-  const roleFromText = value => {
-    const text = String(value || "").trim();
-    if (!text) return "";
-    const roles = { actor: "Actor", actress: "Actor", acting: "Actor", director: "Director", directing: "Director", writer: "Writer", writing: "Writer", producer: "Producer", production: "Producer", composer: "Composer", cinematographer: "Cinematographer", camera: "Cinematographer", editor: "Editor", editing: "Editor", creator: "Creator", host: "Host" };
-    const match = roles[text.toLowerCase()];
-    return match || "Actor";
-  };
-
   function personRole(key, card) {
     try {
       const segments = new URL(key).pathname.split("/").filter(Boolean).map(value => value.toLowerCase());
@@ -360,12 +344,12 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     } catch (error) { /* malformed card link */ }
     const lines = Array.from(card.querySelectorAll("p")).map(node => elementText(node)).filter(Boolean);
     const parts = cardText(card).split(/\s+[•·]\s+/);
-    return roleFromText(lines[1] || parts[1]);
+    return HOA.roleFromText(lines[1] || parts[1]);
   }
 
   function cardRatings(card, rule, data) {
     const values = [];
-    const add = value => { const normalized = normalizeRating(value); if (normalized && !values.includes(normalized)) values.push(normalized); };
+    const add = value => { const normalized = HOA.normalizeRating(value); if (normalized && !values.includes(normalized)) values.push(normalized); };
     const meta = rule.meta || {};
     const selectors = [meta.rating, rule.ratingSelector].flat().filter(Boolean);
     selectors.forEach(selector => {
@@ -426,7 +410,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     }
     if (Array.isArray(test.ratings)) {
       const ratings = cardRatings(card, rule, data);
-      results.push(test.ratings.some(rating => ratings.includes(normalizeRating(rating))));
+      results.push(test.ratings.some(rating => ratings.includes(HOA.normalizeRating(rating))));
     }
     if (test.kids === true) results.push(Boolean(data && data.pageData && data.pageData.kids === true));
     if (Number.isFinite(test.maxSeconds)) {
@@ -723,6 +707,14 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       if (getComputedStyle(target).position === "static") target.style.position = "relative";
       return target;
     }
+    // Prefer a box the site already positions (a ratio wrapper around the image): forcing position on the site's own
+    // link can re-anchor its absolutely placed image and collapse it to nothing (Dailymotion's home feed).
+    const image = card.querySelector("img, [class*=thumbnail], [class*=Thumbnail]");
+    for (let node = image; node && node !== card; node = node.parentElement) {
+      if (getComputedStyle(node).position === "static") continue;
+      const box = node.getBoundingClientRect();
+      if (box.width >= 80 && box.height >= 40) return node;
+    }
     const generic = card.querySelector("a:has(img), [class*=thumbnail], [class*=Thumbnail], img") || card;
     const target = generic.tagName === "IMG" ? generic.parentElement || card : generic;
     if (target && getComputedStyle(target).position === "static") target.style.position = "relative";
@@ -744,12 +736,14 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   function ensureContinueProgress(card, rule, data) {
     const current = data && watchProgress[data.key];
     const show = rule.id !== "youtube" && current && current.cw && !current.watched && current.duration > 0;
-    const thumbnail = thumbnailForWatchedLabel(card);
-    if (!thumbnail) return;
+    // Only look for (and prepare) the thumbnail when there is a bar to draw: this runs for every card on every pass.
     if (!show) {
-      if (thumbnail.hasAttribute("data-hoa-continue")) thumbnail.removeAttribute("data-hoa-continue");
+      const marked = card.querySelector("[data-hoa-continue]") || (card.hasAttribute("data-hoa-continue") ? card : null);
+      if (marked) marked.removeAttribute("data-hoa-continue");
       return;
     }
+    const thumbnail = thumbnailForWatchedLabel(card);
+    if (!thumbnail) return;
     const progress = `${Math.max(0, Math.min(100, current.position / current.duration * 100))}%`;
     if (!thumbnail.hasAttribute("data-hoa-continue")) thumbnail.setAttribute("data-hoa-continue", "");
     if (thumbnail.style.getPropertyValue("--hoa-progress") !== progress) thumbnail.style.setProperty("--hoa-progress", progress);
@@ -1143,7 +1137,15 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       return target;
     }
     if (rule.removeClosest) {
-      return card.closest(rule.removeClosest) || card;
+      let target = card.closest(rule.removeClosest) || card;
+      if (["pbs", "crunchyroll", "kick"].includes(rule.id)) {
+        for (let level = 0; level < 4; level += 1) {
+          const parent = target.parentElement;
+          if (!parent || ["BODY", "HTML", "MAIN"].includes(parent.tagName) || parent.children.length !== 1) break;
+          target = parent;
+        }
+      }
+      return target;
     }
     if (!rule.removeClimb && rule.builtIn) {
       return card;
@@ -1402,6 +1404,44 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     return keyForHref(href, rule || {});
   }
 
+  const sharedDoorCache = new WeakMap();
+  // Only for rules that opt in (Pluto's live rows): elsewhere two titles behind one link are the same show.
+  function sharedDoorKey(card, rule, key, title) {
+    if (!rule.sharedDoorCards) return "";
+    const signature = `${key}|${title}`;
+    const cached = sharedDoorCache.get(card);
+    if (cached && cached.signature === signature) return cached.key;
+    let container = card.parentElement;
+    let cards = [];
+    while (container && !["BODY", "HTML"].includes(container.tagName)) {
+      try { cards = Array.from(container.querySelectorAll(rule.cardSelector)); } catch (error) { cards = []; }
+      if (cards.length >= 2) break;
+      container = container.parentElement;
+    }
+    let result = "";
+    if (cards.length >= 2) {
+      const normalizedTitle = String(title || "").trim().toLocaleLowerCase();
+      const sameDoor = cards.filter(other => other !== card).some(other => {
+        const otherLink = getLinkInfo(other, rule).link;
+        const otherHref = otherLink && ((rule.linkAttribute && otherLink.getAttribute(rule.linkAttribute)) || otherLink.href || otherLink.getAttribute("href"));
+        const otherKey = otherHref && keyForHref(otherHref, rule);
+        if (otherKey !== key) return false;
+        let otherTitle = "";
+        for (const selector of rule.titleCandidates || []) {
+          try {
+            const candidate = other.matches(selector) ? other : other.querySelector(selector);
+            otherTitle = candidateText(candidate, selector);
+          } catch (error) { otherTitle = ""; }
+          if (otherTitle) break;
+        }
+        return otherTitle && otherTitle.trim().toLocaleLowerCase() !== normalizedTitle;
+      });
+      if (sameDoor) result = HOA.cardKey(location.origin, title);
+    }
+    sharedDoorCache.set(card, { signature, key: result });
+    return result;
+  }
+
   function cardData(card, rule) {
     const linkInfo = getLinkInfo(card, rule);
     const link = linkInfo.link;
@@ -1417,11 +1457,13 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
         ...(key !== formerKey ? { formerKey } : {}) };
     }
     const href = (rule.linkAttribute && link.getAttribute(rule.linkAttribute)) || link.href || link.getAttribute("href");
-    const key = playlistKeyForCard(card, href, keyForHref(href, rule));
+    let key = playlistKeyForCard(card, href, keyForHref(href, rule));
     if (!key) {
       return null;
     }
-    const kind = HOA.kindOf(key);
+    const urlKind = HOA.kindOf(key);
+    const liveChannelCard = Boolean(rule.liveChannelCards && urlKind === "channel");
+    let kind = liveChannelCard ? "video" : urlKind;
     const category = kind === "category";
     let title = category ? categoryTitle(card) : "";
     if (!title) {
@@ -1471,6 +1513,13 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const namedYear = title.match(/^(.{2,}?)\s*\(((?:18|19|20)\d{2})\)$/);
     if (namedYear) title = namedYear[1];
 
+    const originalKey = key;
+    const doorKey = sharedDoorKey(card, rule, key, title);
+    if (doorKey) {
+      key = doorKey;
+      kind = HOA.kindOf(key);
+    }
+
     let thumb = HOA.youtubeThumb(key);
     if (!thumb) {
       const image = card.querySelector("img");
@@ -1483,7 +1532,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const formerHref = former && former !== link && ((rule.linkAttribute && former.getAttribute(rule.linkAttribute)) || former.href || former.getAttribute("href"));
     const candidateKey = formerHref && keyForHref(formerHref, rule);
     const formerKey = candidateKey && HOA.kindOf(candidateKey) !== "channel" ? candidateKey : "";
-    return { key, title, thumb, kind, site: HOA.siteOf(key), ts: Date.now(), ...(kind === "person" ? { role: personRole(key, card) } : {}), ...(namedYear ? { year: Number(namedYear[2]) } : {}), ...(formerKey && formerKey !== key ? { formerKey } : {}), ...(pageData ? { pageData } : {}) };
+    return { key, title, thumb, kind, site: HOA.siteOf(key), ts: Date.now(), ...(doorKey ? { linkless: true, formerKey: originalKey } : {}), ...(kind === "person" ? { role: personRole(key, card) } : {}), ...(namedYear ? { year: Number(namedYear[2]) } : {}), ...(!doorKey && formerKey && formerKey !== key ? { formerKey } : {}), ...(pageData ? { pageData } : {}) };
   }
 
   function elementText(element) {
@@ -1639,11 +1688,11 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       meta.views = meta.views ?? firstParsed(texts, HOA.parseViews);
       meta.published = meta.published ?? firstParsed(texts, text => HOA.parseRelativeAge(text, Date.now()))
         ?? firstParsed(texts, HOA.parseDate);
-      const rating = texts.map(normalizeRating).find(Boolean);
+    const rating = texts.map(HOA.normalizeRating).find(Boolean);
       meta.rating = meta.rating ?? rating ?? null;
     }
     const detectedRating = cardRatings(card, rule, { pageData: pageDataForCard(card, rule) })[0];
-    meta.rating = normalizeRating(meta.rating) || detectedRating || null;
+    meta.rating = HOA.normalizeRating(meta.rating) || detectedRating || null;
     if (Array.isArray(rule.typeByCard)) {
       const match = rule.typeByCard.find(entry => card.matches(entry[0]));
       if (match) meta.type = match[1];
@@ -1866,7 +1915,9 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
         // Skip only something that covers the whole card (its own wrapper). A side-by-side thumbnail is often
         // exactly as tall as the card.
         const coversCard = rect.width >= cardRect.width * 0.98 && rect.height >= cardRect.height * 0.98;
-        if (rect.width >= cardRect.width * 0.3 && !coversCard && area > bestArea) {
+        // A short image is a title logo over artwork drawn as a background (Tubi's hero cards), not the picture.
+        const tallEnough = rect.height >= cardRect.height * 0.4;
+        if (rect.width >= cardRect.width * 0.3 && tallEnough && !coversCard && area > bestArea) {
           best = rect;
           bestArea = area;
         }
@@ -1954,11 +2005,18 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       rows = [margin, ...controls.map(rect => rect.bottom + 6).filter(top => top > margin)].sort((a, b) => a - b)
         .filter(row => row + height <= Math.max(cardRect.height / 2, margin + height));
     }
-    for (const row of rows) {
-      x = tryRow(row);
-      if (x !== null) {
-        y = row;
-        break;
+    const centredX = clampX(preferredX);
+    const centredRow = rows.find(row => !blocker(centredX, row));
+    if (centredRow !== undefined) {
+      x = centredX;
+      y = centredRow;
+    } else {
+      for (const row of rows) {
+        x = tryRow(row);
+        if (x !== null) {
+          y = row;
+          break;
+        }
       }
     }
     if (x === null) {
@@ -2490,10 +2548,12 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
   }
 
   function needsEnrich(entry, key) {
-    const kind = HOA.kindOf(key);
-    const type = HOA.typeOf(key);
-    return Boolean(entry) && kind !== "channel" && kind !== "category" && type !== "playlist" && !HOA.isHoaCardKey(key)
-      && (!entry.thumb || (!entry.year && kind !== "person") || ((!entry.rating || !Array.isArray(entry.genres)) && Boolean(fandangoInfoUrl(key) || rokuInfoUrl(key))) || weakName(entry.title, key) || / – /.test(entry.title || ""));
+    if (HOA.needsEnrich(entry, key)) return true;
+    if (!entry || (Number.isFinite(entry.enrichedAt) && Date.now() - entry.enrichedAt < 7 * 86400000)) return false;
+    const kind = entry.kind || HOA.kindOf(key);
+    return kind !== "channel" && kind !== "category" && !["playlist", "genre", "category"].includes(entry.type || HOA.typeOf(key))
+      && !HOA.isHoaCardKey(key) && Boolean(fandangoInfoUrl(key) || rokuInfoUrl(key))
+      && (!entry.rating || !Array.isArray(entry.genres) || !entry.genres.length);
   }
 
   function queueEnrich(key) {
@@ -2515,15 +2575,15 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
         const roku = rokuInfoUrl(key);
         if (fandango) {
           const response = await fetch(fandango, { credentials: "omit" });
-          if (response.ok) applyEnrich(key, fandangoInfo(await response.text()));
+          applyEnrich(key, response.ok ? fandangoInfo(await response.text()) : {});
         } else if (roku) {
           const response = await fetch(roku, { credentials: "include" });
-          if (response.ok) applyEnrich(key, rokuInfo(await response.text()));
+          applyEnrich(key, response.ok ? rokuInfo(await response.text()) : {});
         } else {
           const html = await readPage(key);
-          if (html) applyEnrich(key, pageInfo(new DOMParser().parseFromString(html, "text/html"), key));
+          applyEnrich(key, html ? HOA.pageInfo(new DOMParser().parseFromString(html, "text/html"), key) : {});
         }
-      } catch (error) { /* the page could not be read: the entry keeps what it has */ }
+      } catch (error) { applyEnrich(key, {}); }
       await new Promise(resolve => setTimeout(resolve, 1200));
     }
     enriching = false;
@@ -2588,7 +2648,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     if (type === "program") info.type = "movie"; else if (/^(?:series|season|episode)$/.test(type)) info.type = "tv";
     const poster = String(first(content.posterUrl)).replace(/^http:/, "https:");
     if (/^https:\/\//.test(poster)) info.thumb = poster;
-    const rating = normalizeRating(first(content.mpaaRating) || first(content.contentRating));
+    const rating = HOA.normalizeRating(first(content.mpaaRating) || first(content.contentRating));
     if (rating) info.rating = rating;
     const genres = HOA.splitGenres(Array.isArray(content.genres) ? content.genres.join(",") : first(content.genres));
     if (genres.length) info.genres = genres.slice(0, 5);
@@ -2609,79 +2669,13 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     const info = {}; const title = HOA.cleanTitle(content.title || ""); if (title) info.title = title.slice(0, HOA.MAX_TITLE);
     const year = Number(content.releaseYear || String(content.releaseDate || "").slice(0, 4)); if (year >= 1870 && year <= new Date().getFullYear() + 1) info.year = year;
     if (content.type === "movie") info.type = "movie"; else if (/^(series|season|episode)$/.test(content.type || "")) info.type = "tv";
-    const rating = normalizeRating(content.parentalRatings && content.parentalRatings[0] && content.parentalRatings[0].code); if (rating) info.rating = rating;
+    const rating = HOA.normalizeRating(content.parentalRatings && content.parentalRatings[0] && content.parentalRatings[0].code); if (rating) info.rating = rating;
     const genres = HOA.splitGenres(Array.isArray(content.genres) ? content.genres.join(",") : content.genres); if (genres.length) info.genres = genres.slice(0, 5);
     const poster = content.imageMap && content.imageMap.detailPoster && content.imageMap.detailPoster.path; if (/^https:\/\//.test(poster || "")) info.thumb = poster;
     return info;
   }
 
   // Name, year, type and picture as the page states them for search engines and link previews.
-  function pageInfo(doc, key) {
-    const info = {};
-    const meta = selector => { const node = doc.querySelector(selector); return node ? (node.getAttribute("content") || "").trim() : ""; };
-    const absolute = value => { try { const url = new URL(value, key); return /^https?:$/.test(url.protocol) && url.href.length <= HOA.MAX_URL ? url.href : ""; } catch (error) { return ""; } };
-    const items = [];
-    doc.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
-      try {
-        const walk = value => { if (Array.isArray(value)) value.forEach(walk); else if (value && typeof value === "object") { items.push(value); if (value["@graph"]) walk(value["@graph"]); } };
-        walk(JSON.parse(script.textContent));
-      } catch (error) { /* not JSON */ }
-    });
-    const typeOf = item => [].concat(item["@type"] || []).map(String);
-    const main = items.find(item => typeOf(item).some(type => /^(Movie|TVSeries|TVSeason|TVEpisode|Episode|VideoObject|Person|CreativeWork|Clip)$/.test(type))) || {};
-    const types = typeOf(main);
-    if (types.some(type => type === "Movie")) info.type = "movie";
-    else if (types.some(type => /^(TVSeries|TVSeason|TVEpisode|Episode)$/.test(type))) info.type = "tv";
-    else if (types.includes("Person")) info.type = "person";
-    if (types.includes("Person")) {
-      const job = String(main.jobTitle || "").trim();
-      if (job) info.role = roleFromText(job);
-    }
-    // Prime Video says it in its own page data: "titleType":"movie", or "season"/"episode" for a series.
-    if (!info.type) { const titleType = (Array.from(doc.querySelectorAll("script:not([src])")).map(script => script.textContent || "").join(" ").slice(0, 2000000).match(/"titleType"\s*:\s*"(movie|season|episode|series|show|tv_?show)"/i) || [])[1];
-      if (titleType) info.type = /^movie$/i.test(titleType) ? "movie" : "tv"; }
-    const name = typeof main.name === "string" ? main.name : "";
-    const ogTitle = meta('meta[property="og:title"]') || meta('meta[name="twitter:title"]') || (doc.title || "");
-    info.title = HOA.cleanTitle(name || ogTitle.replace(/\s+[|–—-]\s+[^|–—-]+$/, "")).slice(0, HOA.MAX_TITLE);
-    // In order of trust: the page's structured data, a release-year badge (Prime), a release key in the page's own
-    // data (Prime, Xumo, Fandango-style JSON), a "Year 2011" label (FilmRise), and last the upload date, which on a
-    // streaming site is when it was added, not when it came out.
-    const scripts = () => Array.from(doc.querySelectorAll("script:not([src])")).map(script => script.textContent || "").join("\n").slice(0, 2000000);
-    // The page's words with a space between boxes ("Year" and "2011" in separate cells), scripts left out.
-    const pageText = () => { if (!doc.body) return ""; const parts = []; let size = 0; const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
-      for (let node = walker.nextNode(); node && size < 300000; node = walker.nextNode()) { if (node.parentElement && node.parentElement.closest("script, style, noscript")) continue; parts.push(node.nodeValue); size += node.nodeValue.length; }
-      return parts.join(" ").replace(/\s+/g, " "); };
-    const yearIn = (text, pattern) => { const match = String(text || "").match(pattern); return match ? match[1] : ""; };
-    const badge = doc.querySelector('[data-automation-id="release-year-badge"], [data-testid="release-year-badge"]');
-    const date = [main.datePublished, main.dateCreated, main.startDate, main.releaseDate, main.copyrightYear,
-      main.releasedEvent && main.releasedEvent.startDate, meta('meta[itemprop="datePublished"]'), meta('meta[property="video:release_date"]'),
-      badge && badge.textContent,
-      () => yearIn(scripts(), /"(?:releaseYear|release_year|productionYear|production_year|releaseDate|release_date|originalReleaseDate|premiereDate|firstAirDate|first_air_date|releaseTime)"\s*:\s*\[?\s*"?((?:18|19|20)\d{2})\b/),
-      () => yearIn(pageText(), /\b(?:Release(?:d| year| date)?|Year|Premiered|First aired)\s*:?\s*((?:18|19|20)\d{2})\b/i),
-      () => yearIn(pageText(), /\b((?:18|19|20)\d{2})\s*[•·]/),
-      () => yearIn(pageText(), /\b((?:18|19|20)\d{2})\s*(?=[•·|]\s*(?:TV-?(?:Y7?|G|PG|14|MA)|G|PG|PG-?13|R|NC-?17)|\d+\s*(?:h|hr))/i),
-      () => yearIn(scripts(), /"year"\s*:\s*"?((?:18|19|20)\d{2})\b/),
-      main.uploadDate]
-      .map(value => String((typeof value === "function" ? value() : value) || "")).find(value => /\b(?:18|19|20)\d{2}\b/.test(value));
-    const year = date ? Number(date.match(/\b(?:18|19|20)\d{2}\b/)[0]) : 0;
-    // A date past next year is when the site stops offering it, not when it came out.
-    if (year && year <= new Date().getFullYear() + 1) info.year = year;
-    const scriptText = scripts();
-    const inlineRating = (scriptText.match(/"(?:contentRating|mpaaRating|maturityRating|rating)"\s*:\s*"([^"]+)"/i) || [])[1];
-    const rating = normalizeRating(main.contentRating || inlineRating);
-    if (rating) info.rating = rating;
-    const rawGenres = main.genre || (scriptText.match(/"(?:genres|genre)"\s*:\s*(\[[^\]]*\]|"[^"]+")/i) || [])[1];
-    const genres = HOA.splitGenres(Array.isArray(rawGenres) ? rawGenres.join(",") : String(rawGenres || "").replace(/[\[\]"]/g, ""))
-      .filter(genre => genre.length <= 40 && genre.split(/\s+/).length <= 4).slice(0, 5);
-    if (genres.length) info.genres = genres;
-    if (info.type === "person" && !info.role) {
-      const department = (scriptText.match(/"known_for_department"\s*:\s*"([^"]+)"/i) || [])[1];
-      if (department) info.role = roleFromText(department);
-    }
-    const image = [].concat(main.image || []).map(value => (value && typeof value === "object" ? value.url : value)).find(value => typeof value === "string");
-    info.thumb = absolute(image || meta('meta[property="og:image"]') || meta('meta[name="twitter:image"]'));
-    return info;
-  }
 
   function applyEnrich(key, info) {
     HOA.readLists(lists => {
@@ -2689,23 +2683,8 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
       ["added", "hidden"].forEach(name => {
         const saved = lists[name][key];
         if (!saved) return;
-        const patch = {};
-        const plain = String(saved.title || "").replace(/…$/, "");
-        const ours = / – (.+)$/.exec(plain);
-        const better = info.title && !weakName(info.title, key) && info.title !== saved.title
-          && (weakName(saved.title, key) || plain.includes(info.title) || (ours && (info.title.startsWith(ours[1]) || ours[1].startsWith(info.title))));
-        if (better) patch.title = info.title;
-        const year = patch.year || saved.year || info.year;
-        // "Name (2022)" with the year saved beside it: the name alone.
-        const named = patch.title || saved.title || "";
-        if (year && named.endsWith(` (${year})`)) patch.title = named.slice(0, -` (${year})`.length);
-        if (!saved.year && Number.isInteger(info.year) && info.year >= 1870 && info.year <= 2100) patch.year = info.year;
-        if (!saved.thumb && info.thumb) patch.thumb = info.thumb;
-        if (info.type && (!saved.type || saved.type === "video" || (saved.type === "live" && info.type === "past"))) patch.type = info.type;
-        if (!saved.rating && info.rating) patch.rating = info.rating;
-        if ((!Array.isArray(saved.genres) || !saved.genres.length) && Array.isArray(info.genres) && info.genres.length) patch.genres = info.genres;
-        if (saved.type === "person" && !saved.role && info.role) patch.role = info.role;
-        if (Object.keys(patch).length) changed[name] = { ...lists[name], [key]: { ...saved, ...patch } };
+        const patch = HOA.enrichPatch(saved, info, key);
+        changed[name] = { ...lists[name], [key]: { ...saved, ...patch } };
       });
       if (Object.keys(changed).length) HOA.writeLists(changed);
     });
@@ -2742,7 +2721,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     if (Object.keys(patch).length) { healedSaved.delete(key); pendingHeals.set(key, patch); flushHeals(); }
     [2500, 6000].forEach(delay => window.setTimeout(() => {
       if (!ensureContext() || location.href !== pageHealHref) return;
-      applyEnrich(key, pageInfo(document, key));
+      applyEnrich(key, HOA.pageInfo(document, key));
     }, delay));
   }
 
@@ -3299,7 +3278,7 @@ if (window.name !== "hoa-rows-frame" && !(window === window.top && location.host
     addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveTracker(true); }); addEventListener("pagehide", () => saveTracker(true));
   }
   // Narrow test seam: production pages never create __hoaTest.
-  if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, applyAdded, compensateCarousels, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, keyForHref, attachTracker, findPlayer, activeCategories, keywordMatch: HOA.keywordMatch, saveTracker, watchedCard, frameEntry, watchedProgressMutation });
+  if (window.__hoaTest) Object.assign(window.__hoaTest, { apply, applyAdded, compensateCarousels, filterText, cardRatings, pageDataForCard, shouldFilterCard, hostnameRule, cardData, keyForHref, attachTracker, findPlayer, activeCategories, keywordMatch: HOA.keywordMatch, pageInfo: HOA.pageInfo, saveTracker, watchedCard, frameEntry, watchedProgressMutation });
 
   function isOwnMutation(mutation) {
     if (mutation.target.closest && mutation.target.closest(".hoa-actions, #hoa-toast, #hoa-banner, #hoa-watch-later")) return true;

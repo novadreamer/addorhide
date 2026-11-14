@@ -12,7 +12,7 @@ function check(name, fn) {
 }
 
 const hostname = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/;
-const types = new Set(["video", "trailer", "short", "movie", "tv", "live", "music", "sport", "other"]);
+const types = new Set(["video", "trailer", "short", "movie", "tv", "live", "music", "sport", "genre", "other"]);
 const ids = new Set();
 const hosts = new Set();
 catalog.rules.forEach(rule => {

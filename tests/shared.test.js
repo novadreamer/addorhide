@@ -399,9 +399,9 @@ check("Roku: a movie link and a series link are told apart and By type is offere
   assert.deepEqual(HOA.groupEntries(pairs, "type").map(group => group.label), ["Movies", "TV Shows"]);
 });
 check("videos and shorts only: By type adds nothing", () => assert.deepEqual(
-  HOA.availableGroups(groupedPairs.slice(0, 2).map(([key, entry]) => [key, { ...entry, genres: ["Drama"] }])), ["none"]));
-check("one shared genre: By genre adds nothing", () => assert.deepEqual(
-  HOA.availableGroups([["a", { type: "movie", genres: ["Drama"] }], ["b", { type: "movie", genres: ["Drama"] }]]), ["none"]));
+  HOA.availableGroups(groupedPairs.slice(0, 2).map(([key, entry]) => [key, { ...entry, genres: ["Drama"] }])), ["none", "genre"]));
+check("one shared genre: By genre is still offered", () => assert.deepEqual(
+  HOA.availableGroups([["a", { type: "movie", genres: ["Drama"] }], ["b", { type: "movie", genres: ["Drama"] }]]), ["none", "type", "genre"]));
 check("added grouping options require distinct non-trivial values", () => {
   const entries = [["a", { type: "movie", ts: Date.now(), channel: "One", year: 1994, rating: "PG" }], ["b", { type: "movie", ts: Date.now() - 40 * 86400000, channel: "Two", year: 2004, rating: "R" }]];
   const modes = HOA.availableGroups(entries);
@@ -716,6 +716,19 @@ check("normalizing existing added items derives channel kind without overwriting
   const items = HOA.normalizeItems({ [channel]: { title: "Creator", thumb: "", ts: 1 }, [short]: { title: "Short", thumb: "", ts: 2, kind: "short" } });
   assert.equal(items[channel].kind, "channel"); assert.equal(items[short].kind, "short");
 });
+check("Kick live-channel migration repairs legacy channel entries", () => {
+  const key = "https://kick.com/lacobraaa";
+  const item = HOA.normalizeItems({ [key]: { title: "true", thumb: "", kind: "channel", ts: 1 } })[key];
+  assert.equal(item.kind, "video"); assert.equal(item.type, "live"); assert.equal(item.title, "lacobraaa");
+});
+check("an explicit stored video kind wins over a channel-looking URL", () => {
+  const key = "https://www.twitch.tv/streamer";
+  assert.equal(HOA.normalizeItems({ [key]: { title: "Stream", thumb: "", kind: "video", ts: 1 } })[key].kind, "video");
+});
+check("enrichment patches always stamp their cooldown", () => {
+  const patch = HOA.enrichPatch({ title: "Stream", type: "video" }, {}, "https://example.com/video/1");
+  assert.ok(Number.isFinite(patch.enrichedAt));
+});
 check("category URLs accept supported category paths and reject lookalikes", () => {
   ["https://www.twitch.tv/directory/category/just-chatting", "https://www.twitch.tv/directory/category/just-chatting/videos", "https://www.twitch.tv/directory/event/just-chatting", "https://www.twitch.tv/category/films", "https://example.com/category/films", "https://example.com/categories/films/popular"].forEach(url => assert.equal(HOA.isCategoryUrl(url), true, url));
   ["https://www.twitch.tv/directory/category/just-chatting", "https://www.twitch.tv/directory/category/just-chatting/videos", "https://www.twitch.tv/directory/game/just-chatting", "https://www.twitch.tv/category/films", "https://example.com/category/films", "https://example.com/categories/films/popular"].forEach(url => assert.equal(HOA.isCategoryUrl(url), true, url));
@@ -762,6 +775,17 @@ check("Twitch links distinguish live streams, past broadcasts and clips", () => 
   assert.equal(HOA.typeOf("https://www.twitch.tv/videos/123456789"), "past");
   assert.equal(HOA.typeOf("https://www.twitch.tv/streamer/clip/Clip_Slug-123"), "clip");
   assert.equal(HOA.typeOf("https://clips.twitch.tv/Clip_Slug-123"), "clip");
+});
+check("Kick links distinguish live streams, past broadcasts and clips", () => {
+  assert.equal(HOA.typeOf("https://kick.com/lacobraaa"), "live");
+  assert.equal(HOA.typeOf("https://kick.com/lacobraaa/videos/123"), "past");
+  assert.equal(HOA.typeOf("https://kick.com/lacobraaa/clips/abc"), "clip");
+  assert.equal(HOA.typeOf("https://kick.com/clips/abc"), "clip");
+});
+check("Shout genre sections and translated genre names are supported", () => {
+  assert.equal(HOA.typeOf("https://watch.shout-tv.com/section/Anime%20Film"), "genre");
+  assert.equal(HOA.englishGenre("Acción"), "Action");
+  assert.deepEqual("Ciencia ficción/fantasía".split("/").map(HOA.englishGenre), ["Science Fiction", "Fantasy"]);
 });
 check("filmography and Letterboxd job paths are people", () => {
   ["https://athome.fandango.com/content/browse/filmography/Stacey-Dash/560619", "https://letterboxd.com/director/greta-gerwig/"]

@@ -489,7 +489,8 @@ function renderSite() {
   actions.className = "page-actions teach-actions";
   actions.appendChild(teach);
   siteContent.appendChild(actions);
-  appendFilterControls(siteContent, catalogRule);
+  // Teach and Hide on this site share one row: stacked, they pushed the popup past its 600px and a scrollbar showed.
+  appendFilterControls(actions, catalogRule);
   const links = document.createElement("div");
   links.className = "site-links";
   addLearnedControl(activeHost, isCatalog, rule, links);

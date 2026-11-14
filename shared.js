@@ -287,7 +287,7 @@ var HOA = Object.freeze((() => {
     if (comparison) return comparison;
     return leftRaw < rightRaw ? -1 : leftRaw > rightRaw ? 1 : 0;
   }
-  const TYPES = ["video", "short", "playlist", "movie", "tv", "live", "past", "clip", "music", "sport", "person", "category", "other"];
+  const TYPES = ["video", "short", "playlist", "movie", "tv", "live", "past", "clip", "music", "sport", "person", "category", "genre", "other"];
   const SORT_KEYS = ["added", "published", "views", "votes", "score", "duration", "title", "year", "channel"];
   const TYPE_LABELS = Object.freeze({
     video: "Video",
@@ -302,6 +302,7 @@ var HOA = Object.freeze((() => {
     sport: "Sport",
     person: "Person",
     category: "Category",
+    genre: "Genre",
     other: "Other"
   });
   const SITE_NAMES = Object.freeze({
@@ -664,12 +665,13 @@ var HOA = Object.freeze((() => {
       const parsed = new URL(url);
       const path = parsed.pathname.toLowerCase();
       const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
-      if (host === "twitch.tv") {
-        if (/^\/videos\/\d+(?:\/|$)/.test(path)) return "past";
-        if (/^\/[^/]+\/clip\/[^/]+(?:\/|$)/.test(path)) return "clip";
+      if (host === "twitch.tv" || host === "kick.com") {
+        if (/^\/videos\/\d+(?:\/|$)/.test(path) || /^\/[^/]+\/videos\/\d+(?:\/|$)/.test(path)) return "past";
+        if (/^\/clips?\/[^/]+(?:\/|$)/.test(path) || /^\/[^/]+\/clips?\/[^/]+(?:\/|$)/.test(path)) return "clip";
         if (/^\/[^/]+\/?$/.test(path) && isChannelUrl(parsed.href)) return "live";
       }
       if (host === "clips.twitch.tv" && /^\/[^/]+\/?$/.test(path)) return "clip";
+      if (host === "watch.shout-tv.com" && /^\/section\/[^/]+(?:\/|$)/.test(path)) return "genre";
       // The Roku Channel plays a movie at /watch; a series opens a page of seasons and episodes at /details.
       if (["therokuchannel.roku.com", "app.roku.com"].includes(parsed.hostname.toLowerCase())) {
         if (path.startsWith("/watch/")) return "movie";
@@ -892,6 +894,202 @@ var HOA = Object.freeze((() => {
       }
     });
     return result;
+  }
+
+  function normalizeRating(value) {
+    const text = String(value || "").trim().toUpperCase();
+    if (/^(?:NOT\s*RATED|UNRATED|NR|UR)$/.test(text)) return "NR";
+    const normalized = text.replace(/[\s-]/g, "");
+    if (!/^(?:TVY7(?:FV)?|TVY|TVG|TVPG|TV14|TVMA|G|PG|PG13|R|NC17|X|12\+|16\+|18\+|7\+)$/.test(normalized)) return "";
+    return ({ TVY: "TV-Y", TVY7: "TV-Y7", TVY7FV: "TV-Y7", TVG: "TV-G", TVPG: "TV-PG", TV14: "TV-14", TVMA: "TV-MA", PG13: "PG-13", NC17: "NC-17" })[normalized] || normalized;
+  }
+
+  function roleFromText(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const roles = { actor: "Actor", actress: "Actor", acting: "Actor", director: "Director", directing: "Director", writer: "Writer", writing: "Writer", producer: "Producer", production: "Producer", composer: "Composer", cinematographer: "Cinematographer", camera: "Cinematographer", editor: "Editor", editing: "Editor", creator: "Creator", host: "Host" };
+    return roles[text.toLowerCase()] || "Actor";
+  }
+
+  const GENRE_TRANSLATIONS = Object.freeze({
+    accion: "Action", acao: "Action", azione: "Action", action: "Action",
+    aventura: "Adventure", aventure: "Adventure", abenteuer: "Adventure", adventure: "Adventure",
+    comedia: "Comedy", comedie: "Comedy", commedia: "Comedy", komodie: "Comedy", comedy: "Comedy",
+    drama: "Drama", drame: "Drama", dramma: "Drama",
+    terror: "Horror", horreur: "Horror", orrore: "Horror", horror: "Horror",
+    suspenso: "Thriller", suspense: "Thriller", thriller: "Thriller",
+    "ciencia ficcion": "Science Fiction", "ficcao cientifica": "Science Fiction", "science fiction": "Science Fiction", fantascienza: "Science Fiction",
+    fantasia: "Fantasy", fantastique: "Fantasy", fantasy: "Fantasy",
+    romance: "Romance", romantico: "Romance", romantique: "Romance",
+    documental: "Documentary", documentario: "Documentary", documentaire: "Documentary", dokumentation: "Documentary",
+    animacion: "Animation", animacao: "Animation", animazione: "Animation", animation: "Animation",
+    infantil: "Kids", infantiles: "Kids", ninos: "Kids", kids: "Kids",
+    familia: "Family", famille: "Family", famiglia: "Family", family: "Family",
+    crimen: "Crime", crime: "Crime", policial: "Crime",
+    misterio: "Mystery", mystere: "Mystery", mystery: "Mystery",
+    musical: "Music", musica: "Music", music: "Music",
+    deportes: "Sports", esportes: "Sports", sports: "Sports",
+    telenovela: "Telenovela", novelas: "Telenovela",
+    reality: "Reality", belico: "War", guerra: "War", war: "War",
+    western: "Western", occidental: "Western", historia: "History", history: "History"
+  });
+
+  function genreKey(value) {
+    return String(value || "").trim().toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+  }
+
+  function englishGenre(name) {
+    const value = String(name || "").trim();
+    return GENRE_TRANSLATIONS[genreKey(value)] || value;
+  }
+
+  function translatedGenres(values) {
+    const result = [];
+    const seen = new Set();
+    (Array.isArray(values) ? values : []).forEach(value => String(value || "").split("/").map(part => part.trim()).filter(Boolean).forEach(part => {
+      const translated = englishGenre(part);
+      const key = genreKey(translated);
+      if (translated && !seen.has(key) && result.length < 5) {
+        seen.add(key);
+        result.push(translated);
+      }
+    }));
+    return result;
+  }
+
+  function metadataOnly(text) {
+    const rest = String(text || "")
+      .replace(/\b(?:19|20)\d{2}\b/g, " ")
+      .replace(/\b\d+\s*h(?:rs?|ours?)?(?![a-z])|\b\d+\s*m(?:ins?|inutes?)?(?![a-ce-z])/gi, " ")
+      .replace(/\b(?:G|PG|PG-13|R|NC-17|NR|UR|TV-?(?:Y7?|Y7-?FV|G|PG|14|MA)|Unrated|Not Rated|HD|4K|UHD|CC|AD)\b/gi, " ")
+      .replace(/(?:Details|More info|Watch now|Trailer|Season[s]?\s*\d*|\d+\s*Seasons?)/gi, " ")
+      .replace(/[·•|,\-–—:()[\]]/g, " ").replace(/\s+/g, " ").trim();
+    return !rest;
+  }
+
+  function looksLikeBadge(text) {
+    return /^(\d{1,2}:){1,2}\d{2}$/.test(text) || /^(live|new|shorts?)$/i.test(text)
+      || /^(?:video(?: card| thumbnail)?|card|thumbnail|poster|image|play(?: video| now)?|watch(?: now| video)?|more info|details|now playing|free to watch|trending|most liked|new episodes?)$/i.test(text)
+      || metadataOnly(text);
+  }
+
+  function weakName(title, key) {
+    return !title || title === siteOf(key) || looksLikeBadge(title);
+  }
+
+  function pageInfo(doc, key) {
+    const info = {};
+    if (!doc || !doc.querySelectorAll) return info;
+    const meta = selector => { const node = doc.querySelector(selector); return node ? (node.getAttribute("content") || "").trim() : ""; };
+    const absolute = value => { try { const url = new URL(value, key); return /^https?:$/.test(url.protocol) && url.href.length <= MAX_URL ? url.href : ""; } catch (error) { return ""; } };
+    const items = [];
+    doc.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
+      try {
+        const walk = value => { if (Array.isArray(value)) value.forEach(walk); else if (value && typeof value === "object") { items.push(value); if (value["@graph"]) walk(value["@graph"]); } };
+        walk(JSON.parse(script.textContent));
+      } catch (error) { /* not JSON */ }
+    });
+    const typeOf = item => [].concat(item["@type"] || []).map(String);
+    const main = items.find(item => typeOf(item).some(type => /^(Movie|TVSeries|TVSeason|TVEpisode|Episode|VideoObject|Person|CreativeWork|Clip)$/.test(type))) || {};
+    const types = typeOf(main);
+    if (types.some(type => type === "Movie")) info.type = "movie";
+    else if (types.some(type => /^(TVSeries|TVSeason|TVEpisode|Episode)$/.test(type))) info.type = "tv";
+    else if (types.includes("Person")) info.type = "person";
+    if (types.includes("Person")) {
+      const job = String(main.jobTitle || "").trim();
+      if (job) info.role = roleFromText(job);
+    }
+    const scripts = () => Array.from(doc.querySelectorAll("script:not([src])")).map(script => script.textContent || "").join("\n").slice(0, 2000000);
+    const scriptText = scripts();
+    const normalizedScript = scriptText.replace(/\\"/g, '"');
+    const vixType = (normalizedScript.match(/"videoType"\s*:\s*"(MOVIE|SERIES|SHOW|EPISODE)"/i) || [])[1];
+    if (!info.type && vixType) info.type = vixType.toUpperCase() === "MOVIE" ? "movie" : "tv";
+    if (!info.type && /(?:^|\.)vix\.com$/i.test(siteOf(key)) && /\/detail\/series-/i.test(new URL(key).pathname)) info.type = "tv";
+    // ViX keeps the title right before videoType in its page data; elsewhere the first "title" in a script is often the site's.
+    const inlineTitle = vixType ? (normalizedScript.match(/"title"\s*:\s*"([^"\\]{1,200})"\s*,\s*"videoType"/i) || [])[1] : "";
+    const name = typeof main.name === "string" ? main.name : "";
+    const ogTitle = meta('meta[property="og:title"]') || meta('meta[name="twitter:title"]') || (doc.title || "");
+    info.title = cleanTitle(name || inlineTitle || ogTitle.replace(/\s+[|–—-]\s+[^|–—-]+$/, "")).slice(0, MAX_TITLE);
+    const pageText = () => {
+      if (!doc.body) return "";
+      const parts = []; let size = 0; const view = doc.defaultView;
+      const filter = view && view.NodeFilter ? view.NodeFilter.SHOW_TEXT : 4;
+      const walker = doc.createTreeWalker(doc.body, filter);
+      for (let node = walker.nextNode(); node && size < 300000; node = walker.nextNode()) { if (node.parentElement && node.parentElement.closest("script, style, noscript")) continue; parts.push(node.nodeValue); size += node.nodeValue.length; }
+      return parts.join(" ").replace(/\s+/g, " ");
+    };
+    const yearIn = (text, pattern) => { const match = String(text || "").match(pattern); return match ? match[1] : ""; };
+    const badge = doc.querySelector('[data-automation-id="release-year-badge"], [data-testid="release-year-badge"]');
+    const date = [main.datePublished, main.dateCreated, main.startDate, main.releaseDate, main.copyrightYear,
+      main.releasedEvent && main.releasedEvent.startDate, meta('meta[itemprop="datePublished"]'), meta('meta[property="video:release_date"]'), badge && badge.textContent,
+      () => yearIn(scriptText, /"(?:releaseYear|release_year|productionYear|production_year|releaseDate|release_date|originalReleaseDate|premiereDate|firstAirDate|first_air_date|releaseTime)"\s*:\s*\[?\s*"?((?:18|19|20)\d{2})\b/),
+      () => yearIn(pageText(), /\b(?:Release(?:d| year| date)?|Year|Premiered|First aired)\s*:?\s*((?:18|19|20)\d{2})\b/i),
+      () => yearIn(pageText(), /\b((?:18|19|20)\d{2})\s*[•·]/),
+      () => yearIn(pageText(), /\b((?:18|19|20)\d{2})\s*(?=[•·|]\s*(?:TV-?(?:Y7?|G|PG|14|MA)|G|PG-?13|R|NC-?17)|\d+\s*(?:h|hr))/i),
+      () => yearIn(scriptText, /"year"\s*:\s*"?((?:18|19|20)\d{2})\b/),
+      // Any language: a metadata cell holding only a year (ViX: <span class="DetailBody_metadataItem…">2016</span>).
+      () => { const cell = Array.from(doc.querySelectorAll('[class*="metadata" i]')).find(node => node.childElementCount === 0 && /^(?:18|19|20)\d{2}$/.test((node.textContent || "").trim()));
+        return cell ? cell.textContent.trim() : ""; },
+      main.uploadDate]
+      .map(value => String((typeof value === "function" ? value() : value) || "")).find(value => /\b(?:18|19|20)\d{2}\b/.test(value));
+    const year = Number((date && date.match(/\b(?:18|19|20)\d{2}\b/)[0]) || 0);
+    if (year && year >= 1870 && year <= new Date().getFullYear() + 1) info.year = year;
+    const inlineRating = (normalizedScript.match(/"(?:contentRating|mpaaRating|maturityRating|rating|ratingValue)"\s*:\s*"([^"\\]+)"/i) || [])[1];
+    const rating = normalizeRating(main.contentRating || inlineRating);
+    if (rating) info.rating = rating;
+    const rawGenres = main.genre || (normalizedScript.match(/"(?:genres|genre)"\s*:\s*(\[[^\]]*\]|"[^"]+")/i) || [])[1];
+    let genres = translatedGenres(HOA_splitGenres(Array.isArray(rawGenres) ? rawGenres.join(",") : String(rawGenres || "").replace(/[\[\]"]/g, "")));
+    if (!genres.length) {
+      const selectors = ['a[href*="/generos/"]', 'a[href*="/genero/"]', 'a[href*="/genres/"]', 'a[href*="/genre/"]', 'a[href*="/generi/"]', 'a[href*="/genres?"]'];
+      const linked = selectors.flatMap(selector => Array.from(doc.querySelectorAll(selector)).map(node => (node.textContent || "").trim()).filter(Boolean));
+      genres = translatedGenres(linked);
+    }
+    if (genres.length) info.genres = genres;
+    if (info.type === "person" && !info.role) {
+      const department = (normalizedScript.match(/"known_for_department"\s*:\s*"([^"\\]+)"/i) || [])[1];
+      if (department) info.role = roleFromText(department);
+    }
+    const image = [].concat(main.image || []).map(value => (value && typeof value === "object" ? value.url : value)).find(value => typeof value === "string");
+    info.thumb = absolute(image || meta('meta[property="og:image"]') || meta('meta[name="twitter:image"]'));
+    return info;
+  }
+
+  function HOA_splitGenres(text) {
+    return splitGenres(text);
+  }
+
+  function enrichPatch(saved, info, key) {
+    const entry = isObject(saved) ? saved : {};
+    const details = isObject(info) ? info : {};
+    const patch = {};
+    const plain = String(entry.title || "").replace(/…$/, "");
+    const ours = / – (.+)$/.exec(plain);
+    const better = details.title && !weakName(details.title, key) && details.title !== entry.title
+      && (weakName(entry.title, key) || plain.includes(details.title) || (ours && (details.title.startsWith(ours[1]) || ours[1].startsWith(details.title))));
+    if (better) patch.title = details.title;
+    const year = patch.year || entry.year || details.year;
+    const named = patch.title || entry.title || "";
+    if (year && named.endsWith(` (${year})`)) patch.title = named.slice(0, -` (${year})`.length);
+    if (!entry.year && Number.isInteger(details.year) && details.year >= 1870 && details.year <= 2100) patch.year = details.year;
+    if (!entry.thumb && details.thumb) patch.thumb = details.thumb;
+    if (details.type && (!entry.type || entry.type === "video" || (entry.type === "live" && details.type === "past"))) patch.type = details.type;
+    if (!entry.rating && details.rating) patch.rating = details.rating;
+    if ((!Array.isArray(entry.genres) || !entry.genres.length) && Array.isArray(details.genres) && details.genres.length) patch.genres = details.genres;
+    if (entry.type === "person" && !entry.role && details.role) patch.role = details.role;
+    patch.enrichedAt = Date.now();
+    return patch;
+  }
+
+  function needsEnrich(entry, key) {
+    if (!entry || !isObject(entry)) return false;
+    if (Number.isFinite(entry.enrichedAt) && Date.now() - entry.enrichedAt < 7 * 86400000) return false;
+    const storedKind = typeof entry.kind === "string" ? entry.kind : "";
+    const kind = storedKind || kindOf(key);
+    const type = entry.type || typeOf(key);
+    const nonYoutube = siteOf(key) !== "youtube.com";
+    return kind !== "channel" && kind !== "category" && !["playlist", "genre", "category", "live"].includes(type) && !isHoaCardKey(key)
+      && (!entry.thumb || (!entry.year && kind !== "person") || (nonYoutube && (!Array.isArray(entry.genres) || !entry.genres.length || !entry.type || entry.type === "video"))
+        || !entry.title || entry.title === siteOf(key) || looksLikeBadge(entry.title) || / – /.test(entry.title || ""));
   }
 
   function siteHostname(site) {
@@ -1207,6 +1405,9 @@ var HOA = Object.freeze((() => {
     if (Number.isFinite(raw.published)) {
       target.published = raw.published;
     }
+    if (Number.isFinite(raw.enrichedAt) && raw.enrichedAt >= 0) {
+      target.enrichedAt = raw.enrichedAt;
+    }
     if (Number.isInteger(raw.year) && raw.year >= 1870 && raw.year <= 2100) {
       target.year = raw.year;
     }
@@ -1281,11 +1482,21 @@ var HOA = Object.freeze((() => {
         thumb,
         // Shorts are an explicit historical choice. Everything else follows the URL
         // so saved channels migrate into their own section without a data rewrite.
-        kind: raw.kind === "short" ? "short" : kindOf(key),
+        kind: ["video", "short", "channel", "category", "person", "title"].includes(raw.kind) ? raw.kind : kindOf(key),
         site: siteOf(key),
         ts: raw.ts
       };
       addOptionalFields(normalized[key], raw);
+      // Live cards on Kick/Twitch historically saved their channel door as a channel item.
+      // Preserve those entries as live videos so they remain with the site's video group.
+      if ((siteOf(key) === "kick.com" || siteOf(key) === "twitch.tv") && normalized[key].kind === "channel"
+        && isSingleSegmentLiveKey(key)) {
+        normalized[key].kind = "video";
+        normalized[key].type = "live";
+        if (!title || title.toLowerCase() === "true") {
+          normalized[key].title = liveSlug(key);
+        }
+      }
       // Items saved before their site's types were known say "video"; the link can tell better.
       if (raw.kind === "category") normalized[key].type = "category";
       if (!normalized[key].type || normalized[key].type === "video") {
@@ -1308,6 +1519,25 @@ var HOA = Object.freeze((() => {
       keys.slice(0, keys.length - max).forEach(key => delete normalized[key]);
     }
     return normalized;
+  }
+
+  function isSingleSegmentLiveKey(key) {
+    try {
+      const url = new URL(key);
+      const host = url.hostname.toLowerCase().replace(/^www\./, "");
+      const segments = url.pathname.split("/").filter(Boolean);
+      return (host === "kick.com" || host === "twitch.tv") && segments.length === 1 && isChannelUrl(url.href);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function liveSlug(key) {
+    try {
+      return decodeURIComponent(new URL(key).pathname.split("/").filter(Boolean)[0] || "").trim().toLowerCase();
+    } catch (error) {
+      return "";
+    }
   }
 
   // Keep channel identities independent of a presentation URL.  Handles and the legacy channel paths are stable
@@ -1661,7 +1891,7 @@ var HOA = Object.freeze((() => {
     if (mode === "type") {
       const nonPeople = TYPES.filter(type => type !== "person").map(type => ({
         id: type,
-        label: { movie: "Movies", tv: "TV Shows", past: "Past Broadcasts", clip: "Clips" }[type] || typeLabel(type),
+        label: { movie: "Movies", tv: "TV Shows", past: "Past Broadcasts", clip: "Clips", genre: "Genres" }[type] || typeLabel(type),
         entries: pairs.filter(pair => entryType(pair) === type)
       })).filter(group => group.entries.length);
       const people = new Map();
@@ -1827,16 +2057,16 @@ var HOA = Object.freeze((() => {
     const pairs = Array.isArray(entries) ? entries : [];
     const result = ["none"];
     const otherTypes = new Set(pairs.map(entryType).filter(type => type !== "short"));
-    if (otherTypes.size >= 2) {
+    if (otherTypes.size >= 2 || pairs.some(pair => !["video", "short"].includes(entryType(pair)))) {
       result.push("type");
     }
     const hasGenres = pairs.some(pair => pair[1] && Array.isArray(pair[1].genres) && pair[1].genres.length);
-    if (hasGenres && groupEntries(pairs, "genre").length >= 2) {
+    if (hasGenres) {
       result.push("genre");
     }
     [["channel", "channel"], ["added-date", "ts"], ["decade", "year"], ["rating", "rating"]].forEach(([mode, field]) => {
       const values = pairs.map(pair => pair[1] && pair[1][field]).filter(value => value !== null && value !== undefined && value !== "");
-      if (values.length >= 2 && groupEntries(pairs, mode).length >= 2) result.push(mode);
+      if (mode === "added-date" ? values.length >= 2 && groupEntries(pairs, mode).length >= 2 : values.length >= 1) result.push(mode);
     });
     return result;
   }
@@ -2343,6 +2573,12 @@ var HOA = Object.freeze((() => {
     addedSummaryText,
     siteMonogram,
     typeLabel,
+    normalizeRating,
+    roleFromText,
+    englishGenre,
+    pageInfo,
+    enrichPatch,
+    needsEnrich,
     roleLabel,
     formatDuration,
     formatViews,

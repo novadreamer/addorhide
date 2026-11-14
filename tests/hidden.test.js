@@ -121,6 +121,6 @@ async function load({ hiddenItems = {}, hiddenChannels = {}, watchProgress = {},
   restoreSite.document.querySelector("#hidden-restore-channels").click(); await wait(15);
   check("Show all channels empties the channel list", () => assert.deepEqual(restoreSite.store.hiddenChannels, {})); restoreSite.window.close();
   const useful = await load({ hiddenItems: { "https://tubitv.com/movies/only": { title: "Only", thumb: "", site: "tubitv.com", listed: true, ts: 1 } } });
-  check("Hidden only offers controls that can change a group", () => assert.equal(useful.document.querySelector(".site-group select"), null)); useful.window.close();
+  check("Hidden offers a type grouping when the lone entry has a non-video type", () => assert.ok(useful.document.querySelector("select[id^='hidden-group']"))); useful.window.close();
   console.log(`hidden.test.js: ${passed} passed, 0 failed`);
 })().catch(error => { console.error(error); process.exitCode = 1; });

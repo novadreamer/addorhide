@@ -63,6 +63,13 @@ async function load(initial = {}) {
   assert.equal(oneSite.document.querySelectorAll(".site-group").length, 1, "one section stays stacked");
   oneSite.window.close();
 
+  const titled = await load({ addedItems: {
+    "https://tubitv.com/movies/1999": { site: "tubitv.com", title: "Old movie", thumb: "", type: "movie", published: Date.UTC(2025, 4, 1), ts: 1 }
+  }, watchProgress: {} });
+  assert.match(titled.document.querySelector(".added-card .added-meta").textContent, /2025/, "movie metadata shows release year instead of relative age");
+  assert.doesNotMatch(titled.document.querySelector(".added-card .added-meta").textContent, /ago|today/);
+  titled.window.close();
+
   const videos = {
     "https://www.youtube.com/watch?v=abcdefghijk": { site: "youtube.com", title: "Zebra", thumb: "", ts: 10 },
     "https://www.youtube.com/watch?v=abcdefghijl": { site: "youtube.com", title: "Alpha", thumb: "", ts: 9 },
@@ -189,5 +196,5 @@ async function load(initial = {}) {
   assert.equal(crowdedTabs().length + 1, 8, "a picked site takes a place rather than adding a row");
   moreButton().click(); await wait(5); crowded.document.body.dispatchEvent(new crowded.window.MouseEvent("pointerdown", { bubbles: true }));
   assert.equal(crowded.document.querySelector(".added-more-panel"), null, "clicking elsewhere closes the panel");
-  crowded.window.close(); console.log("added.test.js: 52 passed, 0 failed");
+  crowded.window.close(); console.log("added.test.js: 54 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

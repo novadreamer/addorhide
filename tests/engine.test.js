@@ -330,7 +330,7 @@ const CASES = [
     ["rottentomatoes", "sites/rottentomatoes.html", "https://www.rottentomatoes.com/browse/movies_at_home/", "www.rottentomatoes.com", "div.discovery-tiles__wrap > div.flex-container", 6],
     ["letterboxd", "sites/letterboxd.html", "https://letterboxd.com/films/", "letterboxd.com", "li.posteritem", 6]
   ].map(([name, fixture, url, host, cardSelector, cards]) => ({
-    name, fixture, url, host, cardSelector, cards, optIn: true,
+    name, fixture, url, host, cardSelector, cards, optIn: true, wrapperHidden: ["crunchyroll", "kick"].includes(name),
     expectAdd(key, entry) { assert.ok(key && /^https:\/\//.test(key), key); assert.ok(entry && entry.title, name); }
   }))
 ];
@@ -576,8 +576,8 @@ const CASES = [
       siteRules: { "www.crunchyroll.com": { enabled: true, hideKinds: ["not-english"] } } });
     const cards = Array.from(page.document.querySelectorAll('[class*="browse-card--"]:not([class*="hover"])'));
     check("filters: Crunchyroll Not in English hides Subtitled-only and keeps Sub | Dub", () => {
-      assert.ok(cards.find(card => card.textContent.includes("Subtitled")).classList.contains("hoa-filtered"));
-      cards.filter(card => card.textContent.includes("Sub | Dub")).forEach(card => assert.ok(!card.classList.contains("hoa-filtered")));
+      assert.ok(cards.find(card => card.textContent.includes("Subtitled")).closest(".hoa-filtered"));
+      cards.filter(card => card.textContent.includes("Sub | Dub")).forEach(card => assert.ok(!card.closest(".hoa-filtered")));
     });
     page.window.close();
   }
@@ -1778,6 +1778,37 @@ const CASES = [
     twitch.document.querySelector("[data-action='add']").click(); await wait(35);
     check("a Twitch videos card saves as a past broadcast", () => assert.equal(twitch.store.addedItems["https://www.twitch.tv/videos/123456789"].type, "past"));
     twitch.window.close();
+  }
+  {
+    const kick = await load({ html: '<div class="group/card" data-testid="livestream-results-card"><div class="card"><a data-card-link="true" aria-hidden="true" href="/lacobraaa"></a><a data-testid="media-card-thumbnail" href="/lacobraaa"><span title="79039">79039</span></a><a title="LACOBRAAA" href="/lacobraaa"><span>LACOBRAAA</span></a><a title="412 con LA COBRA EN VIVO" href="/lacobraaa"><h3>412 con LA COBRA EN VIVO</h3></a></div><div class="border"></div></div>', url: "https://kick.com/browse", siteRules: { "kick.com": { enabled: true } } });
+    kick.document.querySelector("[data-action='add']").click(); await wait(35);
+    const entry = kick.store.addedItems["https://kick.com/lacobraaa"];
+    check("Kick live cards save their stream title as videos", () => { assert.equal(entry.title, "412 con LA COBRA EN VIVO"); assert.equal(entry.kind, "video"); assert.equal(entry.type, "live"); });
+    kick.window.close();
+  }
+  {
+    const pbs = await load({ html: '<ul><li id="pbs-slot"><a class="show_poster__link" href="/show/example/"><img alt="Example"></a></li><li><a class="show_poster__link" href="/show/other/"><img alt="Other"></a></li></ul>', url: "https://www.pbs.org/shows/", siteRules: { "www.pbs.org": { enabled: true } } });
+    pbs.document.querySelector("#pbs-slot [data-action='hide']").click(); await wait(30);
+    check("PBS hiding a poster removes its single-child slide", () => assert.ok(pbs.document.getElementById("pbs-slot").closest(".hoa-removed")));
+    pbs.window.close();
+  }
+  {
+    const pluto = await load({ html: '<div class="vds-carousel"><div class="swiper-slide" id="one"><a data-testid="region-link" href="/us/watch/live-tv/" aria-label="Alpha"><img alt="Alpha"></a></div><div class="swiper-slide" id="two"><a data-testid="region-link" href="/us/watch/live-tv/" aria-label="Beta"><img alt="Beta"></a></div><div class="swiper-slide" id="three"><a data-testid="region-link" href="/us/watch/live-tv/" aria-label="Gamma"><img alt="Gamma"></a></div></div>', url: "https://pluto.tv/us/watch/live-tv/", siteRules: { "pluto.tv": { enabled: true } } });
+    pluto.document.querySelector("#two [data-action='hide']").click(); await wait(35);
+    check("Pluto shared live doors hide only the chosen card", () => {
+      assert.ok(pluto.document.getElementById("two").closest(".hoa-removed"));
+      assert.equal(pluto.document.getElementById("one").closest(".hoa-removed"), null);
+      assert.equal(pluto.document.getElementById("three").closest(".hoa-removed"), null);
+    });
+    pluto.window.close();
+  }
+  {
+    const vix = await load({ html: '<meta property="og:image" content="https://img.example/tarzan.jpg"><a class="DetailBody_metadataGenre__WF17t" href="/generos/ciencia-ficcionfantasia">Ciencia ficción/fantasía</a><a href="/generos/accion">Acción</a><span class="DetailBody_metadataItem__0ZHHJ">2016</span><time>1h 42m</time><script>\\"ratings\\":[{\\"ratingValue\\":\\"TV-14\\"}],\\"title\\":\\"The Legend of Tarzan\\",\\"videoType\\":\\"MOVIE\\"</script>', url: "https://vix.com/detail/video-4334000", siteRules: { "vix.com": { enabled: true } }, testSeam: true });
+    const info = vix.test.pageInfo(vix.document, "https://vix.com/detail/video-4334000");
+    check("ViX metadata enrichment reads translated genres, year, rating and type", () => {
+      assert.deepEqual(info.genres, ["Science Fiction", "Fantasy", "Action"]); assert.equal(info.year, 2016); assert.equal(info.rating, "TV-14"); assert.equal(info.type, "movie");
+    });
+    vix.window.close();
   }
   {
     const css = new JSDOM(`<!doctype html><style>${read("content.css")}</style><div class="hoa-actions"><button hidden>Hidden action</button></div>`, { pretendToBeVisual: true });

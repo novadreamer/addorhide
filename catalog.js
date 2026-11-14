@@ -212,7 +212,7 @@ var HOA_CATALOG = Object.freeze((() => {
       id: "twitch", name: "Twitch", builtIn: false, hosts: Object.freeze(["twitch.tv"]), subdomains: true,
       cardSelector: 'article:has(a[data-a-target="preview-card-image-link"]), .game-card:has(a[data-a-target="tw-box-art-card-link"])',
       linkSelector: 'a[data-a-target="preview-card-image-link"], a[data-a-target="tw-box-art-card-link"]', titleCandidates: Object.freeze(["h4", "h3", "h2"]),
-      removeClimb: true,
+      removeClimb: true, liveChannelCards: true,
       meta: Object.freeze({ texts: Object.freeze(["*"]), genres: 'a[data-a-target="preview-card-game-link"]' }),
       channelLinkSelector: 'a[data-a-target="preview-card-channel-link"]', channelNameSelector: 'a[data-a-target="preview-card-channel-link"] p[title]',
       channelCandidates: Object.freeze(['a[data-a-target="preview-card-channel-link"] p[title]']),
@@ -242,7 +242,7 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "pluto", carousels: true, name: "Pluto TV", builtIn: false, hosts: Object.freeze(["pluto.tv"]), subdomains: true,
-      cardSelector: 'div.swiper-slide:has(a[data-testid="region-link"]), a[data-testid="region-link"]:not(div.swiper-slide a[data-testid="region-link"])', removeClosest: 'div.swiper-slide, a[data-testid="region-link"]', linkSelector: 'a[data-testid="region-link"]', titleCandidates: Object.freeze(["a[aria-label]", "img[alt]"]),
+      cardSelector: 'div.swiper-slide:has(a[data-testid="region-link"]), a[data-testid="region-link"]:not(div.swiper-slide a[data-testid="region-link"])', removeClosest: 'div.swiper-slide, a[data-testid="region-link"]', sharedDoorCards: true, linkSelector: 'a[data-testid="region-link"]', titleCandidates: Object.freeze(["a[aria-label]", "img[alt]"]),
       pageData: Object.freeze({ script: "script#__NEXT_DATA__", idFromHref: "(?:movies|shows|series)/([0-9a-f]{24})", idKeys: Object.freeze(["id", "contentId", "movieId"]), fields: Object.freeze({ cast: "castNames", genres: "genre", description: "description", rating: "regionalRating.rating", kids: "isKidsContent" }) }),
       sections: Object.freeze([{ container: "div.vds-carousel", title: ".vds-carousel__title-medium", titleClosest: ".vds-screen" }]),
       categories: Object.freeze([
@@ -342,8 +342,8 @@ var HOA_CATALOG = Object.freeze((() => {
     }),
     Object.freeze({
       id: "kick", name: "Kick", builtIn: false, hosts: Object.freeze(["kick.com"]), subdomains: true,
-      cardSelector: 'div:has(> a[data-testid="media-card-thumbnail"])', removeClosest: 'div:has(> a[data-testid="media-card-thumbnail"])', linkSelector: 'a[data-testid="media-card-thumbnail"]', titleCandidates: Object.freeze(["a[data-card-link]", "a[title]"]),
-      channelLinkSelector: 'a[data-card-link]', channelNameSelector: 'a[data-card-link]:not([title])', channelCandidates: Object.freeze(['a[data-card-link]:not([title])']),
+      cardSelector: 'div:has(> a[data-testid="media-card-thumbnail"])', removeClosest: 'div[class*="group/card"]', linkSelector: 'a[data-testid="media-card-thumbnail"]', titleCandidates: Object.freeze(['a[title]:has(> h3)', "h3"]), liveChannelCards: true,
+      channelLinkSelector: 'a[title]:not(:has(h3))', channelNameSelector: 'a[title]:not(:has(h3))', channelCandidates: Object.freeze(['a[title]:not(:has(h3))']),
       sections: Object.freeze([{ container: "section:has(> div h2)", title: "h2" }]),
       categories: Object.freeze([
         { id: "gambling", label: "Gambling", hint: "Casino, betting and gambling streams", card: { text: "Slots & Casino|\\bCasino\\b|\\bSlots\\b|\\bPoker\\b|Blackjack|Roulette|Gambling|Plinko|Sports betting" } },

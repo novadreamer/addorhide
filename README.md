@@ -15,6 +15,15 @@ movie and streaming sites, and a card picker that teaches it any other video sit
 | ![Add to Watch Later and Continue Watching](store/assets/screenshot-2-continue-watching.png) | ![Hide whole categories for each site](store/assets/screenshot-3-hide-by-type.png) |
 | ![Tabs, sorting and grouping on the Added Videos page](store/assets/screenshot-4-tabs-sort-group.png) | ![Hidden videos, channels and watched videos](store/assets/screenshot-5-hidden.png) |
 
+## What's new in 1.1.2
+
+- **Details fill in by themselves:** the Added page reads a saved title's own page for a missing year, genres, type, rating and poster, including Spanish pages like ViX (common genre names are translated to English).
+- **Movies and shows show their year** (2026), not "7 months ago".
+- **Grouping** options appear as soon as any saved video has that detail.
+- **Genre** type for genre tiles (Shout TV), grouped as Genres.
+- **Fixes:** Dailymotion thumbnails no longer disappear; Tubi's hover buttons stay centred on carousel cards; hiding a card on PBS, Crunchyroll and Kick leaves no gap; Kick videos keep their titles (not "true") and show under Kick as Live; on Pluto TV, hiding one live channel no longer hides its whole row; no scrollbar in the popup when Teach cards shows.
+- **Look:** a round power button with a neon ring (green on, red off) around a raised metal disc, and a silver Position pill.
+
 ## What's new in 1.1.1
 
 - **Group headings in Title Case** on the Added and Hidden pages ("TV Shows", "This Week", "Science Fiction and Fantasy"), and role groups pluralise properly ("Directors of Photography").
@@ -127,9 +136,9 @@ Regenerating icons: run `python tools/make_icons.py` from this directory.
 
 Build the Chrome Web Store archive with `python tools/package.py .`. It writes the runtime-only archive to `dist/AddOrHide-<version>.zip`.
 
-## Status: 1.1.1
+## Status: 1.1.2
 
-1.1.1 is ready for the Chrome Web Store (see *What's new in 1.1.1* and *1.1.0* above). Up to 1.0.13: YouTube search results, Shorts and new layouts everywhere, gap-free
+1.1.2 is ready for the Chrome Web Store (see *What's new in 1.1.2*, *1.1.1* and *1.1.0* above). Up to 1.0.13: YouTube search results, Shorts and new layouts everywhere, gap-free
 hiding of Shorts, Hide the whole feed on every YouTube page, two installed copies no longer fight (the newest runs
 the page and the other one's popup says so), a redesigned popup (Added Videos and Hidden Videos side by side, a round
 3D power button, arrowhead Position buttons, a GitHub link) and a per-website delete button on the Added page and in

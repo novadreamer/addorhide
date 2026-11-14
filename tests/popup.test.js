@@ -148,11 +148,11 @@ async function loadPopup({ url = "https://tubitv.com/", siteRules, seenRows, sta
   const controls = await loadPopup();
   const power = controls.document.getElementById("buttons-toggle");
   assert.equal(power.dataset.enabled, "true", "power control exposes the enabled state for its green ring");
-  assert.ok(power.querySelector("svg[viewBox='0 0 64 64']"), "power control injects the round SVG redraw");
-  assert.match(controls.window.getComputedStyle(power).getPropertyValue("--power-ring-light"), /50d58f/i, "enabled power ring is green");
+  assert.ok(power.querySelector("svg[viewBox='0 0 64 64']"), "power control injects the ringed power SVG");
+  assert.match(controls.window.getComputedStyle(power).getPropertyValue("--power-ring-light"), /5dffa8/i, "enabled power ring is green");
   power.click(); await wait(10);
   assert.equal(power.dataset.enabled, "false", "power control flips state when pressed");
-  assert.match(controls.window.getComputedStyle(power).getPropertyValue("--power-ring-light"), /f06b73/i, "disabled power ring is red");
+  assert.match(controls.window.getComputedStyle(power).getPropertyValue("--power-ring-light"), /ff6b86/i, "disabled power ring is red");
   assert.equal(controls.document.querySelectorAll(".position-buttons .edge-button").length, 2, "position arrows remain available");
   assert.ok(controls.document.querySelector(".position-buttons .position-pill"), "position arrows include their decorative pill");
   assert.ok(controls.document.querySelector(".popup-control-divider"), "popup divides power and position controls");
