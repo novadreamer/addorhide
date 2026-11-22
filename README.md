@@ -1,5 +1,6 @@
 # AddOrHide
 
+[![Get it on the Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-Get%20AddOrHide-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/addorhide/ppohfbhkefnapejmompeeebiaipbbcef)
 [![Support me on Ko-fi](https://img.shields.io/badge/Support%20me%20on-Ko--fi-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/ashmustafa)
 
 AddOrHide is a Chrome/Brave extension that puts you in charge of the videos on the sites you use. Point at any
