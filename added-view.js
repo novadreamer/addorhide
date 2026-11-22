@@ -15,5 +15,5 @@ if (location.pathname === "/robots.txt" && location.hash === "#addorhide-added")
   viewport.content = "width=device-width, initial-scale=1";
   const main = document.createElement("main");
   document.body.appendChild(main);
-  HOA_ADDED.mount(main);
+  HOA_LOCK.gate("added", main, () => HOA_ADDED.mount(main));
 }

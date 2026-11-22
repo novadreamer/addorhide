@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
   "name": "AddOrHide",
-  "version": "1.0.13",
+  "version": "1.1.13",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "description": "Save videos you like to your own list and hide the recommendations you don't want, on YouTube and other video sites you choose.",
+  "description": "Save videos, hide what you don't want, tag what you've watched and resume where you left off, on YouTube and sites you choose.",
   "permissions": [
     "storage",
     "scripting",
@@ -36,7 +36,8 @@
       "css": [
         "content.css"
       ],
-      "run_at": "document_idle"
+      "all_frames": true,
+      "run_at": "document_start"
     },
     {
       "matches": [
@@ -51,7 +52,8 @@
       "css": [
         "content.css"
       ],
-      "run_at": "document_idle"
+      "all_frames": true,
+      "run_at": "document_start"
     },
     {
       "matches": [
@@ -61,6 +63,7 @@
         "theme.js",
         "shared.js",
         "added-ui.js",
+        "lock.js",
         "added-view.js"
       ],
       "css": [

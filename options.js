@@ -18,10 +18,24 @@ const exportDataButton = document.getElementById("export-data-button");
 const importDataButton = document.getElementById("import-data-button");
 const importDataInput = document.getElementById("import-data-input");
 const dataStatus = document.getElementById("data-status");
+const filterSites = document.getElementById("filter-sites");
+const tagWatchedInput = document.getElementById("tag-watched");
+const continueInput = document.getElementById("auto-continue");
+const clearWatchHistoryButton = document.getElementById("clear-watch-history-button");
+const watchStatus = document.getElementById("watch-status");
+const pageLockBody = document.getElementById("page-lock-body");
 
 let hidden = {};
 let added = {};
 let siteRules = {};
+let seenRows = {};
+let watchSettings = HOA.normalizeWatchSettings({});
+let siteRulesWrittenHere = false;
+const filterDuplicateNotes = {};
+let pageLock = null;
+let pageLockPending = null;
+// The panel is rebuilt whenever the lock changes (including this page's own saves), so the message is kept here.
+let pageLockMessage = { text: "", kind: "" };
 
 function siteRule(host) {
   return siteRules[host] && typeof siteRules[host] === "object" ? siteRules[host] : {};
@@ -132,6 +146,132 @@ function setStatus(element, message, kind = "") {
   element.className = `status ${kind}`.trim();
 }
 
+function normalizedPageLock(value) {
+  if (!value || typeof value !== "object" || typeof value.salt !== "string" || typeof value.hash !== "string") return null;
+  return { salt: value.salt, hash: value.hash, iterations: Number.isInteger(value.iterations) ? value.iterations : 200000,
+    added: value.added === true, hidden: value.hidden === true };
+}
+
+function lockField(id, label, type = "password") {
+  const wrapper = document.createElement("div"); wrapper.className = "field page-lock-field";
+  const labelElement = document.createElement("label"); labelElement.htmlFor = id; labelElement.textContent = label;
+  const input = document.createElement("input"); input.id = id; input.type = type; input.autocomplete = "current-password";
+  wrapper.append(labelElement, input); return { wrapper, input };
+}
+
+function pageLockStatus(message, kind = "") {
+  pageLockMessage = { text: message, kind };
+  const status = document.getElementById("page-lock-status");
+  if (status) setStatus(status, message, kind);
+}
+
+function savePageLock(next, successMessage) {
+  chrome.storage.local.set({ pageLock: next }, () => {
+    if (chrome.runtime.lastError) { pageLockStatus("Could not save the page lock.", "error"); return; }
+    pageLock = normalizedPageLock(next);
+    pageLockPending = null;
+    renderPageLock();
+    pageLockStatus(successMessage, "success");
+  });
+}
+
+function makeLockSwitch(id, label, checked, disabled, onChange) {
+  const row = document.createElement("label"); row.className = "switch-row page-lock-switch";
+  const input = document.createElement("input"); input.id = id; input.type = "checkbox"; input.setAttribute("role", "switch"); input.checked = checked; input.disabled = disabled;
+  input.addEventListener("change", () => onChange(input));
+  const text = document.createElement("span"); text.textContent = label; row.append(input, text); return row;
+}
+
+function renderPageLock() {
+  while (pageLockBody.firstChild) pageLockBody.firstChild.remove();
+  if (!pageLock) {
+    const form = document.createElement("form"); form.id = "page-lock-set-form";
+    const newField = lockField("page-lock-new", "New password", "password");
+    newField.input.autocomplete = "new-password";
+    const confirmField = lockField("page-lock-confirm", "Confirm", "password");
+    confirmField.input.autocomplete = "new-password";
+    const button = document.createElement("button"); button.id = "page-lock-set"; button.className = "primary-button"; button.type = "submit"; button.textContent = "Set password";
+    form.append(newField.wrapper, confirmField.wrapper, button);
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (newField.input.value.length < 4) { pageLockStatus("Password must be at least 4 characters.", "error"); return; }
+      if (newField.input.value !== confirmField.input.value) { pageLockStatus("Passwords do not match.", "error"); return; }
+      button.disabled = true;
+      const hashed = await HOA_LOCK.hashPassword(newField.input.value);
+      savePageLock({ ...hashed, added: false, hidden: false }, "Password set.");
+    });
+    pageLockBody.appendChild(form);
+    const hint = document.createElement("p"); hint.className = "muted page-lock-hint"; hint.textContent = "Set a password first"; pageLockBody.appendChild(hint);
+    pageLockBody.appendChild(makeLockSwitch("lock-added-page", "Lock Added Videos page", false, true, () => {}));
+    pageLockBody.appendChild(makeLockSwitch("lock-hidden-page", "Lock Hidden Videos page", false, true, () => {}));
+  } else {
+    const switches = document.createElement("div"); switches.className = "page-lock-switches";
+    switches.appendChild(makeLockSwitch("lock-added-page", "Lock Added Videos page", pageLock.added, false, input => {
+      if (input.checked) savePageLock({ ...pageLock, added: true }, "Added Videos page locked.");
+      else { pageLockPending = { type: "disable", pageId: "added" }; renderPageLock(); pageLockStatus("Enter your current password to turn this off."); }
+    }));
+    switches.appendChild(makeLockSwitch("lock-hidden-page", "Lock Hidden Videos page", pageLock.hidden, false, input => {
+      if (input.checked) savePageLock({ ...pageLock, hidden: true }, "Hidden Videos page locked.");
+      else { pageLockPending = { type: "disable", pageId: "hidden" }; renderPageLock(); pageLockStatus("Enter your current password to turn this off."); }
+    }));
+    pageLockBody.appendChild(switches);
+    if (pageLockPending) {
+      const action = document.createElement("form"); action.className = "page-lock-inline-form";
+      const current = lockField("page-lock-action-current", "Current password");
+      const button = document.createElement("button"); button.className = "secondary-button"; button.type = "submit"; button.textContent = "Confirm";
+      action.append(current.wrapper, button);
+      action.addEventListener("submit", async event => {
+        event.preventDefault(); button.disabled = true;
+        if (!await HOA_LOCK.verify(current.input.value, pageLock)) { button.disabled = false; pageLockStatus("Wrong password.", "error"); current.input.select(); return; }
+        if (pageLockPending.type === "export") {
+          pageLockPending = null; renderPageLock(); exportData();
+        } else {
+          const next = { ...pageLock, [pageLockPending.pageId]: false };
+          savePageLock(next, `${pageLockPending.pageId === "added" ? "Added Videos" : "Hidden Videos"} page unlocked.`);
+        }
+      });
+      pageLockBody.appendChild(action);
+    }
+    const change = document.createElement("form"); change.className = "page-lock-change-form";
+    const currentField = lockField("page-lock-change-current", "Current password");
+    const newField = lockField("page-lock-change-new", "New password", "password"); newField.input.autocomplete = "new-password";
+    const confirmField = lockField("page-lock-change-confirm", "Confirm", "password"); confirmField.input.autocomplete = "new-password";
+    const changeButton = document.createElement("button"); changeButton.id = "page-lock-change"; changeButton.className = "secondary-button"; changeButton.type = "submit"; changeButton.textContent = "Change password";
+    change.append(currentField.wrapper, newField.wrapper, confirmField.wrapper, changeButton);
+    change.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (newField.input.value.length < 4) { pageLockStatus("Password must be at least 4 characters.", "error"); return; }
+      if (newField.input.value !== confirmField.input.value) { pageLockStatus("Passwords do not match.", "error"); return; }
+      changeButton.disabled = true;
+      if (!await HOA_LOCK.verify(currentField.input.value, pageLock)) { changeButton.disabled = false; pageLockStatus("Wrong password.", "error"); currentField.input.select(); return; }
+      const hashed = await HOA_LOCK.hashPassword(newField.input.value);
+      savePageLock({ ...hashed, added: pageLock.added, hidden: pageLock.hidden }, "Password changed.");
+    });
+    pageLockBody.appendChild(change);
+    const remove = document.createElement("form"); remove.className = "page-lock-remove-form";
+    const removeField = lockField("page-lock-remove-current", "Current password");
+    const removeButton = document.createElement("button"); removeButton.id = "page-lock-remove"; removeButton.className = "ghost-button danger-button"; removeButton.type = "submit"; removeButton.textContent = "Remove password";
+    remove.append(removeField.wrapper, removeButton);
+    remove.addEventListener("submit", async event => {
+      event.preventDefault(); removeButton.disabled = true;
+      if (!await HOA_LOCK.verify(removeField.input.value, pageLock)) { removeButton.disabled = false; pageLockStatus("Wrong password.", "error"); removeField.input.select(); return; }
+      const done = () => { pageLock = null; pageLockPending = null; renderPageLock(); pageLockStatus("Password removed.", "success"); };
+      if (typeof chrome.storage.local.remove === "function") chrome.storage.local.remove("pageLock", done);
+      else chrome.storage.local.set({ pageLock: null }, done);
+    });
+    pageLockBody.appendChild(remove);
+  }
+  const forgot = document.createElement("p"); forgot.className = "muted page-lock-forgot";
+  forgot.textContent = "If you forget the password, removing and reinstalling AddOrHide clears it (and your lists — export them first).";
+  pageLockBody.appendChild(forgot);
+  const status = document.createElement("div"); status.id = "page-lock-status"; status.className = "status"; status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); pageLockBody.appendChild(status);
+  if (pageLockMessage.text) setStatus(status, pageLockMessage.text, pageLockMessage.kind);
+}
+
+function loadPageLock() {
+  chrome.storage.local.get({ pageLock: null }, result => { pageLock = normalizedPageLock(result.pageLock); pageLockPending = null; renderPageLock(); });
+}
+
 function renderHidden() {
   const listed = HOA.listedHidden(hidden).length;
   const total = Object.keys(hidden).length;
@@ -140,13 +280,26 @@ function renderHidden() {
 }
 
 function loadRules() {
-  chrome.storage.local.get({ [HOA.SITES_KEY]: {} }, result => {
+  chrome.storage.local.get({ [HOA.SITES_KEY]: {}, [HOA.SEEN_ROWS_KEY]: {} }, result => {
     siteRules = result[HOA.SITES_KEY] && typeof result[HOA.SITES_KEY] === "object" ? result[HOA.SITES_KEY] : {};
+    seenRows = result[HOA.SEEN_ROWS_KEY] && typeof result[HOA.SEEN_ROWS_KEY] === "object" ? result[HOA.SEEN_ROWS_KEY] : {};
     bulkHideInput.checked = (siteRules["www.youtube.com"] || siteRules["youtube.com"] || {}).bulkHide === true;
     bulkHideTubiInput.checked = (siteRules["tubitv.com"] || siteRules["www.tubitv.com"] || {}).bulkHide === true;
     renderSites();
+    renderFilterSites();
   });
 }
+
+function loadWatchSettings() {
+  chrome.storage.local.get({ [HOA.WATCH_SETTINGS_KEY]: {} }, result => {
+    watchSettings = HOA.normalizeWatchSettings(result[HOA.WATCH_SETTINGS_KEY]);
+    tagWatchedInput.checked = watchSettings.tagWatched;
+    continueInput.checked = watchSettings.continueWatching === "auto";
+  });
+}
+function saveWatchSettings() { chrome.storage.local.set({ [HOA.WATCH_SETTINGS_KEY]: watchSettings }); }
+tagWatchedInput.addEventListener("change", () => { watchSettings = { ...watchSettings, tagWatched: tagWatchedInput.checked }; saveWatchSettings(); });
+continueInput.addEventListener("change", () => { watchSettings = { ...watchSettings, continueWatching: continueInput.checked ? "auto" : "off" }; saveWatchSettings(); });
 
 function bindBulkHide(input, host) {
   input.addEventListener("change", () => {
@@ -223,8 +376,22 @@ unhideAllButton.addEventListener("click", () => {
   if (!window.confirm("Unhide everything, including videos removed from the list?")) {
     return;
   }
-  hidden = {};
-  HOA.writeLists({ hidden }, () => setStatus(hiddenStatus, "Everything unhidden.", "success"));
+  HOA.readLists(lists => {
+    const next = HOA.prepareUnhideAll(lists);
+    hidden = next.hidden;
+    HOA.writeLists(next, () => setStatus(hiddenStatus, "Everything unhidden.", "success"));
+  });
+});
+
+clearWatchHistoryButton.addEventListener("click", () => {
+  if (!window.confirm("Clear Watched tags and Continue Watching for every video?")) {
+    return;
+  }
+  HOA.readLists(lists => {
+    const next = HOA.clearWatchHistory(lists);
+    hidden = next.hidden;
+    HOA.writeLists(next, () => setStatus(watchStatus, "Watch history cleared.", "success"));
+  });
 });
 
 function openAddedPage() {
@@ -237,12 +404,144 @@ function openAddedPage() {
     chrome.tabs.create(details);
   });
 }
+
+function filterHost(catalogRule) {
+  return catalogRule.id === "youtube" ? "www.youtube.com" : catalogRule.hosts[0];
+}
+
+function saveFilterRule(host, categories, kinds, keywords, hideSections = siteRule(host).hideSections) {
+  const wasWatched = HOA.normalizeHideKinds(siteRule(host).hideKinds, categories.map(category => category.id)).includes("watched");
+  const nextKinds = HOA.normalizeHideKinds(kinds, categories.map(category => category.id));
+  siteRules = { ...siteRules, [host]: {
+    ...siteRule(host),
+    hideKinds: nextKinds,
+    hideKeywords: HOA.normalizeKeywords(keywords),
+    hideSections: HOA.normalizeSectionTitles(hideSections)
+  } };
+  siteRulesWrittenHere = true;
+  chrome.storage.local.set({ [HOA.SITES_KEY]: siteRules }, () => renderFilterSites());
+  if (wasWatched !== nextKinds.includes("watched")) HOA.resetWatched(host, wasWatched);
+}
+
+function saveFeaturedCarousels(host, included) {
+  siteRules = { ...siteRules, [host]: { ...siteRule(host), featuredCarousels: included } };
+  siteRulesWrittenHere = true;
+  chrome.storage.local.set({ [HOA.SITES_KEY]: siteRules }, () => renderFilterSites());
+}
+
+function renderFilterSites() {
+  const scrollTop = window.scrollY;
+  const openSites = new Set(Array.from(filterSites.querySelectorAll("details[open]")).map(node => node.dataset.host));
+  const focused = document.activeElement;
+  const focusId = focused && focused.id ? focused.id : "";
+  while (filterSites.firstChild) filterSites.firstChild.remove();
+  HOA_CATALOG.rules.forEach(catalogRule => {
+    const host = filterHost(catalogRule);
+    const categories = Array.isArray(catalogRule.categories) ? catalogRule.categories : [];
+    const rule = siteRule(host);
+    const kinds = HOA.normalizeHideKinds(rule.hideKinds, categories.map(category => category.id));
+    const keywords = HOA.normalizeKeywords(rule.hideKeywords);
+    const hideSections = HOA.normalizeSectionTitles(rule.hideSections);
+    const details = document.createElement("details");
+    details.className = "hide-filters";
+    details.dataset.host = host;
+    details.open = openSites.has(host);
+    const summary = document.createElement("summary");
+    const labels = categories.filter(category => kinds.includes(category.id)).map(category => category.label);
+    summary.textContent = `${catalogRule.name}${labels.length || keywords.length ? ` — ${[...labels, keywords.length ? `${keywords.length} word${keywords.length === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ")}` : " — no filters"}`;
+    details.appendChild(summary);
+    const body = document.createElement("div");
+    body.className = "hide-filters-body";
+    const typeCategories = categories.filter(category => category.id !== "genres");
+    typeCategories.forEach(category => {
+      const label = document.createElement("label");
+      label.className = "switch-row";
+      label.title = category.hint;
+      const toggle = document.createElement("input");
+      toggle.type = "checkbox";
+      toggle.setAttribute("role", "switch");
+      toggle.checked = kinds.includes(category.id);
+      toggle.addEventListener("change", () => saveFilterRule(host, categories,
+        toggle.checked ? [...kinds, category.id] : kinds.filter(id => id !== category.id), keywords));
+      label.append(toggle, document.createTextNode(` ${category.label}`));
+      body.appendChild(label);
+    });
+    const rowPicker = categories.find(category => category.id === "genres");
+    if (rowPicker) {
+      const rowDetails = document.createElement("details"); rowDetails.className = "row-picker";
+      const rowSummary = document.createElement("summary"); rowSummary.textContent = `${rowPicker.label} — ${hideSections.length} hidden`; rowDetails.appendChild(rowSummary);
+      const titles = HOA.normalizeSectionTitles([...(seenRows[host] || []), ...hideSections]);
+      if (!titles.length) rowDetails.appendChild(Object.assign(document.createElement("p"), { className: "filter-note muted", textContent: "Open the site once to list its rows." }));
+      titles.forEach(title => { const label = document.createElement("label"); label.className = "switch-row"; const toggle = document.createElement("input"); toggle.type = "checkbox"; toggle.checked = hideSections.some(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) === 0);
+        toggle.addEventListener("change", () => saveFilterRule(host, categories, kinds, keywords, toggle.checked ? [...hideSections, title] : hideSections.filter(value => value.localeCompare(title, undefined, { sensitivity: "accent" }) !== 0))); label.append(toggle, document.createTextNode(` ${title}`)); rowDetails.appendChild(label); });
+      body.appendChild(rowDetails);
+    }
+    if (categories.length && (catalogRule.carousels || catalogRule.featuredSelector)) {
+      const label = document.createElement("label");
+      label.className = "switch-row";
+      label.title = "Leave big rotating featured rows alone when hiding types or words.";
+      const toggle = document.createElement("input");
+      toggle.type = "checkbox";
+      toggle.setAttribute("role", "switch");
+      toggle.checked = rule.featuredCarousels !== false;
+      toggle.addEventListener("change", () => saveFeaturedCarousels(host, toggle.checked));
+      label.append(toggle, document.createTextNode(" Include featured carousels (big rotating rows like Tubi's For You)"));
+      body.appendChild(label);
+    }
+    const words = document.createElement("div");
+    words.className = "filter-words";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "Hide videos with these words";
+    input.disabled = keywords.length >= 10;
+    if (input.disabled) input.placeholder = "10 of 10 words — remove one to add another";
+    input.setAttribute("aria-label", `${catalogRule.name}: hide videos with these words`);
+    const duplicateNote = document.createElement("p");
+    duplicateNote.className = "filter-note muted";
+    duplicateNote.textContent = filterDuplicateNotes[host] || "";
+    const addWords = () => {
+      const next = HOA.normalizeKeywords(input.value.split(","));
+      const duplicate = next.some(word => keywords.some(value => value.localeCompare(word, undefined, { sensitivity: "accent" }) === 0));
+      input.value = "";
+      filterDuplicateNotes[host] = duplicate ? "Already in the list" : "";
+      saveFilterRule(host, categories, kinds, [...keywords, ...next]);
+      if (duplicate) window.setTimeout(() => { delete filterDuplicateNotes[host]; renderFilterSites(); }, 1600);
+    };
+    const save = siteActionButton("Add", addWords);
+    input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); addWords(); } });
+    words.append(input, save);
+    body.appendChild(words);
+    if (catalogRule.pageData && catalogRule.pageData.fields && catalogRule.pageData.fields.cast) {
+      body.appendChild(Object.assign(document.createElement("p"), { className: "filter-note muted", textContent: "Tip: type an actor's name — it matches wherever the site lists the cast." }));
+    }
+    const chips = document.createElement("div");
+    chips.className = "filter-chips";
+    keywords.forEach(word => {
+      const chip = siteActionButton(`× ${word}`, () => saveFilterRule(host, categories, kinds, keywords.filter(value => value !== word)));
+      chip.className = "filter-chip";
+      chip.title = `Remove ${word}`;
+      chips.appendChild(chip);
+    });
+    body.append(chips, duplicateNote);
+    details.appendChild(body);
+    filterSites.appendChild(details);
+  });
+  window.scrollTo(0, scrollTop);
+  const nextFocus = focusId ? document.getElementById(focusId) : null;
+  if (nextFocus) nextFocus.focus({ preventScroll: true });
+}
 openAddedButton.addEventListener("click", openAddedPage);
 
 function storageSnapshot(callback) {
   chrome.storage.local.get({
     [HOA.HIDDEN_KEY]: {},
     [HOA.ADDED_KEY]: {},
+    [HOA.CHANNELS_KEY]: {},
+    [HOA.WATCHED_SHOWN_KEY]: {},
+    [HOA.PROGRESS_KEY]: {},
+    [HOA.SEEN_ROWS_KEY]: {},
+    hiddenViewPrefs: {},
+    [HOA.WATCH_SETTINGS_KEY]: {},
     [HOA.SITES_KEY]: {},
     [HOA.PREFS_KEY]: {}
   }, callback);
@@ -254,6 +553,12 @@ function exportData() {
     const backup = HOA.buildBackup({
       hidden: result[HOA.HIDDEN_KEY],
       added: result[HOA.ADDED_KEY],
+      channels: result[HOA.CHANNELS_KEY],
+      watchedShown: result[HOA.WATCHED_SHOWN_KEY],
+      watchProgress: result[HOA.PROGRESS_KEY],
+      seenRows: result[HOA.SEEN_ROWS_KEY],
+      hiddenViewPrefs: result.hiddenViewPrefs,
+      watchSettings: result[HOA.WATCH_SETTINGS_KEY],
       siteRules: result[HOA.SITES_KEY],
       prefs: result[HOA.PREFS_KEY]
     }, manifest.version || "", Date.now());
@@ -265,6 +570,16 @@ function exportData() {
     setTimeout(() => URL.revokeObjectURL(link.href), 0);
     setStatus(dataStatus, "Your AddOrHide data was exported.", "success");
   });
+}
+
+function requestExport() {
+  if (pageLock && (pageLock.added || pageLock.hidden)) {
+    pageLockPending = { type: "export" };
+    renderPageLock();
+    pageLockStatus("Enter your current password to export your data.");
+    return;
+  }
+  exportData();
 }
 
 function permissionPattern(host, rule) {
@@ -312,6 +627,12 @@ function importDataFile(file) {
       const merged = HOA.mergeBackup({
         hidden: current[HOA.HIDDEN_KEY],
         added: current[HOA.ADDED_KEY],
+        channels: current[HOA.CHANNELS_KEY],
+        watchedShown: current[HOA.WATCHED_SHOWN_KEY],
+        watchProgress: current[HOA.PROGRESS_KEY],
+        seenRows: current[HOA.SEEN_ROWS_KEY],
+        hiddenViewPrefs: current.hiddenViewPrefs,
+        watchSettings: current[HOA.WATCH_SETTINGS_KEY],
         siteRules: current[HOA.SITES_KEY],
         prefs: current[HOA.PREFS_KEY]
       }, parsed.backup);
@@ -322,6 +643,12 @@ function importDataFile(file) {
       chrome.storage.local.set({
         [HOA.HIDDEN_KEY]: merged.hidden,
         [HOA.ADDED_KEY]: merged.added,
+        [HOA.CHANNELS_KEY]: merged.channels,
+        [HOA.WATCHED_SHOWN_KEY]: merged.watchedShown,
+        [HOA.PROGRESS_KEY]: merged.watchProgress,
+        [HOA.SEEN_ROWS_KEY]: merged.seenRows,
+        hiddenViewPrefs: merged.hiddenViewPrefs,
+        [HOA.WATCH_SETTINGS_KEY]: merged.watchSettings,
         [HOA.SITES_KEY]: merged.siteRules,
         [HOA.PREFS_KEY]: merged.prefs
       }, () => {
@@ -337,13 +664,14 @@ function importDataFile(file) {
           siteRules = merged.siteRules;
           renderHidden();
           renderSites();
+          renderFilterSites();
         });
       });
     });
   }).catch(() => setStatus(dataStatus, "Import failed: could not read the file.", "error"));
 }
 
-exportDataButton.addEventListener("click", exportData);
+exportDataButton.addEventListener("click", requestExport);
 importDataButton.addEventListener("click", () => importDataInput.click());
 importDataInput.addEventListener("change", () => {
   const file = importDataInput.files && importDataInput.files[0];
@@ -359,10 +687,14 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; renderHidden(); });
   }
   if (changes[HOA.SITES_KEY]) {
+    if (siteRulesWrittenHere) { siteRulesWrittenHere = false; return; }
     loadRules();
   }
+  if (changes.pageLock) loadPageLock();
 });
 
 HOA.purgeLegacy();
 HOA.readLists(lists => { hidden = lists.hidden; added = lists.added; renderHidden(); });
 loadRules();
+loadWatchSettings();
+loadPageLock();

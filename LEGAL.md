@@ -16,7 +16,7 @@ its use, including lost lists, hidden videos or settings.
 
 ## Your responsibility
 AddOrHide only changes what your own browser shows you: it hides recommendation cards you choose to hide and keeps a
-list of videos you choose to add, all stored in your browser. It does not download, record, decrypt or
+list of videos you choose to add and locally stored watch-progress data, all stored in your browser. It does not download, record, decrypt or
 redistribute video, and it does not get around DRM, ads or other protections. Its popup player uses each site's
 official embed player, unaltered, ads included. You are responsible for using it in line with the terms of service
 of the websites you visit and the laws that apply to you.

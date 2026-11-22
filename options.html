@@ -34,16 +34,29 @@
         <div class="control-row position-row">
           <span id="position-label" class="control-label">Position</span>
           <div id="button-edge" class="position-buttons" role="group" aria-labelledby="position-label">
-            <button class="edge-button press-button" type="button" data-edge="top" aria-pressed="false" aria-label="Top" title="Top"><svg aria-hidden="true" focusable="false" viewBox="0 0 46 30"><defs><linearGradient id="options-edge-top-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--edge-top)"/><stop offset="1" stop-color="var(--edge-bottom)"/></linearGradient></defs><path d="M23 2 44 28H2Z" fill="url(#options-edge-top-gradient)"/></svg></button>
-            <button class="edge-button press-button" type="button" data-edge="bottom" aria-pressed="false" aria-label="Bottom" title="Bottom"><svg aria-hidden="true" focusable="false" viewBox="0 0 46 30"><defs><linearGradient id="options-edge-bottom-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--edge-top)"/><stop offset="1" stop-color="var(--edge-bottom)"/></linearGradient></defs><path d="M2 2h42L23 28Z" fill="url(#options-edge-bottom-gradient)"/></svg></button>
+            <button class="edge-button press-button" type="button" data-edge="top" aria-pressed="false" aria-label="Top" title="Top"><svg aria-hidden="true" focusable="false" viewBox="0 0 46 30"><path d="M23 3 43 27 23 22 3 27Z" fill="var(--edge-fill)"/></svg></button>
+            <span class="position-pill" aria-hidden="true"></span>
+            <button class="edge-button press-button" type="button" data-edge="bottom" aria-pressed="false" aria-label="Bottom" title="Bottom"><svg aria-hidden="true" focusable="false" viewBox="0 0 46 30"><path d="M3 3 23 8 43 3 23 27Z" fill="var(--edge-fill)"/></svg></button>
           </div>
         </div>
       </div>
+    </section>
+    <section class="panel" aria-labelledby="watch-heading">
+      <h2 id="watch-heading">Watching</h2>
+      <label class="switch-row"><input id="tag-watched" type="checkbox" role="switch"> <span>Tag watched videos</span></label>
+      <label class="switch-row"><input id="auto-continue" type="checkbox" role="switch"> <span>Auto-add videos I start to Continue Watching</span></label>
+      <div class="page-actions"><button id="clear-watch-history-button" class="ghost-button danger-button" type="button">Clear watch history</button></div>
+      <div id="watch-status" class="status" role="status" aria-live="polite"></div>
     </section>
     <section class="panel" aria-labelledby="feed-heading">
       <h2 id="feed-heading">Hide whole feeds</h2>
       <label class="switch-row"><input id="bulk-hide" type="checkbox" role="switch"> <span>Hide every recommendation on YouTube</span></label>
       <label class="switch-row"><input id="bulk-hide-tubi" type="checkbox" role="switch"> <span>Hide every tile on Tubi</span></label>
+    </section>
+    <section class="panel" aria-labelledby="filters-heading">
+      <h2 id="filters-heading">Hide by type and keyword</h2>
+      <p class="muted">Choose categories or words per site. These cards are hidden on the page but never added to Hidden videos.</p>
+      <div id="filter-sites" class="filter-sites"></div>
     </section>
     <section class="panel" aria-labelledby="add-heading">
       <h2 id="add-heading">Add a video by URL</h2>
@@ -63,9 +76,13 @@
       </div>
       <div id="hidden-status" class="status" role="status" aria-live="polite"></div>
     </section>
+    <section class="panel" aria-labelledby="page-lock-heading" id="page-lock-panel">
+      <h2 id="page-lock-heading">Page lock</h2>
+      <div id="page-lock-body"></div>
+    </section>
     <section class="panel" aria-labelledby="privacy-heading">
       <h2 id="privacy-heading">Your data</h2>
-      <p>AddOrHide keeps the videos you add or hide, your site settings and your page preferences in this browser only. Nothing is sent to the developer, and there are no accounts, ads or analytics.</p>
+      <p>AddOrHide keeps the videos you add or hide, watch progress, your site settings and your page preferences in this browser only. Nothing is sent to the developer, and there are no accounts, ads or analytics.</p>
       <p class="muted">When you click <strong>Add</strong> or <strong>Hide</strong>, the extension reads that video's link, title, thumbnail link and any duration, view count, date, rating or genre shown on its card, and stores them on this device. It uses this data only to build your Added Videos page and to hide videos, and it never sells or shares it. Thumbnails and site icons are loaded straight from the sites they come from. You can delete it at any time: Remove or Clear page for added videos, Restore or Unhide everything for hidden videos, Forget for a site's settings, or remove the extension.</p>
       <div class="page-actions">
         <button id="export-data-button" class="secondary-button" type="button">Export my data</button>
@@ -76,9 +93,11 @@
     </section>
   </main>
   <script src="shared.js"></script>
+  <script src="tooltip.js"></script>
   <script src="edge-choice.js"></script>
   <script src="catalog.js"></script>
   <script src="sites.js"></script>
+  <script src="lock.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

@@ -130,7 +130,25 @@ if (typeof window !== "undefined") {
   function workableMatches(selector) {
     try {
       const matches = Array.from(document.querySelectorAll(selector));
-      return matches.length >= 2 && matches.length <= 300 ? matches : null;
+      if (matches.length < 2 || matches.length > 3000) return null;
+      // Rows and panels often have a perfectly stable selector too.  They are not cards: a representative
+      // one contains several destinations or several poster-sized images.  jsdom has no layout, so the image
+      // count is deliberately the fallback there.
+      const sample = matches.slice(0, Math.min(matches.length, 9));
+      const values = sample.map(match => {
+        const hrefs = new Set(Array.from(match.querySelectorAll("a[href]")).map(link => {
+          try { const url = new URL(link.href || link.getAttribute("href"), location.href); return `${url.pathname}${url.search}`; }
+          catch (error) { return link.getAttribute("href") || ""; }
+        }).filter(Boolean));
+        const images = Array.from(match.querySelectorAll("img"));
+        const sizeable = images.filter(image => {
+          const rect = image.getBoundingClientRect();
+          return rect.width || rect.height ? rect.width >= 60 && rect.height >= 40 : true;
+        });
+        return { hrefs: hrefs.size, images: sizeable.length };
+      }).sort((left, right) => left.hrefs - right.hrefs || left.images - right.images);
+      const median = values[Math.floor(values.length / 2)];
+      return median && median.hrefs <= 2 && median.images <= 2 ? matches : null;
     } catch (error) {
       return null;
     }
@@ -143,9 +161,15 @@ if (typeof window !== "undefined") {
 
   // card is the ancestor the selector was built from (not the image under the mouse): its matches must
   // include it, look like it in size, and not be nested in each other.
-  function scoreCandidate(selector, card) {
+  function scoreCandidate(selector, card, linkless = false) {
     const matches = workableMatches(selector);
-    if (!matches || !matches.includes(card) || matches.filter(hasAnchor).length / matches.length < 0.8) {
+    const qualifying = linkless ? matches && matches.filter(match => match.querySelector("img")).length / matches.length >= 0.8
+      : matches && matches.filter(hasAnchor).length / matches.length >= 0.8;
+    if (!matches || !matches.includes(card) || !qualifying) {
+      return null;
+    }
+    const siteChrome = node => node.closest("nav, header, footer, aside, [role=navigation], [role=banner], [role=contentinfo]");
+    if (!siteChrome(card) && matches.some(siteChrome)) {
       return null;
     }
     const nested = matches.filter(match => matches.some(other => other !== match && other.contains(match))).length;
@@ -153,7 +177,9 @@ if (typeof window !== "undefined") {
       return null;
     }
     const cardArea = area(card);
-    const visibleAreas = matches.map(area).filter(value => value > 0);
+    // Click-only cards are often carousel slides: those off screen are not laid out like the one clicked.
+    const measured = linkless ? matches.filter(match => { const rect = match.getBoundingClientRect(); return rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth; }) : matches;
+    const visibleAreas = measured.map(area).filter(value => value > 0);
     if (cardArea > 0 && visibleAreas.length) {
       const similar = visibleAreas.filter(value => value >= cardArea * 0.4 && value <= cardArea * 2.5).length;
       if (similar / visibleAreas.length < 0.6) {
@@ -170,24 +196,54 @@ if (typeof window !== "undefined") {
     let node = element;
     // Class/attribute patterns describe the card itself; structural :has() patterns also catch menus and
     // footers that merely link to the same section, so they are only a fallback.
-    const best = { plain: null, structural: null };
+    let structural = null;
     for (let level = 0; node && node !== document.documentElement && node !== document.body && level < 12; level += 1) {
       if (hasAnchor(node)) {
+        let plain = null;
         candidateSelectors(node).forEach(selector => {
           const scored = scoreCandidate(selector, node);
           const kind = selector.includes(":has(") ? "structural" : "plain";
-          const current = best[kind];
+          const current = kind === "plain" ? plain : structural;
           if (scored && (!current || scored.matches.length > current.matches.length
             || (scored.matches.length === current.matches.length && scored.parts < current.parts))) {
-            best[kind] = scored;
+            if (kind === "plain") plain = scored;
+            else structural = scored;
           }
         });
+        // The closest level with an ordinary selector is the card.  Continuing upward merely favours a row.
+        if (plain) return plain.selector;
       }
       node = node.parentElement;
     }
-    const chosen = best.plain || best.structural;
-    return chosen ? chosen.selector : null;
+    if (structural) return structural.selector;
+    node = element;
+    for (let level = 0; node && node !== document.documentElement && node !== document.body && level < 12; level += 1) {
+      if (!hasAnchor(node) && node.querySelector("img") && node.querySelector("h1, h2, h3, h4")
+        && !(node.classList && node.classList.contains("pointer-events-none"))) {
+        let best = null;
+        const selectors = new Set(candidateSelectors(node));
+        Array.from(node.classList || []).forEach(token => {
+          try {
+            if (document.querySelectorAll(`.${pickerCssEscape(token)}`).length >= 2) {
+              selectors.add(`${node.localName}.${pickerCssEscape(token)}`);
+            }
+          } catch (error) { /* ignore an unusable class selector */ }
+        });
+        // A carousel's own classes say where a slide is, not what it is: slick-active is only the slides on screen. Tracking classes (gtm-hp) are per page, so they would miss the genre pages.
+        Array.from(selectors).filter(selector => !/(?:slick|swiper|owl|splide|glide|active|current|selected|hover|focus|gtm-|ga-|analytics|tracking)/i.test(selector)).forEach(selector => {
+          const scored = scoreCandidate(selector, node, true);
+          if (scored && (!best || scored.matches.length > best.matches.length
+            || (scored.matches.length === best.matches.length && scored.parts < best.parts))) best = scored;
+        });
+        if (best) return best.selector;
+      }
+      node = node.parentElement;
+    }
+    return null;
   }
+
+  // Narrow test seam; production pages never set this flag.
+  if (window.__hoaPickerTest) window.__hoaPickerTest = { buildSelector, workableMatches, candidateSelectors };
 
   function setPanel(text) {
     message.textContent = text;
@@ -283,6 +339,22 @@ if (typeof window !== "undefined") {
     return elements.filter(element => !ownNodes.some(node => node === element || node.contains(element)));
   }
 
+  function playerSurfaceFor(element) {
+    for (let node = element, level = 0; node && node !== document.documentElement && level < 12; node = node.parentElement, level += 1) {
+      if (HOA.isPlayerSurface(node, location.href)) return node;
+    }
+    return null;
+  }
+
+  function onlyPlayerSurfaces(matches) {
+    return Boolean(matches && matches.length && matches.every(match => HOA.isPlayerSurface(match, location.href)));
+  }
+
+  function showPlayerSurface() {
+    highlight.hidden = true;
+    showPickMessage("That's a video player, not a thumbnail. Click a thumbnail that opens a video or channel.");
+  }
+
   function updateHighlight(event) {
     if (!pickMode || panel.contains(event.target)) {
       return;
@@ -293,9 +365,13 @@ if (typeof window !== "undefined") {
     }
     lastHighlight = now;
     const element = elementsAtPoint(event)[0];
+    if (playerSurfaceFor(element)) {
+      highlight.hidden = true;
+      return;
+    }
     const selector = element && buildSelector(element);
     const matches = selector && workableMatches(selector);
-    if (!selector || !matches) {
+    if (!selector || !matches || onlyPlayerSurfaces(matches)) {
       highlight.hidden = true;
       return;
     }
@@ -315,8 +391,16 @@ if (typeof window !== "undefined") {
     event.preventDefault();
     event.stopPropagation();
     const element = elementsAtPoint(event)[0];
+    if (playerSurfaceFor(element)) {
+      showPlayerSurface();
+      return;
+    }
     const selector = element && buildSelector(element);
     const matches = selector && workableMatches(selector);
+    if (onlyPlayerSurfaces(matches)) {
+      showPlayerSurface();
+      return;
+    }
     if (!selector || !matches) {
       showNoPattern();
       return;

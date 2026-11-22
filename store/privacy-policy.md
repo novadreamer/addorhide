@@ -1,26 +1,31 @@
 # AddOrHide Privacy Policy
 
-**Effective date:** October 9, 2026 (updated October 26, 2026)
+**Effective date:** October 9, 2026 (updated November 21, 2026)
 **Developer:** Ashraf Mustafa
 **Contact:** mybrainnoor@gmail.com
 
 ## The short version
 
-AddOrHide does not collect your data. It has no servers, no accounts, no analytics and no ads. The videos you add or hide, and your settings, are stored only in your own browser, on your own device. We never receive them, sell them or share them.
+AddOrHide does not collect your data. It has no servers, no accounts, no analytics and no ads. The videos you add or hide, your watch history, and your settings are stored only in your own browser, on your own device. We never receive them, sell them or share them.
 
 ## What AddOrHide stores on your device
 
 The extension stores the following in your browser's local extension storage:
 
-- **Videos you add or hide.** When you click **Add** or **Hide** on a video, the extension saves that video's web address, title, thumbnail address and site name, along with any of these that the video's card shows on the page: duration, view count, publish date or year, rating, genres, and the site's icon address. It also saves the time you took the action and, if you choose to tag a video, the type and genres you enter.
+- **Videos, channels and categories you add or hide.** When you click **Add** or **Hide** on a video, channel or category, the extension saves that video's web address, title, thumbnail address and site name, along with any of these that the video's card shows on the page: duration, view count, publish date or year, rating, genres, and the site's icon address. It also saves the time you took the action and, if you choose to tag a video, the type and genres you enter.
+- **Watch history.** On sites where the extension is active, when you play a video it saves that video's address, title and thumbnail address, its length, how much of it you played, where you stopped and when. This powers the Watched tags, hiding watched videos, Continue Watching and resuming. Nothing is saved in private windows. When Tag watched videos, Continue Watching and hiding Watched are all off, nothing is saved either, except for videos you saved to Watch Later yourself.
+- **Watch Later.** When you click **Add to Watch Later**, the extension saves that video's address, title, thumbnail address, site name, length and the time you added it.
+- **Row names.** The names of the rows a site shows, so you can pick rows to hide under Rows by name. If you press **Find all rows**, the extension also opens up to 12 of that site's own genre pages in a hidden frame to read their row names. Like any page you open, those pages are loaded from that site.
+- **Addresses of cards with no link.** Some sites keep a card's address out of the page. When you click **Add** or **Hide** on such a card, the extension clicks the card itself, reads the address the site tries to open, cancels the move and saves that address for the card. The site may count this as a click on that card.
+- **Names, years and pictures of saved videos.** When you add or hide a video, the extension may load that video's own page from the same site in the background to read its name, release year, type, rating, genres and picture, as the page states them. While a site is open, it may do the same for a few videos you saved from that site that are still missing these details, and when you open the Added Videos page it does the same, at most once a week per video, for saved videos from sites you have turned AddOrHide on for. Only pages on sites you have turned AddOrHide on for are read, plus the page a link there moves to when that is another site you have turned AddOrHide on for (for example Cartoony specials that open on carateen.tv). On Fandango at Home, whose pages carry no details, the extension asks Fandango at Home's own catalog service (apicache.vudu.com) for that title instead, without your sign-in; on The Roku Channel it asks Roku's catalog service on the same site. On Twitch, live streams you saved are checked on their channel page so they can be marked Past broadcast once they end. No other service is ever contacted. What is read stays in your lists on your device.
 - **Site settings.** The sites where you turned the extension on, the card pattern (a CSS selector) learned when you use the card picker, and your "hide the whole feed" switches.
-- **Page preferences.** How you sorted, grouped or collapsed each site on the Added Videos page.
+- **Page preferences.** How you sorted, grouped or collapsed things on the Added Videos and Hidden Videos pages, and your Watching settings.
 
-Nothing is saved from a page until you click Add or Hide, except your settings and preferences. On sites where the extension is active, it reads the links and titles of the video cards on the page, on your device only, so it can place its buttons and keep videos you already hid out of view. This information is not stored or sent anywhere.
+Apart from your watch history and row names, nothing is saved from a page until you click Add or Hide. On sites where the extension is active, it reads the links and titles of the video cards on the page, on your device only, so it can place its buttons and keep videos you already hid out of view. This information is not sent anywhere.
 
 ## How the data is used
 
-Only to provide the extension's single purpose: showing the videos you added on your own Added Videos page and hiding videos from recommendation feeds. It is not used for advertising, profiling, analytics or any other purpose, and it is never sold or transferred to anyone.
+Only to provide the extension's single purpose: showing the videos you added on your own Added Videos page, hiding videos from feeds, and keeping track of what you watched so you can resume it or hide it. It is not used for advertising, profiling, analytics or any other purpose, and it is never sold or transferred to anyone.
 
 No person reads your data. It never leaves your browser.
 
@@ -32,12 +37,14 @@ You can delete your data at any time:
 
 - **Hidden videos:** **Restore** in the Hidden Videos window (opened from the extension popup) deletes a video's record and brings the video back to the feed. **Unhide everything** in Options deletes all hidden-video records. (**Remove** in that window only takes a video off the list while keeping it hidden, so its record stays until you restore it or use Unhide everything.)
 - **Added videos:** **Remove** on a card deletes that video's record, and **Clear page** deletes all of them.
-- **Site settings:** **Forget** in Options deletes a site's saved settings. (**Disable** turns the extension off for the site but keeps the saved settings.)
+- **Watch Later:** **Remove** on a card deletes that video's record, and its bin button deletes the whole list. Playing a saved video moves it to Continue Watching.
+- **Watch history:** **Clear watch history** in Options deletes all of it. Removing a video from Continue Watching takes it off that list.
+- **Site settings:** **Forget** in Options deletes a site's saved settings, row names and card addresses. (**Disable** turns the extension off for the site but keeps the saved settings.)
 - **Everything:** removing the extension deletes all the data it stored.
 
 ## Private windows
 
-If you allow the extension to run in private (incognito) windows, videos you add or hide there are saved in the same extension storage used by your normal windows. They remain after the private window is closed until you delete them as described above. If you do not want this, do not enable the extension in private windows.
+If you allow the extension to run in private (incognito) windows, videos you add or hide there are saved in the same extension storage used by your normal windows. They remain after the private window is closed until you delete them as described above. If you do not want this, do not enable the extension in private windows. Row names are not remembered from private windows unless you press **Find all rows**. What you play in a private window is never recorded in your watch history, and Continue Watching and Watch Later do not appear there.
 
 ## Popup player
 
@@ -55,12 +62,16 @@ The extension does not send your data to the developer. These requests happen di
 
 The extension does not download or run code from the internet.
 
+With **Labelled as AI** turned on, the extension reads the titles of the YouTube videos in your feed and loads the YouTube page of each video shown (one every 2 seconds) to read YouTube's own AI label and the creator's tags and hashtags; the results stay on your device.
+
+If you set a **page lock** password, only a salted one-way hash of it is stored on your device; the password itself is never stored or sent anywhere.
+
 ## Permissions
 
 - **storage** keeps your lists, settings and preferences on your device.
 - **scripting** and **activeTab** let the extension add its buttons and the card picker to the page you are on, and turn itself on for a site you choose.
-- **Access to YouTube and Tubi** lets the extension work on those sites. It is also needed to read the cards you act on.
-- **Optional access to other sites** is requested one site at a time, only when you choose to enable the extension there, and you can revoke it at any time with Disable.
+- **Access to YouTube and Tubi** lets the extension work on those sites. It is also needed to read the cards you act on and to measure playback, including in the site's own player frames.
+- **Optional access to other sites** is requested one site at a time, only when you choose to enable the extension there, and you can revoke it at any time with Disable. On a few sites the video player sits on a separate host of the same service, and that host is included in the same request.
 
 ## Limited Use
 

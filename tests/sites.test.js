@@ -22,7 +22,8 @@ function check(name, fn) {
   ["view-source:https://example.com", false], ["devtools://devtools/bundled/inspector.html", false],
   ["https://chromewebstore.google.com/detail/example", false],
   ["https://chrome.google.com/webstore/category/extensions", false],
-  ["https://chrome.google.com/docs", true], ["https://addons.mozilla.org/en-US/firefox/", false]
+  ["https://chrome.google.com/docs", true], ["https://addons.mozilla.org/en-US/firefox/", false],
+  ["https://www.youtube.com/robots.txt#addorhide-added", false],
 ].forEach(([value, expected]) => check(`supported URL ${value}`, () => assert.equal(SITES.isSupportedPageUrl(value), expected)));
 
 [
@@ -64,6 +65,28 @@ check("requested patterns are covered by the manifest's optional_host_permission
   });
 });
 check("script id", () => assert.equal(SITES.scriptId("example.com"), "hoa-site-example.com"));
+check("PBS requests and registers its player host separately", () => assert.deepEqual(SITES.playerHosts("www.pbs.org"), ["player.pbs.org"]));
+check("Dailymotion requests and registers its player host separately", () => assert.deepEqual(SITES.playerHosts("www.dailymotion.com"), ["geo.dailymotion.com"]));
+check("ordinary sites have no separate player host", () => assert.deepEqual(SITES.playerHosts("www.imdb.com"), []));
+{
+  const requested = []; const registered = []; const removed = [];
+  const previousChrome = global.chrome;
+  global.chrome = {
+    runtime: { lastError: null },
+    storage: { local: { get(_defaults, callback) { callback({ siteRules: {} }); }, set(_value, callback) { if (callback) callback(); } } },
+    permissions: { request(details, callback) { requested.push(details.origins); callback(true); }, remove(details, callback) { removed.push(details.origins); callback(); } },
+    scripting: {
+      unregisterContentScripts(_details, callback) { callback(); }, registerContentScripts(details, callback) { registered.push(details); callback(); },
+      executeScript(_details, callback) { callback(); }, insertCSS(_details, callback) { callback(); }
+    }
+  };
+  SITES.enableSite("www.pbs.org", 1, {}, result => assert.equal(result.ok, true));
+  SITES.disableSite("www.pbs.org", result => assert.equal(result.ok, true));
+  check("PBS enable requests page and player origins from catalog metadata", () => assert.deepEqual(requested[0], ["https://www.pbs.org/*", "https://player.pbs.org/*"]));
+  check("PBS registers a distinct player content script", () => assert.deepEqual(registered[0].map(script => script.matches[0]), ["https://www.pbs.org/*", "https://player.pbs.org/*"]));
+  check("PBS disable removes page and player origins", () => assert.deepEqual(removed, [["https://www.pbs.org/*", "https://player.pbs.org/*"], ["http://www.pbs.org/*", "http://player.pbs.org/*"]]));
+  global.chrome = previousChrome;
+}
 check("host from pattern", () => assert.equal(SITES.hostFromPattern("*://example.com/*"), "example.com"));
 check("host from https pattern", () => assert.equal(SITES.hostFromPattern("https://www.imdb.com/*"), "www.imdb.com"));
 check("host from http pattern", () => assert.equal(SITES.hostFromPattern("http://example.com/*"), "example.com"));
@@ -71,5 +94,25 @@ check("ftp pattern rejected", () => assert.equal(SITES.hostFromPattern("ftp://ex
 check("wildcard host rejected", () => assert.equal(SITES.hostFromPattern("*://*.example.com/*"), null));
 check("pattern without path rejected", () => assert.equal(SITES.hostFromPattern("*://example.com"), null));
 check("YouTube host from pattern", () => assert.equal(SITES.hostFromPattern("*://youtube.com/*"), "youtube.com"));
+
+{
+  const previousChrome = global.chrome;
+  const store = { siteRules: { "example.com": { enabled: true } }, seenRows: { "example.com": ["Drama"], "other.com": ["Comedy"] } };
+  global.chrome = {
+    runtime: { lastError: null },
+    storage: { local: {
+      get(defaults, callback) { const result = {}; Object.keys(defaults).forEach(key => { result[key] = key in store ? store[key] : defaults[key]; }); callback(result); },
+      set(values, callback) { Object.assign(store, values); if (callback) callback(); }
+    } },
+    permissions: { remove(_details, callback) { callback(); } },
+    scripting: { unregisterContentScripts(_details, callback) { callback(); } }
+  };
+  SITES.forgetSite("example.com", result => assert.equal(result.ok, true));
+  check("forgetting a site also removes its remembered rows", () => {
+    assert.equal(store.siteRules["example.com"], undefined);
+    assert.deepEqual(store.seenRows, { "other.com": ["Comedy"] });
+  });
+  global.chrome = previousChrome;
+}
 
 console.log(`sites.test.js: ${passed} passed, 0 failed`);

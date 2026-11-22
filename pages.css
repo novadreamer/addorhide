@@ -59,12 +59,6 @@ a:hover { color: var(--accent); }
 :root[data-theme="dark"] .popup-header .theme-toggle .icon-sun { display: block; }
 :root[data-theme="dark"] .popup-header .theme-toggle .icon-moon { display: none; }
 .popup-header .theme-toggle:hover:not(:disabled) svg { transform: rotate(20deg) scale(1.1); }
-.page-details-box { margin: 2px 0 6px; }
-.page-details-box summary { color: var(--muted); font-size: 12px; cursor: pointer; }
-.page-details-box summary::marker { content: ""; }
-.page-details-box summary::before { content: "▸"; display: inline-block; margin-right: 4px; }
-.page-details-box[open] summary::before { content: "▾"; }
-.page-details-box .page-details { margin: 4px 0 0; font-size: 11px; user-select: all; }
 
 button { min-height: 32px; padding: 6px 12px; color: var(--accent-contrast); background: var(--accent); border: 1px solid transparent; border-radius: var(--radius-sm); font: inherit; font-weight: 600; cursor: pointer; }
 .primary-button { color: var(--accent-contrast); background: var(--accent); }
@@ -81,10 +75,31 @@ button:hover:not(:disabled) { filter: brightness(1.04); }
 .error { color: var(--danger); }
 .success { color: #176b47; }
 
+.hoa-lock-screen { display: grid; min-height: 70vh; place-items: center; }
+.hoa-lock-card { width: min(380px, 100%); box-sizing: border-box; padding: 30px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); text-align: center; }
+.hoa-lock-icon { display: grid; width: 58px; height: 58px; margin: 0 auto 14px; place-items: center; color: var(--accent); background: var(--surface-2); border: 1px solid var(--border); border-radius: 50%; }
+.hoa-lock-icon svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.hoa-lock-card h1 { margin-bottom: 8px; }
+.hoa-lock-form { display: flex; gap: 8px; margin-top: 20px; }
+.hoa-lock-form input { flex: 1 1 auto; min-width: 0; }
+.hoa-lock-form button { flex: 0 0 auto; }
+.hoa-lock-card .status { min-height: 22px; text-align: left; }
+.page-lock-field { display: grid; gap: 5px; min-width: 180px; }
+.page-lock-field label { font-size: 13px; font-weight: 600; }
+.page-lock-field input { width: 100%; box-sizing: border-box; }
+#page-lock-body { display: grid; gap: 12px; }
+.page-lock-switches { display: grid; gap: 2px; }
+.page-lock-hint, .page-lock-forgot { margin: 0; font-size: 13px; }
+.page-lock-inline-form, .page-lock-change-form, .page-lock-remove-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; padding-top: 10px; border-top: 1px solid var(--border); }
+.page-lock-change-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
+.page-lock-change-form .page-lock-field { min-width: 0; }
+.page-lock-inline-form .page-lock-field, .page-lock-remove-form .page-lock-field { flex: 1 1 220px; }
+@media (max-width: 620px) { .page-lock-change-form { grid-template-columns: 1fr; } }
+
 form { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
 .field { display: grid; flex: 1 1 230px; gap: 5px; min-width: 190px; }
 .field label { font-size: 12px; font-weight: 600; }
-input[type="text"] { width: 100%; min-height: 36px; padding: 7px 10px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font: inherit; }
+input[type="text"], input[type="password"] { width: 100%; min-height: 36px; padding: 7px 10px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font: inherit; }
 .mode { display: grid; gap: 12px; }
 .mode label { display: flex; gap: 10px; align-items: flex-start; }
 .mode strong { display: block; margin-bottom: 2px; }
@@ -143,7 +158,7 @@ input[type="checkbox"][role="switch"]:checked::after { left: 19px; }
 
 
 /* Popup compaction: everything must fit the 600px popup. */
-body.popup main { display: flex; flex-direction: column; max-height: 576px; min-height: 0; }
+body.popup main { display: flex; flex-direction: column; min-height: 0; }
 .popup .popup-header { margin-bottom: 8px; padding: 0 0 6px; }
 .popup .brand-lockup img { width: 28px; height: 28px; }
 .popup .brand-lockup h1 { font-size: 15px; line-height: 1.2; }
@@ -156,12 +171,13 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 .popup .popup-header .theme-toggle { min-height: 34px; width: 34px; height: 34px; padding: 4px; font-size: inherit; }
 .popup button { min-height: 28px; padding: 4px 10px; font-size: 12.5px; }
 .popup .page-actions { gap: 6px; }
+.popup .teach-actions { justify-content: center; margin: 8px 0; }
 /* Added Videos (green) | Hidden Videos (red), side by side with a line between; each is off while its list is
    empty, with its count underneath. */
 .popup .lists-card { display: flex; align-items: stretch; gap: 0; padding: 14px 8px; flex: 0 0 auto; }
 .lists-card .list-column { display: flex; flex: 1 1 0; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
 .lists-card .list-divider { flex: 0 0 1px; margin: 2px 10px; background: var(--border); }
-.popup .list-open-button { min-width: 132px; min-height: 38px; padding: 6px 14px; color: #fff; font-size: 15px; border: 1px solid transparent; }
+.popup .list-open-button { min-width: 132px; min-height: 32px; padding: 4px 10px; color: #fff; font-size: 13px; border: 1px solid transparent; }
 .popup .added-open-button { background: #1f9d55; border-color: #188546; }
 .popup .hidden-open-button { background: #d93a49; border-color: #b72f3c; }
 .popup .list-open-button:hover:not(:disabled) { filter: brightness(1.06); }
@@ -198,43 +214,39 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 .control-row { display: flex; gap: 12px; align-items: center; }
 .button-controls .control-label { font-weight: 600; }
 .position-buttons { display: grid; gap: 6px; }
-/* Enable/Disable: a top-lit, convex dome with a diffuse contact shadow rather than a hard lower rim. */
+/* The pill between the arrows is brushed silver, like the power button's metal. */
+.position-pill { display: block; width: 20px; height: 8px; margin: -1px auto; border: 1px solid #8a929b; border-radius: 999px;
+  background: linear-gradient(180deg, #fbfcfd 0%, #d5dae0 35%, #9aa2ab 60%, #e4e7eb 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 1px 2px rgba(0, 0, 0, .25); }
+/* A raised, slightly concave metal disc in a neon ring with thin silver edges; the ring and the power sign glow green
+   when the hover controls show and red when they are off. */
 .button-controls .press-button.toggle-button {
-  position: relative; isolation: isolate; display: grid; place-items: center; width: 56px; height: 56px; min-width: 0; min-height: 0; margin-bottom: 6px; padding: 0;
-  border: 1px solid #188546; border-radius: 50%; color: #fff; font-size: 0;
-  background: radial-gradient(circle at 50% 18%, rgba(255, 255, 255, .6) 0 2%, transparent 25%), radial-gradient(circle at 50% 32%, #40cb7b 0%, #1f9d55 58%, #157b42 100%);
-  box-shadow: 0 7px 13px rgba(18, 42, 28, .28), 0 2px 4px rgba(0, 0, 0, .2), inset 0 1px 1px rgba(255, 255, 255, .82), inset 0 -4px 6px rgba(6, 72, 35, .32), inset 2px 0 3px rgba(255, 255, 255, .12);
-  transition: transform 100ms ease-out, box-shadow 100ms ease-out, filter 150ms ease-out;
-}
-.button-controls .press-button.toggle-button::before {
-  position: absolute; z-index: -1; top: 5px; right: 9px; left: 9px; height: 18px; content: ""; pointer-events: none;
-  background: radial-gradient(ellipse at 50% 0, rgba(255, 255, 255, .62), rgba(255, 255, 255, 0) 70%); border-radius: 50%;
+  --power-ring-light: #5dffa8; --power-ring-dark: #00e676;
+  display: grid; width: 60px; height: 60px; min-width: 0; min-height: 0; margin-bottom: 6px; padding: 0; place-items: center;
+  background: transparent; border: 0; border-radius: 50%; color: transparent; font-size: 0; box-shadow: none;
+  transition: transform 100ms ease-out, filter 150ms ease-out;
 }
 .button-controls .press-button.toggle-button[data-enabled="true"] {
-  border-color: #b72f3c;
-  background: radial-gradient(circle at 50% 18%, rgba(255, 255, 255, .58) 0 2%, transparent 25%), radial-gradient(circle at 50% 32%, #f26470 0%, #d93a49 58%, #ad2432 100%);
-  box-shadow: 0 7px 13px rgba(65, 15, 22, .3), 0 2px 4px rgba(0, 0, 0, .2), inset 0 1px 1px rgba(255, 255, 255, .82), inset 0 -4px 6px rgba(100, 14, 25, .34), inset 2px 0 3px rgba(255, 255, 255, .12);
+  --power-ring-light: #5dffa8; --power-ring-dark: #00e676;
 }
-.button-controls .press-button.toggle-button svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .32)); }
+.button-controls .press-button.toggle-button[data-enabled="false"] { --power-ring-light: #ff6b86; --power-ring-dark: #ff1744; }
+.button-controls .press-button.toggle-button svg { display: block; width: 60px; height: 60px; overflow: visible;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--power-ring-dark) 60%, transparent)) drop-shadow(0 5px 6px rgba(24, 38, 42, .26)) drop-shadow(0 2px 2px rgba(0, 0, 0, .14));
+  transition: filter 100ms ease-out; }
 .button-controls .press-button.toggle-button:hover:not(:disabled) { filter: brightness(1.06) saturate(1.03); }
 .button-controls .press-button.toggle-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 75%, #fff); outline-offset: 3px; }
 .button-controls .press-button.toggle-button:active:not(:disabled) {
   transform: translateY(2px) scale(.98);
-  box-shadow: 0 3px 7px rgba(18, 42, 28, .24), inset 0 3px 7px rgba(6, 72, 35, .34), inset 0 1px 1px rgba(255, 255, 255, .32);
 }
-.button-controls .press-button.toggle-button[data-enabled="true"]:active:not(:disabled) {
-  box-shadow: 0 3px 7px rgba(65, 15, 22, .26), inset 0 3px 7px rgba(100, 14, 25, .36), inset 0 1px 1px rgba(255, 255, 255, .3);
-}
+.button-controls .press-button.toggle-button:active:not(:disabled) svg { filter: drop-shadow(0 2px 3px rgba(24, 38, 42, .26)); }
 .button-controls .press-button.edge-button {
-  --edge-top: #fff; --edge-bottom: #c9cbd3;
+  --edge-fill: #edf0f1; --edge-outline: #47525a;
   display: grid; width: 46px; min-width: 46px; min-height: 30px; padding: 0; place-items: center;
   color: #1d1d27; background: transparent; border-color: transparent; box-shadow: none; line-height: 1;
 }
 .button-controls .press-button.edge-button svg { display: block; width: 46px; height: 30px; overflow: visible; filter: drop-shadow(0 2px 1px rgba(0, 0, 0, .24)) drop-shadow(0 4px 5px rgba(0, 0, 0, .16)); }
-.button-controls .press-button.edge-button path { stroke: rgba(93, 96, 110, .52); stroke-width: 1; stroke-linejoin: round; }
-.button-controls .press-button.edge-button[aria-pressed="true"] { --edge-top: #ffe987; --edge-bottom: #ffd23f; color: #5e4300; }
-.button-controls .press-button.edge-button[aria-pressed="true"] path { stroke: #d39400; }
+.button-controls .press-button.edge-button path { stroke: var(--edge-outline); stroke-width: 2.2; stroke-linejoin: round; }
+.button-controls .press-button.edge-button[aria-pressed="true"] { --edge-fill: #ffd84d; --edge-outline: #a97000; color: #5e4300; }
 .button-controls .press-button.edge-button:hover:not(:disabled) svg { filter: brightness(1.05) drop-shadow(0 3px 2px rgba(0, 0, 0, .25)) drop-shadow(0 5px 6px rgba(0, 0, 0, .16)); }
 .button-controls .press-button.edge-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .button-controls .press-button.edge-button:active:not(:disabled) { transform: translateY(2px) scale(.97); box-shadow: none; }
@@ -250,9 +262,6 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
   box-shadow: 0 2px 0 rgba(0, 0, 0, .18), 0 3px 8px rgba(0, 0, 0, .08);
   transition: transform 90ms ease-out, box-shadow 90ms ease-out, background-color 150ms ease-out;
 }
-/* Action colours: green Enable (buttons hidden now), red Disable (buttons showing now). */
-.button-controls .toggle-button { color: #fff; background: #1f9d55; border: 1px solid #188546; }
-.button-controls .toggle-button[data-enabled="true"] { background: #d93a49; border-color: #b72f3c; }
 .button-controls .press-button:hover:not(:disabled) { filter: brightness(1.04); }
 /* Pressed: the button sinks while held, then springs back. */
 .button-controls .press-button:active:not(:disabled) {
@@ -271,21 +280,20 @@ body.popup main { display: flex; flex-direction: column; max-height: 576px; min-
 /* Popup: sections never overlap. The site card and the buttons controls keep their size; the hidden-videos card
    keeps its contents inside its own box (its list scrolls) and never shrinks below its heading plus one row; if
    everything still cannot fit the 600px popup, the popup scrolls as a whole. */
-body.popup main { overflow-y: auto; scrollbar-width: thin; }
+body.popup main { overflow: visible; scrollbar-width: auto; }
 .popup .site-card, .popup .popup-edge, .popup .popup-footer { flex: 0 0 auto; }
 .popup .button-controls { gap: 24px; }
 .popup .button-controls .press-button.toggle-button { min-height: 0; }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .button-controls .press-button.edge-button:not([aria-pressed="true"]) { --edge-top: #fbfbff; --edge-bottom: #aeb1be; }
+  :root:not([data-theme="light"]) .button-controls .press-button.edge-button:not([aria-pressed="true"]) { --edge-fill: #e8eaed; --edge-outline: #c6cbd1; }
 }
-:root[data-theme="dark"] .button-controls .press-button.edge-button:not([aria-pressed="true"]) { --edge-top: #fbfbff; --edge-bottom: #aeb1be; }
+:root[data-theme="dark"] .button-controls .press-button.edge-button:not([aria-pressed="true"]) { --edge-fill: #e8eaed; --edge-outline: #c6cbd1; }
 
 /* The arrow buttons sit on the centre line (under Enable); "Position" hangs to their left. */
 .button-controls .position-row { display: grid; grid-template-columns: 1fr auto 1fr; justify-self: stretch; }
 .button-controls .position-row #position-label { justify-self: end; }
-/* Breathing room under the position arrows (popup footer / end of the options panel). */
-.button-controls { padding-bottom: 14px; }
+/* The popup applies breathing room under the position arrows only when it still fits. */
 .popup .popup-edge { margin-bottom: 14px; }
 
 /* Optional Ko-fi tip link: quiet text link, never a button that competes with the real controls. */
@@ -294,3 +302,168 @@ body.popup main { overflow-y: auto; scrollbar-width: thin; }
 .support-link span { display: inline-block; color: #e0457b; transition: transform 140ms ease-out; }
 .support-link:hover span { transform: scale(1.25); }
 .support-line { margin-top: 6px; font-size: 13px; }
+
+/* Per-site category and keyword filters. Closed in the popup to preserve its 600px working height. */
+.hide-filters { margin-top: 8px; border-top: 1px solid var(--border); }
+.hide-filters summary { padding: 8px 0; color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; }
+.hide-filters-body { display: grid; gap: 4px; max-height: 270px; padding: 2px 0 8px; overflow-y: auto; scrollbar-width: thin; }
+.hide-filters .switch-row { min-height: 32px; font-size: 12px; }
+.hide-filters .switch-row input[type="checkbox"][role="switch"] { transform: scale(.88); transform-origin: left center; margin-right: -4px; }
+.filter-words { display: flex; gap: 6px; align-items: center; margin-top: 5px; }
+.filter-words input { min-width: 0; min-height: 30px; font-size: 12px; }
+.filter-words button { flex: 0 0 auto; min-height: 30px; }
+.filter-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.filter-launch { display: flex; width: 260px; max-width: 100%; align-items: center; gap: 8px; margin: 10px auto 0; padding: 6px 9px 6px 6px; border-radius: 999px; box-shadow: 0 2px 0 rgba(0,0,0,.12), 0 5px 12px rgba(0,0,0,.08); transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease, background-color 150ms ease; }
+.filter-launch.is-active { color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, var(--surface)); border-color: color-mix(in srgb, var(--danger) 42%, var(--border)); }
+.filter-launch:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 3px 0 rgba(0,0,0,.12), 0 8px 16px rgba(0,0,0,.12); filter: none; }
+.filter-launch:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 1px 0 rgba(0,0,0,.12), 0 3px 7px rgba(0,0,0,.1); }
+.filter-icon { display: grid; width: 26px; height: 26px; place-items: center; color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, transparent); border-radius: 8px; }
+.filter-icon svg, .filter-launch svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.filter-badge { min-width: 19px; margin-left: auto; padding: 1px 6px; color: var(--surface); background: var(--danger); border-radius: 999px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.filter-chevron { font-size: 21px; line-height: 1; color: var(--muted); }
+.filter-launch svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.filter-backdrop { position: fixed; inset: 0; z-index: 10000; opacity: 0; background: rgba(0,0,0,.25); transition: opacity 240ms ease; }
+.filter-backdrop.is-open { opacity: 1; }
+.filter-popover { position: fixed; z-index: 10001; top: 50%; left: 50%; width: min(320px, calc(100vw - 28px)); max-height: min(420px, calc(100vh - 28px)); overflow: hidden; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 18px 42px rgba(0,0,0,.28); opacity: 0; transform: translate(-50%,-50%) scale(.15); transition: transform 280ms cubic-bezier(.3,1.18,.45,1), opacity 220ms ease; }
+.filter-popover.is-open { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+.filter-popover.is-closing { opacity: 0; transform: translate(-50%,-50%) scale(.15); transition-timing-function: ease-in; }
+.filter-popover-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.filter-close { min-width: 28px; min-height: 28px; padding: 0; font-size: 21px; line-height: 1; }
+.filter-popover .hide-filters-body { max-height: 360px; padding: 10px 14px 14px; }
+.filter-note, .filter-page-count { margin: 2px 0; font-size: 11px; }
+.detail-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 4px 0; font-size: 12px; }
+.detail-row strong { text-align: right; font-variant-numeric: tabular-nums; }
+.footer-icon-button { display: inline-grid; width: 28px; min-height: 28px; padding: 3px; place-items: center; color: var(--text); }
+.footer-icon-button svg { width: 21px; height: 21px; }
+/* Options gear: turns a little and lifts on hover (and keyboard focus). */
+#open-options-button svg { transition: transform .45s cubic-bezier(.34, 1.56, .64, 1), color .2s ease; }
+#open-options-button:hover svg, #open-options-button:focus-visible svg { transform: rotate(90deg) scale(1.12); color: var(--accent); }
+/* The gear is round, but the corners of its square box pass the bottom of the popup mid-turn, which brought up the scrollbar. */
+.popup #open-options-button { overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { #open-options-button svg { transition: color .2s ease; } #open-options-button:hover svg, #open-options-button:focus-visible svg { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .filter-launch, .filter-launch:hover:not(:disabled), .filter-launch:active:not(:disabled) { transform: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .filter-popover { transform: translate(-50%,-50%); transition: opacity 160ms ease; } .filter-popover.is-open, .filter-popover.is-closing { transform: translate(-50%,-50%); } .filter-backdrop { transition-duration: 160ms; } }
+button.filter-chip { min-height: 23px; padding: 2px 7px; color: var(--text); background: var(--surface-2); border-color: var(--border); font-size: 11px; font-weight: 500; }
+.filter-sites { display: grid; gap: 8px; }
+.filter-sites .hide-filters { margin-top: 0; }
+
+/* Round 3: the popup itself never scrolls, so its sections are packed to fit the 600px popup. Only the
+   popovers scroll inside. Details sits right next to the theme button. */
+.popup .popup-header #page-details-toggle { margin-left: auto; }
+.popup .popup-header #theme-toggle { margin-left: -6px; }
+.popup .panel { margin-bottom: 8px; }
+.popup .lists-card { padding: 11px 8px; }
+.lists-card .list-column { gap: 5px; }
+.popup .button-controls { gap: 12px; }
+.popup .popup-edge { margin-bottom: 6px; }
+.popup .filter-launch { margin-top: 6px; padding-top: 4px; padding-bottom: 4px; }
+.popup .panel { padding-top: 10px; padding-bottom: 10px; }
+.popup .toggle-row { gap: 3px; }
+/* Safety net for unusually long status text: still reachable by wheel/keyboard, but no scrollbar is drawn. */
+body.popup main { max-height: 576px; overflow-y: auto; scrollbar-width: none; }
+body.popup main::-webkit-scrollbar { display: none; }
+
+/* Round 4: the launch button hugs its content (with some air) and stays centred; its summary is the tooltip.
+   The popup never scrolls sideways. Hide all / Unhide all icons sit beside the popover's close button. */
+.popup .filter-launch { display: flex; width: fit-content; max-width: 100%; margin-left: auto; margin-right: auto; padding-right: 14px; gap: 10px; }
+.popup .filter-launch .filter-badge { margin-left: 4px; }
+body.popup, body.popup main { overflow-x: hidden; }
+.filter-popover-tools { display: flex; align-items: center; gap: 4px; }
+button.filter-tool { display: grid; width: 30px; min-width: 30px; min-height: 30px; padding: 0; place-items: center; color: var(--text); background: var(--surface-2); border-color: var(--border); border-radius: 8px; }
+button.filter-tool svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+button.filter-tool[aria-pressed="false"] { color: var(--muted); }
+button.filter-tool:disabled { opacity: .4; cursor: default; }
+.genres-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; width: 100%; min-height: 38px; padding: 0; color: var(--text); background: transparent; border: 0; border-radius: 0; font: inherit; text-align: left; cursor: pointer; }
+.genres-row:hover { background: transparent; }
+.hide-filters-body button.genres-row { padding: 0; margin: 0; }
+.genres-switch { position: relative; width: 38px; height: 22px; margin-right: -4px; background: var(--border); border-radius: 999px; transform: scale(.88); transform-origin: left center; }
+.genres-switch::after { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; content: ""; background: var(--surface); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,.18); transition: left .15s ease; }
+.genres-row[aria-checked="true"] .genres-switch, .genres-row[aria-checked="mixed"] .genres-switch { background: var(--accent); }
+.genres-row[aria-checked="true"] .genres-switch::after { left: 19px; }
+.genres-row[aria-checked="mixed"] .genres-switch::after { left: 11px; }
+.genres-row small { color: var(--muted); }
+.genres-row .filter-chevron { transition: transform .2s ease; }
+.genres-row[aria-expanded="true"] .filter-chevron { transform: rotate(90deg); }
+.genres-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 200ms ease; }
+.genres-panel.is-open { grid-template-rows: 1fr; }
+.genres-panel > * { min-height: 0; overflow: hidden; }
+.genres-panel-header { display: flex; align-items: center; gap: 5px; padding: 6px 0; }
+.genres-panel-header > span { margin-right: auto; font-size: 12px; }
+.genres-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; padding-bottom: 8px; }
+.genres-list .filter-note { grid-column: 1 / -1; }
+.genre-check { display: flex; gap: 6px; align-items: center; min-width: 0; min-height: 24px; font-size: 12px; line-height: 1.35; cursor: pointer; }
+.genre-check input { flex: 0 0 auto; margin: 0; }
+.genre-check span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+@media (prefers-reduced-motion: reduce) { .genres-panel { transition: none; } }
+.popup .popup-footer .footer-icon-button { width: 30px; min-width: 30px; padding: 3px; }
+
+/* Round 9. Centred tooltips (tooltip.js). */
+.hoa-tip { position: fixed; z-index: 2147483000; max-width: 260px; padding: 1px 5px; color: #1b1b24; background: #fff; border-radius: 4px; font-size: 12px; font-weight: 600; line-height: 1.3; text-align: center; pointer-events: none; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); }
+/* Site links on one line (taught sites have three), and the status line as a toast that takes no room. */
+.popup .site-links { flex-wrap: nowrap; justify-content: center; gap: 12px; white-space: nowrap; }
+.popup .site-links .link-button { font-size: 12px; }
+.popup .site-toast { position: fixed; left: 50%; bottom: 14px; z-index: 9000; max-width: 320px; margin: 0; padding: 6px 12px; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,.16); font-size: 12px; text-align: center; }
+.popup .site-toast:empty { display: none; }
+/* Smaller power and position buttons: more room before the popup would need to scroll. */
+.popup .button-controls .press-button.edge-button { width: 38px; min-width: 38px; min-height: 24px; }
+.popup .button-controls .press-button.edge-button svg { width: 38px; height: 25px; }
+.popup .position-buttons { gap: 2px; }
+
+/* Hover button and Position share one row, so the panel leaves the popup room for longer status text. */
+.popup .button-controls { grid-template-columns: minmax(0, 1fr) 1px auto; align-items: stretch; column-gap: 14px; }
+.popup .popup-control-divider { display: block; width: 1px; align-self: stretch; justify-self: stretch; background: var(--border); }
+.popup .button-controls .position-row { grid-template-columns: auto auto; column-gap: 8px; align-items: center; align-content: center; justify-self: end; }
+.popup .continue-watching-switch { justify-content: flex-start; }
+
+/* The site card holds up to seven rows on a catalog site, and Chrome caps a popup at 600px: these keep the bottom bar in view.
+   If a very long summary still overflows, the scrollbar shows, so nothing is out of reach unseen. */
+body.popup main { scrollbar-width: thin; }
+.popup .popup-header { margin-bottom: 4px; padding-bottom: 4px; }
+.popup .panel { margin-bottom: 10px; padding: 12px 14px; }
+.popup .lists-card { padding: 11px 8px; }
+.popup .switch-row { min-height: 34px; }
+.popup .teach-actions { margin: 6px 0 12px; }
+.popup #site-content p { margin-bottom: 6px; }
+.popup .filter-launch { margin-top: 6px; }
+.popup .site-links { justify-content: center; margin-top: 4px; }
+/* Room either side of Position moves the divider left and centres Position in its half. */
+.popup .position-row { padding: 0 10px; }
+.popup #site-content > .site-title { display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline; }
+.popup .site-title-note { font-size: 12.5px; font-weight: 400; }
+
+/* Teach cards and Hide on this site side by side (a taught or ready-made site): one row instead of two keeps the
+   popup inside its 600px with a long status note and wrapped list summaries. */
+.popup .teach-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+.popup .teach-actions .filter-launch { margin: 0; }
+.popup .list-open-button.is-locked { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.popup .list-lock-icon { display: inline-grid; place-items: center; width: 14px; height: 14px; flex: 0 0 auto; }
+.popup .list-lock-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Sort / Group / Layout pills: one bordered pill per control, a small caption inside, the arrow in the Sort pill. */
+body .site-controls .view-chip { display: inline-flex; align-items: center; min-height: 32px; max-width: 100%; box-sizing: border-box;
+  padding-left: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+body .site-controls .view-chip:focus-within { border-color: var(--accent); }
+body .site-controls .view-chip-label { flex: 0 0 auto; margin: 0; color: var(--muted); font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; white-space: nowrap; cursor: pointer; user-select: none; }
+body .site-controls .view-chip select { min-height: 30px; max-width: 150px; margin: 0; padding: 4px 6px 4px 6px; background-color: var(--surface);
+  border: 0; border-radius: 0; box-shadow: none; outline: none; cursor: pointer; }
+body .site-controls .view-chip .direction-button { width: 30px; min-height: 30px; height: 30px; margin: 0; padding: 0; border: 0; color: var(--muted); background: transparent;
+  border-left: 1px solid var(--border); border-radius: 0; box-shadow: none; font-size: 16px; }
+body .site-controls .view-chip-sort:not(:has(select)) .view-chip-label { margin-right: 6px; }
+body .site-controls .view-chip .direction-button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+body .site-controls .view-chip .direction-button:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+/* The open dropdown list takes its colours from the <select>; inside a pill that is transparent, which on Windows
+   left the items in faint grey. Give the items the theme's own surface and full-strength text. */
+body .site-controls select option, body .site-controls select optgroup { background-color: var(--surface); color: var(--text); }
+body .site-controls select option:checked { background-color: var(--surface-2); color: var(--text); }
+body .site-controls select option:disabled { color: var(--muted); }
+
+/* Collapsible group headings inside a list (By site, By type, ...). */
+body .subgroup-heading.subgroup-toggle { cursor: pointer; user-select: none; border-radius: 6px; }
+body .subgroup-heading.subgroup-toggle:hover { color: var(--text); }
+body .subgroup-heading.subgroup-toggle:focus-visible { outline: 2px solid var(--accent, #3b82f6); outline-offset: 2px; }
+body .subgroup-heading.subgroup-toggle::before { content: "\25BE"; display: inline-block; width: 12px; flex: 0 0 auto; text-align: center; transition: transform .15s ease; }
+body .subgroup-collapsed > .subgroup-heading.subgroup-toggle::before { transform: rotate(-90deg); }
+body .subgroup-collapsed > .subgroup-heading { margin-bottom: 0; }
+body .subgroup-collapsed > :not(.subgroup-heading) { display: none !important; }

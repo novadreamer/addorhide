@@ -29,6 +29,10 @@ const HOA_SITES = Object.freeze((() => {
     if (!["http:", "https:"].includes(url.protocol) || !validHostname(url.hostname)) {
       return false;
     }
+    // The private-window Added Videos page borrows this address; like the extension's own pages, it is not a site.
+    if (url.hostname === "www.youtube.com" && url.pathname === "/robots.txt") {
+      return false;
+    }
     const host = url.hostname.toLowerCase();
     return host !== "chromewebstore.google.com"
       && host !== "addons.mozilla.org"
@@ -76,6 +80,15 @@ const HOA_SITES = Object.freeze((() => {
     return `hoa-site-${hostname}`;
   }
 
+  function playerHosts(hostname) {
+    const rule = HOA_SITES_CATALOG && HOA_SITES_CATALOG.find(hostname);
+    return rule && Array.isArray(rule.playerHosts) ? rule.playerHosts.filter(validHostname) : [];
+  }
+
+  function registeredHosts(hostname) {
+    return [hostname, ...playerHosts(hostname)];
+  }
+
   function chromeError(fallback) {
     return typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.lastError
       ? chrome.runtime.lastError.message || fallback : fallback;
@@ -93,23 +106,19 @@ const HOA_SITES = Object.freeze((() => {
   }
 
   function unregister(hostname, callback) {
-    chrome.scripting.unregisterContentScripts({ ids: [scriptId(hostname)] }, () => {
+    chrome.scripting.unregisterContentScripts({ ids: registeredHosts(hostname).map(scriptId) }, () => {
       callback();
     });
   }
 
   function register(hostname, scheme, callback) {
-    const details = {
-      id: scriptId(hostname),
-      matches: [matchPattern(hostname, scheme)],
-      js: ["shared.js", "catalog.js", "content.js"],
-      css: ["content.css"],
-      runAt: "document_idle",
-      persistAcrossSessions: true
-    };
-    chrome.scripting.registerContentScripts([details], () => {
+    const details = registeredHosts(hostname).map(host => ({
+      id: scriptId(host), matches: [matchPattern(host, scheme)], js: ["shared.js", "catalog.js", "content.js"], css: ["content.css"],
+      allFrames: true, runAt: "document_start", persistAcrossSessions: true
+    }));
+    chrome.scripting.registerContentScripts(details, () => {
       if (chrome.runtime.lastError && /duplicate script id/i.test(chrome.runtime.lastError.message || "")) {
-        chrome.scripting.updateContentScripts([details], () => callback());
+        chrome.scripting.updateContentScripts(details, () => callback());
         return;
       }
       callback(chrome.runtime.lastError ? chromeError("Could not register the site script.") : "");
@@ -117,12 +126,12 @@ const HOA_SITES = Object.freeze((() => {
   }
 
   function inject(tabId, callback) {
-    chrome.scripting.executeScript({ target: { tabId }, files: ["shared.js", "catalog.js", "content.js"] }, () => {
+    chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ["shared.js", "catalog.js", "content.js"] }, () => {
       if (chrome.runtime.lastError) {
         callback(chromeError("Could not inject the site script."));
         return;
       }
-      chrome.scripting.insertCSS({ target: { tabId }, files: ["content.css"] }, () => {
+      chrome.scripting.insertCSS({ target: { tabId, allFrames: true }, files: ["content.css"] }, () => {
         callback(chrome.runtime.lastError ? chromeError("Could not inject site styles.") : "");
       });
     });
@@ -154,7 +163,7 @@ const HOA_SITES = Object.freeze((() => {
     };
     chrome.storage.local.set({ [SITE_KEY]: next });
     // Keep this request synchronous with the popup's click handler.
-    chrome.permissions.request({ origins: [matchPattern(hostname, scheme)] }, granted => {
+    chrome.permissions.request({ origins: registeredHosts(hostname).map(host => matchPattern(host, scheme)) }, granted => {
       if (chrome.runtime.lastError || !granted) {
         const error = chromeError("Permission was not granted.");
         readRules(rules => {
@@ -179,8 +188,8 @@ const HOA_SITES = Object.freeze((() => {
   function removePermissionAndScript(hostname, callback) {
     unregister(hostname, () => {
       // Whichever scheme was granted gets revoked; removing one that was never granted is harmless.
-      chrome.permissions.remove({ origins: [matchPattern(hostname, "https")] }, () => {
-        chrome.permissions.remove({ origins: [matchPattern(hostname, "http")] }, () => callback());
+      chrome.permissions.remove({ origins: registeredHosts(hostname).map(host => matchPattern(host, "https")) }, () => {
+        chrome.permissions.remove({ origins: registeredHosts(hostname).map(host => matchPattern(host, "http")) }, () => callback());
       });
     });
   }
@@ -199,7 +208,20 @@ const HOA_SITES = Object.freeze((() => {
     readRules(rules => {
       const next = { ...rules };
       delete next[hostname];
-      setRules(next, () => removePermissionAndScript(hostname, () => cb({ ok: true })));
+      setRules(next, () => {
+        chrome.storage.local.get({ seenRows: {}, cardLinks: {}, watchedParked: {} }, result => {
+          const seenRows = result.seenRows && typeof result.seenRows === "object" ? { ...result.seenRows } : {};
+          const cardLinks = Object.fromEntries(Object.entries(result.cardLinks || {}).filter(([key]) => {
+            try { return new URL(key).hostname.replace(/^www\./, "") !== hostname.replace(/^www\./, ""); } catch (error) { return false; }
+          }));
+          delete seenRows[hostname];
+          delete seenRows[hostname.replace(/^www\./, "")];
+          const watchedParked = Object.fromEntries(Object.entries(result.watchedParked || {}).filter(([key]) => {
+            try { return new URL(key).hostname.replace(/^www\./, "") !== hostname.replace(/^www\./, ""); } catch (error) { return false; }
+          }));
+          chrome.storage.local.set({ seenRows, cardLinks, watchedParked }, () => removePermissionAndScript(hostname, () => cb({ ok: true })));
+        });
+      });
     });
   }
 
@@ -211,8 +233,42 @@ const HOA_SITES = Object.freeze((() => {
   }
 
   function injectGranted(tabId, callback) {
-    chrome.scripting.executeScript({ target: { tabId }, files: ["shared.js", "catalog.js", "content.js"] }, () => {
-      chrome.scripting.insertCSS({ target: { tabId }, files: ["content.css"] }, callback);
+    chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ["shared.js", "catalog.js", "content.js"] }, () => {
+      chrome.scripting.insertCSS({ target: { tabId, allFrames: true }, files: ["content.css"] }, callback);
+    });
+  }
+
+  function enablePlayers(hostname, tabId, callback, requestedScheme) {
+    const cb = typeof callback === "function" ? callback : () => {};
+    const scheme = requestedScheme === "http" ? "http" : "https";
+    const hosts = playerHosts(hostname);
+    if (!hosts.length || typeof chrome === "undefined" || !chrome.permissions || !chrome.scripting) {
+      cb({ ok: false, error: "That video player is not supported." });
+      return;
+    }
+    chrome.permissions.request({ origins: hosts.map(host => matchPattern(host, scheme)) }, granted => {
+      if (chrome.runtime.lastError || !granted) { cb({ ok: false, error: chromeError("Permission was not granted.") }); return; }
+      registerPlayers(hostname, scheme, error => {
+        if (error) { cb({ ok: false, error }); return; }
+        inject(tabId, injectError => cb(injectError ? { ok: false, error: injectError } : { ok: true }));
+      });
+    });
+  }
+
+  function registerPlayers(hostname, scheme, callback) {
+    const cb = typeof callback === "function" ? callback : () => {};
+    const hosts = playerHosts(hostname);
+    if (!hosts.length) { cb(""); return; }
+    const details = hosts.map(host => ({
+      id: scriptId(host), matches: [matchPattern(host, scheme)], js: ["shared.js", "catalog.js", "content.js"], css: ["content.css"],
+      allFrames: true, runAt: "document_start", persistAcrossSessions: true
+    }));
+    chrome.scripting.registerContentScripts(details, () => {
+      if (chrome.runtime.lastError && /duplicate script id/i.test(chrome.runtime.lastError.message || "")) {
+        chrome.scripting.updateContentScripts(details, () => cb(chrome.runtime.lastError ? chromeError("Could not register the player script.") : ""));
+        return;
+      }
+      cb(chrome.runtime.lastError ? chromeError("Could not register the player script.") : "");
     });
   }
 
@@ -346,7 +402,7 @@ const HOA_SITES = Object.freeze((() => {
         getRegisteredAndReconcile(new Map(), cb);
         return;
       }
-      hosts.forEach(host => chrome.permissions.contains({ origins: [matchPattern(host, schemeOfRule(rules[host]))] }, granted => {
+      hosts.forEach(host => chrome.permissions.contains({ origins: registeredHosts(host).map(playerHost => matchPattern(playerHost, schemeOfRule(rules[host]))) }, granted => {
         if (granted) {
           desired.set(host, schemeOfRule(rules[host]));
         }
@@ -361,11 +417,11 @@ const HOA_SITES = Object.freeze((() => {
   function getRegisteredAndReconcile(desired, callback) {
     chrome.scripting.getRegisteredContentScripts(scripts => {
       const registered = Array.isArray(scripts) ? scripts : [];
-      const registeredHosts = new Map(registered
-        .filter(script => typeof script.id === "string" && script.id.startsWith("hoa-site-"))
-        .map(script => [script.id.slice("hoa-site-".length), script]));
-      const missing = Array.from(desired.keys()).filter(host => !registeredHosts.has(host));
-      const stale = Array.from(registeredHosts.keys()).filter(host => !desired.has(host));
+      const registeredIds = new Set(registered.filter(script => typeof script.id === "string" && script.id.startsWith("hoa-site-"))
+        .map(script => script.id.slice("hoa-site-".length)));
+      const rootsFor = host => Array.from(desired.keys()).find(root => registeredHosts(root).includes(host));
+      const missing = Array.from(desired.keys()).filter(host => !registeredIds.has(host));
+      const stale = Array.from(registeredIds).filter(host => !rootsFor(host));
       let pending = missing.length + stale.length;
       if (!pending) {
         callback();
@@ -382,8 +438,8 @@ const HOA_SITES = Object.freeze((() => {
     });
   }
 
-  return { validHostname, isSupportedPageUrl, isCatalog, isBuiltIn, matchPattern, schemeOfRule, hostFromPattern, scriptId,
-    enableSite, disableSite, forgetSite, startPicker, reconcile, activateGranted, injectIntoOpenTabs };
+  return { validHostname, isSupportedPageUrl, isCatalog, isBuiltIn, matchPattern, schemeOfRule, hostFromPattern, scriptId, playerHosts,
+    enableSite, enablePlayers, disableSite, forgetSite, startPicker, reconcile, activateGranted, injectIntoOpenTabs };
 })());
 
 if (typeof module !== "undefined") {

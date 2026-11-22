@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict");
 const HOA = require("../shared.js");
+const CATALOG = require("../catalog.js");
 
 let passed = 0;
 function check(name, fn) {
@@ -17,6 +18,25 @@ const now = Date.UTC(2026, 0, 31);
 
 check("canonical YouTube short URL", () => assert.equal(HOA.canonicalUrl(`https://youtu.be/${id}?utm_source=x`), watch));
 check("canonical YouTube tracking params", () => assert.equal(HOA.canonicalUrl(`${watch}&list=abc&index=2#comments`), watch));
+check("canonical YouTube playlist retains its list", () => assert.equal(HOA.canonicalUrl("https://www.youtube.com/playlist?list=PL123&si=tracking"), "https://www.youtube.com/playlist?list=PL123"));
+check("playlist and category types are labelled", () => {
+  assert.equal(HOA.typeOf("https://www.youtube.com/playlist?list=PL123"), "playlist");
+  assert.equal(HOA.typeOf("https://example.com/playlists/featured"), "playlist");
+  assert.equal(HOA.typeOf("https://example.com/category/action"), "category");
+  assert.equal(HOA.typeLabel("playlist"), "Playlist");
+  assert.equal(HOA.typeLabel("category"), "Category");
+});
+check("text comparison ignores leading display decoration and sorts numbers naturally", () => {
+  assert(HOA.compareText("\u200f( The 2)", "The 10") < 0);
+  assert(HOA.compareText("\uFD3EAlpha\uFD3F", "Beta") < 0);
+});
+check("text comparison provides stable natural ordering across Arabic and Latin labels", () => {
+  assert.deepEqual(["ب", "ا", "Zebra", "apple", "١٠", "٣"].sort(HOA.compareText), ["apple", "Zebra", "٣", "١٠", "ا", "ب"]);
+});
+check("legacy category kinds migrate to the Category type", () => {
+  const items = HOA.normalizeItems({ "https://example.com/category/films": { title: "Films", thumb: "", kind: "category", type: "video", ts: 1 } });
+  assert.equal(items["https://example.com/category/films"].type, "category");
+});
 check("canonical short", () => assert.equal(HOA.canonicalUrl(`${short}?si=abc#x`), short));
 check("canonical generic URL", () => assert.equal(HOA.canonicalUrl("https://example.com/path/?b=2&utm_source=x&a=1#hash"), "https://example.com/path?a=1&b=2"));
 check("canonical IMDb title URL", () => assert.equal(HOA.canonicalUrl("https://m.imdb.com/title/tt31450459/?ref_=chtmvm_i_1&foo=ignored#hash"), "https://www.imdb.com/title/tt31450459"));
@@ -26,6 +46,12 @@ check("canonical IMDb video URL", () => assert.equal(HOA.canonicalUrl("https://w
 check("canonical IMDb non-title URL", () => assert.equal(HOA.canonicalUrl("https://m.imdb.com/chart/moviemeter/?ref_=x&pf_rd_i=y&foo=1#hash"), "https://www.imdb.com/chart/moviemeter?foo=1"));
 check("canonical ref tracking params", () => assert.equal(HOA.canonicalUrl("https://example.com/path?ref_=x&pf_rd_i=y&ref_source=z&keep=1"), "https://example.com/path?keep=1"));
 check("reject unsafe URL", () => assert.equal(HOA.canonicalUrl("javascript:alert(1)"), null));
+check("card keys are stable title slugs", () => assert.equal(HOA.cardKey("https://fawesome.tv/browse", "Breakdown!"), "https://fawesome.tv/hoa-card/breakdown"));
+check("card links keep same-site real URLs and cap invalid values", () => assert.deepEqual(HOA.normalizeCardLinks({
+  "https://fawesome.tv/hoa-card/breakdown": "https://fawesome.tv/movies/10863050/breakdown?x=1",
+  "https://fawesome.tv/hoa-card/nope": "https://elsewhere.example/video"
+}), { "https://fawesome.tv/hoa-card/breakdown": "https://fawesome.tv/movies/10863050/breakdown?x=1" }));
+check("openUrl sends unresolved card keys to their home page", () => assert.equal(HOA.openUrl("https://fawesome.tv/hoa-card/breakdown"), "https://fawesome.tv/"));
 check("reject invalid YouTube id", () => assert.equal(HOA.canonicalUrl("https://www.youtube.com/watch?v=bad"), null));
 check("player maps YouTube watch", () => assert.deepEqual(HOA.playerFor(watch), {
   hash: `site=youtube&id=${id}`, siteName: "YouTube"
@@ -80,8 +106,67 @@ check("player site names", () => assert.deepEqual([
   HOA.playerSiteName("https://www.twitch.tv/directory"),
   HOA.playerSiteName(watch)
 ], ["IMDb", "Dailymotion", "Tubi", "TMDB", "Twitch", "YouTube"]));
+check("actors' and directors' pages are people, not videos", () => {
+  ["https://watch.plex.tv/person/michael-c-hall", "https://watch.plex.tv/en-GB/person/michael-c-hall", "https://www.themoviedb.org/person/287-brad-pitt", "https://www.imdb.com/name/nm0000093/", "https://letterboxd.com/actor/tom-hanks/", "https://www.rottentomatoes.com/celebrity/tom_hanks"]
+    .forEach(url => { assert.equal(HOA.kindOf(url), "person", url); assert.equal(HOA.typeOf(url), "person", url); });
+});
+check("a person type is kept and labelled", () => { assert.equal(HOA.typeLabel("person"), "Person"); assert.equal(HOA.groupEntries([["https://watch.plex.tv/person/a", { type: "person", ts: 1 }]], "type")[0].label, "People"); });
+check("ordinary paths are not mistaken for people", () => ["https://www.imdb.com/name/", "https://example.com/person", "https://example.com/watch/people", "https://www.imdb.com/title/tt0111161/", "https://tubitv.com/movies/1/people-like-us"].forEach(url => assert.notEqual(HOA.kindOf(url), "person", url)));
 check("kind short", () => assert.equal(HOA.kindOf(short), "short"));
 check("kind video", () => assert.equal(HOA.kindOf(watch), "video"));
+check("kind table keeps unknown slugs playable and recognizes title, category and channel paths", () => {
+  assert.equal(HOA.kindOf("https://therokuchannel.roku.com/watch/aabbccddeeff"), "video");
+  assert.equal(HOA.kindOf("https://therokuchannel.roku.com/details/aabbccddeeff/a-movie"), "title");
+  assert.equal(HOA.kindOf("https://therokuchannel.roku.com/browse/w.xxxxx/the-cw"), "category");
+  assert.equal(HOA.kindOf("https://example.com/a-perfectly-normal-slug"), "video");
+  assert.equal(HOA.kindOf("https://www.youtube.com/@creator"), "channel");
+});
+
+function fakeCardLink(href, attributes = {}, parent = null) {
+  return {
+    href,
+    textContent: attributes.text || "",
+    parentElement: parent,
+    children: attributes.children || [],
+    getAttribute(name) { return name === "href" ? href : attributes[name] || null; },
+    contains(node) { return this.children.includes(node); },
+    closest() { return null; }
+  };
+}
+
+function fakeCard(links, picture = null, nodes = []) {
+  const card = {
+    parentElement: null,
+    matches() { return false; },
+    querySelectorAll(selector) { return selector === "a[href]" ? links : []; },
+    querySelector(selector) { return selector === "img, picture, video" ? picture : null; },
+    contains(node) { return node === card || links.includes(node) || nodes.includes(node); }
+  };
+  links.forEach(link => { if (!link.parentElement) link.parentElement = card; });
+  return card;
+}
+
+check("chooseCardLink follows the thumbnail and only swaps a title for its same-content play door", () => {
+  const movieId = "c0734dbe498259cf87ec6f049b015eed";
+  const door = fakeCardLink(`https://therokuchannel.roku.com/watch/${movieId}`);
+  const action = { parentElement: null, getAttribute: name => name === "itemtype" ? "http://schema.org/WatchAction" : null };
+  door.parentElement = action;
+  const details = fakeCardLink(`https://therokuchannel.roku.com/details/${movieId}/coraline`);
+  const movie = fakeCard([details, door], null, [action]); action.parentElement = movie;
+  assert.equal(HOA.chooseCardLink(movie, details), door, "Roku movie door");
+  const series = fakeCardLink("https://therokuchannel.roku.com/details/76c556224ae757e6b2a81bcb1aade466/forensic-files");
+  assert.equal(HOA.chooseCardLink(fakeCard([series]), series), series, "Roku series stays details");
+  const title = fakeCardLink("https://www.imdb.com/title/tt1234567");
+  const trailer = fakeCardLink("https://www.imdb.com/video/vi1234567", { title: "Official trailer" });
+  assert.equal(HOA.chooseCardLink(fakeCard([title, trailer]), title), title, "trailer is refused");
+  const other = fakeCardLink("https://www.imdb.com/video/vi7654321", { "aria-label": "Play" });
+  assert.equal(HOA.chooseCardLink(fakeCard([title, other]), title), title, "different ids stay put");
+  const avatar = fakeCardLink("https://example.com/channel/creator");
+  const image = {};
+  const thumbnail = fakeCardLink("https://example.com/watch/episode-one", { children: [image] });
+  assert.equal(HOA.chooseCardLink(fakeCard([avatar, thumbnail], image), null), thumbnail, "thumbnail beats channel avatar");
+  assert.equal(HOA.chooseCardLink(fakeCard([avatar], image), null), avatar, "only channel link stays channel");
+});
 
 const raw = {
   [watch]: {
@@ -220,20 +305,29 @@ check("type tv", () => assert.equal(HOA.typeOf("https://example.com/tv-shows/tit
 check("type live", () => assert.equal(HOA.typeOf("https://example.com/live/title"), "live"));
 check("type default", () => assert.equal(HOA.typeOf("https://example.com/watch/title"), "video"));
 check("known site display name", () => assert.equal(HOA.siteDisplayName("www.youtube.com"), "YouTube"));
-check("unknown site display name", () => assert.equal(HOA.siteDisplayName("www.example.com"), "example.com"));
+check("sites show their own name, not their address", () => {
+  assert.equal(HOA.siteDisplayName("www.example.com"), "Example");
+  [["cartoony.net", "Cartoony"], ["app.roku.com", "The Roku Channel"], ["therokuchannel.roku.com", "The Roku Channel"], ["watch.plex.tv", "Plex"], ["amazon.com", "Prime Video"], ["www.filmrise.com", "FilmRise"], ["play.newsite.tv", "Newsite"], ["127.0.0.1", "127.0.0.1"]]
+    .forEach(([site, name]) => assert.equal(HOA.siteDisplayName(site), name, site));
+});
+check("The Roku Channel's old address is its new one", () => {
+  assert.equal(HOA.canonicalUrl("https://therokuchannel.roku.com/details/abc/a-film"), "https://app.roku.com/details/abc/a-film");
+  const moved = HOA.normalizeItems({ "https://therokuchannel.roku.com/watch/abc": { title: "A film", thumb: "", ts: 1 } });
+  assert.deepEqual(Object.keys(moved), ["https://app.roku.com/watch/abc"]); assert.equal(moved["https://app.roku.com/watch/abc"].title, "A film");
+});
 check("hidden summary empty and invalid", () => assert.deepEqual(
   [HOA.hiddenSummaryText(0), HOA.hiddenSummaryText(-1), HOA.hiddenSummaryText("1")],
-  ["No hidden videos.", "No hidden videos.", "No hidden videos."]));
-check("hidden summary singular", () => assert.equal(HOA.hiddenSummaryText(1), "There is 1 hidden video."));
-check("hidden summary plural", () => assert.equal(HOA.hiddenSummaryText(3), "There are 3 hidden videos."));
+  ["No hidden items.", "No hidden items.", "No hidden items."]));
+check("hidden summary singular", () => assert.equal(HOA.hiddenSummaryText(1), "There is 1 hidden item."));
+check("hidden summary plural", () => assert.equal(HOA.hiddenSummaryText(3), "There are 3 hidden items."));
 check("added count empty", () => assert.deepEqual([HOA.addedCountText(0), HOA.addedCountText(-1), HOA.addedCountText("1")],
   ["No added videos.", "No added videos.", "No added videos."]));
 check("added count singular", () => assert.equal(HOA.addedCountText(1), "There is 1 added video."));
 check("added count plural", () => assert.equal(HOA.addedCountText(4), "There are 4 added videos."));
 check("counts with websites", () => assert.deepEqual(
   [HOA.addedCountText(3, 1), HOA.addedCountText(1, 1), HOA.hiddenSummaryText(5, 2), HOA.hiddenSummaryText(0, 2), HOA.addedCountText(2, 0)],
-  ["There are 3 added videos and 1 website.", "There is 1 added video and 1 website.", "There are 5 hidden videos and 2 websites.",
-   "No hidden videos.", "There are 2 added videos."]));
+   ["There are 3 added videos and 1 website.", "There is 1 added video and 1 website.", "There are 5 hidden items and 2 websites.",
+    "No hidden items.", "There are 2 added videos."]));
 check("site monogram stable", () => assert.deepEqual(HOA.siteMonogram("example.com"), HOA.siteMonogram("example.com")));
 check("site monogram hue", () => assert.ok(HOA.siteMonogram("example.com").hue >= 0 && HOA.siteMonogram("example.com").hue <= 359));
 check("type labels", () => assert.equal(HOA.typeLabel("tv"), "TV"));
@@ -279,6 +373,11 @@ check("equal values do not sort", () => assert.deepEqual(
   HOA.availableSorts([["a", { title: "A", ts: 1, duration: 60 }], ["b", { title: "B", ts: 2, duration: 60 }]]), ["added", "title"]));
 check("years without exact dates offer Year, not Date published", () => assert.deepEqual(
   HOA.availableSorts([["a", { title: "A", ts: 1, year: 1999 }], ["b", { title: "B", ts: 2, year: 2004 }]]), ["added", "title", "year"]));
+check("channel sort and offering use stored channel names", () => {
+  const entries = [["a", { title: "One", ts: 1, channel: "Zulu" }], ["b", { title: "Two", ts: 2, channel: "Alpha" }]];
+  assert.deepEqual(HOA.sortEntries(entries, "channel", "asc").map(pair => pair[0]), ["b", "a"]);
+  assert.ok(HOA.availableSorts(entries).includes("channel"));
+});
 
 const groupedPairs = [
   ["video", { title: "Video", kind: "video", type: "video", ts: 1, genres: ["Drama"] }],
@@ -288,12 +387,30 @@ const groupedPairs = [
 check("none groups videos and shorts", () => assert.deepEqual(HOA.groupEntries(groupedPairs, "none").map(group => group.label), ["Videos", "Shorts"]));
 check("none group without shorts has blank label", () => assert.deepEqual(HOA.groupEntries([groupedPairs[0]], "none"), [{ id: "video", label: "", entries: [groupedPairs[0]] }]));
 check("type groups in label order", () => assert.deepEqual(HOA.groupEntries(groupedPairs, "type").map(group => group.id), ["video", "short", "movie"]));
-check("genre groups alphabetically", () => assert.deepEqual(HOA.groupEntries(groupedPairs, "genre").map(group => group.label), ["Comedy", "Drama", "No genre"]));
+check("genre groups alphabetically", () => assert.deepEqual(HOA.groupEntries(groupedPairs, "genre").map(group => group.label), ["Comedy", "Drama", "No Genre"]));
 check("available groups", () => assert.deepEqual(HOA.availableGroups(groupedPairs), ["none", "type", "genre"]));
+check("Roku: a movie link and a series link are told apart and By type is offered", () => {
+  const items = HOA.normalizeItems({
+    "https://therokuchannel.roku.com/watch/6a6b665450b55647b90e9838ab92be22": { title: "Movie", thumb: "", kind: "video", site: "therokuchannel.roku.com", ts: 1, type: "video" },
+    "https://therokuchannel.roku.com/details/101d8e417eb75d8f819ab9d6753fa4c9/a-series": { title: "Series", thumb: "", kind: "video", site: "therokuchannel.roku.com", ts: 2 }
+  });
+  const pairs = Object.entries(items);
+  assert.deepEqual(pairs.map(pair => pair[1].type).sort(), ["movie", "tv"]);
+  assert.ok(HOA.availableGroups(pairs).includes("type"));
+  assert.deepEqual(HOA.groupEntries(pairs, "type").map(group => group.label), ["Movies", "TV Shows"]);
+});
 check("videos and shorts only: By type adds nothing", () => assert.deepEqual(
-  HOA.availableGroups(groupedPairs.slice(0, 2).map(([key, entry]) => [key, { ...entry, genres: ["Drama"] }])), ["none"]));
-check("one shared genre: By genre adds nothing", () => assert.deepEqual(
-  HOA.availableGroups([["a", { type: "movie", genres: ["Drama"] }], ["b", { type: "movie", genres: ["Drama"] }]]), ["none"]));
+  HOA.availableGroups(groupedPairs.slice(0, 2).map(([key, entry]) => [key, { ...entry, genres: ["Drama"] }])), ["none", "genre"]));
+check("one shared genre: By genre is still offered", () => assert.deepEqual(
+  HOA.availableGroups([["a", { type: "movie", genres: ["Drama"] }], ["b", { type: "movie", genres: ["Drama"] }]]), ["none", "type", "genre"]));
+check("added grouping options require distinct non-trivial values", () => {
+  const entries = [["a", { type: "movie", ts: Date.now(), channel: "One", year: 1994, rating: "PG" }], ["b", { type: "movie", ts: Date.now() - 40 * 86400000, channel: "Two", year: 2004, rating: "R" }]];
+  const modes = HOA.availableGroups(entries);
+  ["channel", "added-date", "decade", "rating"].forEach(mode => assert.ok(modes.includes(mode), mode));
+  assert.deepEqual(HOA.groupEntries(entries, "added-date").map(group => group.label), ["Today", "Earlier"]);
+  assert.deepEqual(HOA.groupEntries(entries, "decade").map(group => group.label), ["1990s", "2000s"]);
+  assert.deepEqual(HOA.groupEntries(entries, "rating").map(group => group.label), ["PG", "R"]);
+});
 
 const bySite = HOA.groupBySite({
   "https://www.youtube.com/watch?v=aaaaaaaaaaa": { title: "Old", site: "youtube.com", ts: 1, icon: "https://old.example/icon" },
@@ -311,6 +428,8 @@ check("prefs defaults and invalid fields", () => assert.deepEqual(HOA.normalizeP
   "other.com": { sort: "added", dir: "desc", group: "none", collapsed: false }
 }));
 check("prefs keep valid values", () => assert.deepEqual(HOA.normalizePrefs({ "example.com": { sort: "year", dir: "asc", group: "genre", collapsed: true } })["example.com"], { sort: "year", dir: "asc", group: "genre", collapsed: true }));
+check("prefs keep valid page tabs settings", () => assert.deepEqual(HOA.normalizePrefs({ __page: { grouping: "tabs", sort: "recent", dir: "desc", selectedTab: "example.com" } }).__page, { grouping: "tabs", sort: "recent", dir: "desc", selectedTab: "example.com" }));
+check("prefs normalize invalid page tabs settings", () => assert.deepEqual(HOA.normalizePrefs({ __page: { grouping: "grid", sort: "date", dir: "sideways", selectedTab: "not a host" } }).__page, { grouping: "none", sort: "name", dir: "asc", selectedTab: "" }));
 check("prefs invalid root", () => assert.deepEqual(HOA.normalizePrefs(null), {}));
 const manyPrefs = {};
 for (let index = 0; index < 201; index += 1) {
@@ -337,8 +456,6 @@ check("listed hidden", () => assert.deepEqual(HOA.listedHidden(hidden).map(pair 
 const added = HOA.toggleAdded({}, watch, { title: "Watch", thumb: "", kind: "video", ts: 10, views: 12 });
 check("toggle adds", () => assert.ok(added[watch]));
 check("toggle removes", () => assert.equal(Object.keys(HOA.toggleAdded(added, watch, added[watch])).length, 0));
-check("group by kind", () => assert.equal(HOA.groupByKind({ [watch]: { kind: "video" }, [short]: { kind: "short" } }).short.length, 1));
-
 check("usable picks ignore bare tags", () => assert.deepEqual(HOA.usablePicks({ pickedSelectors: ["a", "a.card", " div ", "li.slide"] }), ["a.card", "li.slide"]));
 check("usable picks read the legacy cardSelector", () => assert.deepEqual(HOA.usablePicks({ cardSelector: "div.tile" }), ["div.tile"]));
 check("usable picks of nothing", () => assert.deepEqual(HOA.usablePicks(undefined), []));
@@ -350,11 +467,11 @@ const genrePairs = [
 const sortedByDuration = HOA.sortEntries(genrePairs, "duration", "desc");
 check("groups follow the sort", () => assert.deepEqual(
   HOA.orderGroupsBySort(HOA.groupEntries(sortedByDuration, "genre"), sortedByDuration, "genre").map(group => group.label),
-  ["Drama", "Action", "No genre"]));
+  ["Drama", "Action", "No Genre"]));
 const sortedAsc = HOA.sortEntries(genrePairs, "duration", "asc");
 check("reversing the sort reverses the groups", () => assert.deepEqual(
   HOA.orderGroupsBySort(HOA.groupEntries(sortedAsc, "genre"), sortedAsc, "genre").map(group => group.label),
-  ["Action", "Drama", "No genre"]));
+  ["Action", "Drama", "No Genre"]));
 
 const backupData = {
   hidden: { [watch]: { title: "Hidden video", thumb: "", ts: 10, listed: true } },
@@ -428,6 +545,110 @@ check("added summary text", () => assert.deepEqual([
   HOA.addedSummaryText(2, 4)
 ], ["Nothing saved yet.", "1 video saved on 1 site", "3 videos saved on 1 site", "2 videos saved across 4 sites"]));
 
+check("normalize hide kinds keeps allowed unique ids", () => assert.deepEqual(
+  HOA.normalizeHideKinds(["shorts", " shorts ", "bad", 4], ["shorts", "live", "ai"]), ["shorts"]));
+check("AI watch-page parser detects labels and owners", () => {
+  const uc = "UCabcdefghijklmnopqrstuv";
+  assert.deepEqual(HOA.aiLabelFromWatchHtml('{"microformat":{"ownerProfileUrl":"http://www.youtube.com/@Maker"}} {"howThisWasMadeSectionViewModel":{"title":"Altered or synthetic content"}}'), { ai: true, label: true, channel: "/@maker", about: false });
+  assert.deepEqual(HOA.aiLabelFromWatchHtml('{"howThisWasMadeSectionViewModel":{"title":"Captured with a camera"}} "videoDetails":{"videoId":"x","channelId":"' + uc + '"}'), { ai: false, label: false, channel: "/channel/" + uc.toLowerCase(), about: false });
+  assert.deepEqual(HOA.aiLabelFromWatchHtml('"videoOwnerRenderer":{"navigationEndpoint":{"browseEndpoint":{"canonicalBaseUrl":"/@%C3%A9lan"}}}'), { ai: false, label: false, channel: "/@élan", about: false });
+  assert.deepEqual(HOA.aiLabelFromWatchHtml('Altered or synthetic content'), { ai: false, label: false, channel: "", about: false });
+  // Real 2026 shape, and the name-only list every watch page carries.
+  assert.equal(HOA.aiLabelFromWatchHtml('{"howThisWasMadeSectionViewModel":{"sectionTitle":{"content":"How this was made"},"bodyText":{"content":"Sounds or visuals were altered or fully generated. Learn more"},"bodyHeader":{"content":"Made with AI"},"rendererContext":{}}}').ai, true);
+  assert.equal(HOA.aiLabelFromWatchHtml('["videoSummaryParagraphViewModel","howThisWasMadeSectionViewModel","horizontalCardListRenderer"] Made with AI').ai, false);
+  assert.equal(HOA.aiLabelFromWatchHtml('{"howThisWasMadeSectionViewModel":{"bodyHeader":{"content":"Captured with a camera"},"rendererContext":{}}} "shortDescription":"altered or fully generated"').ai, false);
+});
+check("AI wording in titles, tags and hashtags", () => {
+  ["Cat Olympics | AI Generated", "[AI] Medieval Rap Battle", "Sora 2 short film: The Last Train", "Veo 3 music video - Neon Rain",
+    "#sora2 #aivideo puppy chaos", "AI Animation: Lost City", "Kling AI movie trailer"]
+    .forEach(title => assert.equal(HOA.aiTextMatch(title), true, title));
+  ["How to make AI videos with Sora 2 (step by step)", "Sora 2 review: is it worth it?", "Veo 3 vs Sora 2 comparison",
+    "AI Generated video tutorial for beginners", "The AI slop podcast #12", "Why AI art is ruining Pinterest", "Kling 2.5 is here",
+    "Midjourney prompts for beginners", "Learn Stable Diffusion - full course", "AI news this week", "Sora 2 alone"]
+    .forEach(title => assert.equal(HOA.aiTextMatch(title), false, title));
+check("directory, chart and trailer listings are browse pages", () => {
+  assert.equal(HOA.pageType(null, "https://www.twitch.tv/directory/all"), "browse");
+  assert.equal(HOA.pageType(null, "https://www.imdb.com/chart/moviemeter/"), "browse");
+  assert.equal(HOA.pageType(null, "https://www.imdb.com/trailers/"), "browse");
+  assert.equal(HOA.pageType(null, "https://www.imdb.com/title/tt0111161/"), "detail");
+});
+check("an episode page that also describes its series is read as the episode", () => {
+  const { JSDOM } = require(process.env.JSDOM_PATH || "jsdom");
+  const key = "https://cartoony.net/watch/61/485";
+  const doc = new JSDOM(`<html><head><meta property="og:image" content="https://cartoony.net/assets/img/thumbnails/485_thumbnail.webp">
+    <script type="application/ld+json">{"@id":"https://cartoony.net/watch/61","url":"https://cartoony.net/watch/61","@type":"TVSeries","name":"Golden Eagle","datePublished":"1975-01-01","image":"https://cartoony.net/THUMBOR_GENERATED/banner.webp"}</script>
+    <script type="application/ld+json">{"@id":"https://cartoony.net/watch/61/485","name":"13- Episode thirteen","@type":"TVEpisode","datePublished":"2024-08-31T15:39:44+00:00","url":"https://cartoony.net/watch/61/485","image":"https://cartoony.net/assets/img/thumbnails/485_thumbnail.webp","partOfSeries":{"@type":"TVSeries","name":"Golden Eagle","@id":"https://cartoony.net/watch/61"}}</script>
+    </head><body></body></html>`).window.document;
+  const info = HOA.pageInfo(doc, key);
+  assert.equal(info.title, "Golden Eagle – 13- Episode thirteen");
+  assert.equal(info.thumb, "https://cartoony.net/assets/img/thumbnails/485_thumbnail.webp");
+  assert.equal(info.year, 1975);
+  assert.equal(HOA.enrichPatch({ title: "Golden Eagle – 13- Episode thirteen", thumb: "" }, { title: "Golden Eagle" }, key).title, undefined, "Show – Episode never shrinks to Show");
+  assert.equal(HOA.enrichPatch({ title: "Golden Eagle", thumb: "x" }, { title: "Golden Eagle – 12- Episode twelve" }, key).title, "Golden Eagle – 12- Episode twelve", "a title that lost its episode gets it back");
+});
+check("AI matching tells comparisons, tool lists and generators from AI clips", () => {
+  ["Godzilla vs Kong | AI Animation", "Funniest Sora 2 Moments So Far", "ABUSING Sora 2.0 Video AI (again)", "I made an AI movie with Veo 3"]
+    .forEach(title => assert.equal(HOA.aiTextMatch(title), true, title));
+  ["Veo 3 vs Sora 2 comparison", "What This Free AI Video Generator Can Do", "FREE AI Video Tools to Challenge Higgsfield", "I Bought AI-Generated Ads"]
+    .forEach(title => assert.equal(HOA.aiTextMatch(title), false, title));
+});
+  ["How AI Works", "The Problem With AI", "Sora's Kingdom Hearts boss fight", "Lo que veo en Madrid", "Daily vlog #airport", "Maintaining your aircraft"]
+    .forEach(title => assert.equal(HOA.aiTextMatch(title), false, title));
+  const page = (title, tags, description) => `{"videoDetails":{"videoId":"x","title":${JSON.stringify(title)},"keywords":${JSON.stringify(tags)},"channelId":"UCabcdefghijklmnopqrstuv","shortDescription":${JSON.stringify(description)},"isLiveContent":false}}`;
+  const channel = "/channel/ucabcdefghijklmnopqrstuv";
+  const labelPage = title => `{"howThisWasMadeSectionViewModel":{"title":"Made with AI"}} ${page(title, [], "cute")}`;
+  assert.deepEqual(HOA.aiLabelFromWatchHtml(labelPage("How to make AI videos")), { ai: false, label: true, channel, about: true });
+  assert.deepEqual(HOA.aiLabelFromWatchHtml(labelPage("Plain title")), { ai: true, label: true, channel, about: false });
+  assert.deepEqual(HOA.aiLabelFromWatchHtml(page("How to make AI videos", ["ai generated"], "cute")), { ai: false, label: false, channel, about: true });
+  assert.deepEqual(HOA.aiLabelFromWatchHtml(page("Plain title", ["ai generated"], "cute")), { ai: true, label: false, channel, about: false });
+  assert.equal(HOA.aiLabelFromWatchHtml(page("Plain title", ["sora 2"], "cute")).ai, false);
+  assert.equal(HOA.aiLabelFromWatchHtml(page("Plain title", ["cats"], "so cute #aivideo")).ai, true);
+  assert.equal(HOA.aiLabelFromWatchHtml(page("AI generated video tutorial", ["ai generated"], "cute")).ai, false);
+  assert.equal(HOA.aiAboutText("Sora 2 tutorial"), true);
+});
+check("normalize section titles collapses space and deduplicates case-insensitively", () => assert.deepEqual(
+  HOA.normalizeSectionTitles(["  Sci-Fi   & Fantasy ", "sci-fi & fantasy", 4, "Comedy"]), ["Sci-Fi & Fantasy", "Comedy"]));
+check("normalize section titles drops remembered taglines", () => assert.deepEqual(
+  HOA.normalizeSectionTitles(["Step inside for big names, breakout stars, and fresh finds.", "Creatorverse", "Dr. Who"]), ["Creatorverse", "Dr. Who"]));
+check("normalize keywords trims, folds spaces and deduplicates case-insensitively", () => assert.deepEqual(
+  HOA.normalizeKeywords(["  Space   Robot ", "space robot", "", 4]), ["Space Robot"]));
+check("normalize keywords keeps at most ten words", () => assert.equal(
+  HOA.normalizeKeywords(Array.from({ length: 12 }, (_, index) => `word ${index}`)).length, 10));
+check("keyword matching uses Unicode whole-word boundaries", () => {
+  assert.equal(HOA.keywordMatch("A Space Robot and الفن", ["space robot"]), true);
+  assert.equal(HOA.keywordMatch("party time", ["art"]), false);
+  assert.equal(HOA.keywordMatch("الفن رائع", ["الفن"]), true);
+});
+check("backup keeps filter settings", () => {
+  const result = HOA.parseBackup(JSON.stringify(HOA.buildBackup({ hidden: {}, added: {}, siteRules: {
+    "www.youtube.com": { hideKinds: ["shorts", "live"], hideKeywords: [" Robot ", "robot"], hideSections: [" Comedy ", "comedy"], featuredCarousels: false }
+  }, prefs: {} }, "1.1.0", now)));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.backup.siteRules["www.youtube.com"], { hideKinds: ["shorts", "live"], hideKeywords: ["Robot"], hideSections: ["Comedy"], featuredCarousels: false });
+});
+check("YouTube channel keys strip query strings and normalize handles", () => assert.equal(
+  HOA.youtubeChannelKey("/@Handle?si=x"), "youtube.com|/@handle"));
+check("normalizeChannels keeps channel name and both identities", () => {
+  const channels = HOA.normalizeChannels({ "youtube.com|/@handle": { name: "Example Channel", url: "https://www.youtube.com/@Handle?si=x", ts: 1 } });
+  assert.equal(channels["youtube.com|/@handle"].nameKey, "youtube.com|name:example channel");
+  assert.equal(channels["youtube.com|/@handle"].key, "youtube.com|/@handle");
+});
+check("watched hidden items preserve only the watched reason", () => {
+  const items = HOA.normalizeItems({ [watch]: { title: "Watched", thumb: "", ts: 1, reason: "watched" }, [short]: { title: "Other", thumb: "", ts: 1, reason: "other" } }, { max: 10, withListed: true });
+  assert.equal(items[watch].reason, "watched");
+  assert.equal(items[short].reason, undefined);
+});
+check("watchedShown is normalized and markWatchedShown records restores", () => {
+  assert.ok(HOA.markWatchedShown({}, [watch], 9)[watch] === 9);
+});
+
+check("normalization keeps only boolean watched markers", () => {
+  const items = HOA.normalizeItems({ [watch]: { title: "Watched", thumb: "", ts: 1, watched: true },
+    [short]: { title: "Other", thumb: "", ts: 1, watched: "true" } }, { max: 10, withListed: true });
+  assert.equal(items[watch].watched, true);
+  assert.equal(items[short].watched, undefined);
+});
+
 // The popup injects shared.js/catalog.js again into pages that already run them (picker, Enable).
 check("shared.js and catalog.js can be injected twice into one world", () => {
   const vm = require("node:vm");
@@ -439,6 +660,255 @@ check("shared.js and catalog.js can be injected twice into one world", () => {
     files.forEach(source => vm.runInContext(source, sandbox));
   }
   assert.equal(vm.runInContext("typeof HOA.canonicalUrl + typeof HOA_CATALOG.find", sandbox), "functionfunction");
+});
+
+check("progress normalizer keeps a bitmap, played seconds and Continue Watching", () => {
+  const key = "https://example.com/watch/one";
+  const result = HOA.normalizeProgress({ [key]: { duration: 100, position: 40, played: 65, buckets: "f".repeat(25), watched: false, cw: "auto", updated: 1 } });
+  assert.equal(result[key].played, 65); assert.equal(result[key].cw, "auto"); assert.equal(HOA.bucketCount(result[key].buckets), 100);
+});
+check("track floors allow YouTube Shorts and keep other videos at twenty seconds", () => {
+  assert.equal(HOA.minTrackSeconds("https://www.youtube.com/shorts/abc"), 0);
+  assert.equal(HOA.minTrackSeconds("https://www.youtube.com/watch?v=abc"), 20);
+  assert.equal(HOA.minTrackSeconds("garbage"), 20);
+  const result = HOA.normalizeProgress({
+    [`https://www.youtube.com/shorts/${id2}`]: { duration: 9, position: 9, updated: 1 },
+    [`https://www.youtube.com/watch?v=${id}`]: { duration: 9, position: 9, updated: 1 }
+  });
+  assert.ok(result[`https://www.youtube.com/shorts/${id2}`]);
+  assert.equal(result[`https://www.youtube.com/watch?v=${id}`], undefined);
+});
+check("Shorts never keep a Continue Watching mark", () => {
+  const result = HOA.normalizeProgress({ "https://www.youtube.com/shorts/abc123def45": { duration: 40, position: 12, played: 15, cw: "auto", updated: 1 }, "https://www.youtube.com/shorts/abc123def46": { duration: 40, position: 12, cw: "later", updated: 1 } });
+  assert.equal(result["https://www.youtube.com/shorts/abc123def45"].cw, undefined); assert.equal(result["https://www.youtube.com/shorts/abc123def46"].cw, undefined);
+});
+check("progress normalizer drops home records and merges canonical video duplicates", () => {
+  const key = "https://www.youtube.com/watch?v=abc123def45";
+  const result = HOA.normalizeProgress({
+    "https://www.youtube.com/": { duration: 100, position: 20, updated: 1 },
+    "https://www.youtube.com/watch": { duration: 100, position: 20, updated: 1 },
+    "https://www.youtube.com/watch?v=abc123def45&feature=share": { duration: 100, position: 20, played: 20, buckets: "8000000000000000000000000", updated: 1 },
+    [key]: { duration: 100, position: 40, played: 40, buckets: "0800000000000000000000000", updated: 2, cw: "manual" }
+  });
+  assert.deepEqual(Object.keys(result), [key]); assert.equal(result[key].position, 40); assert.equal(result[key].cw, "auto"); assert.equal(HOA.bucketCount(result[key].buckets), 2);
+});
+check("progress eviction keeps Continue Watching entries", () => {
+  const entries = {}; for (let index = 0; index < 1502; index += 1) entries[`https://example.com/watch/${index}`] = { duration: 100, position: 1, updated: index, cw: index === 0 ? "manual" : undefined };
+  const result = HOA.normalizeProgress(entries); assert.ok(result["https://example.com/watch/0"]); assert.equal(Object.keys(result).length, 1500);
+});
+check("progress eviction caps Continue Watching-only history", () => {
+  const entries = {}; for (let index = 0; index < 1501; index += 1) entries[`https://example.com/watch/cw-${index}`] = { duration: 100, position: 1, updated: index, cw: "auto" };
+  const result = HOA.normalizeProgress(entries); assert.equal(Object.keys(result).length, 1500); assert.equal(result["https://example.com/watch/cw-0"], undefined);
+});
+check("watch settings normalize safe defaults", () => {
+  assert.deepEqual(HOA.normalizeWatchSettings({}), { tagWatched: true, continueWatching: "auto" });
+  assert.deepEqual(HOA.normalizeWatchSettings({ tagWatched: false, continueWatching: "off" }), { tagWatched: false, continueWatching: "off" });
+  assert.equal(HOA.normalizeWatchSettings({ continueWatching: "manual" }).continueWatching, "auto");
+});
+check("backup round trip retains watch progress", () => {
+  const key = "https://example.com/watch/backup"; const backup = HOA.buildBackup({ hidden: {}, added: {}, siteRules: {}, prefs: {}, watchProgress: { [key]: { duration: 100, position: 25, updated: 1, buckets: "0".repeat(25) } } }, "1.1.0", now);
+  const result = HOA.parseBackup(JSON.stringify(backup)); assert.equal(result.ok, true); assert.ok(result.backup.watchProgress[key]);
+});
+check("unhide all retains watched videos as user-shown", () => {
+  const auto = "https://www.youtube.com/watch?v=autowatched";
+  const progressed = "https://www.youtube.com/watch?v=progressed1";
+  const next = HOA.prepareUnhideAll({ hidden: { [auto]: { title: "Auto", thumb: "", ts: 1, reason: "watched" } }, watchedShown: {}, watchProgress: {
+    [progressed]: { duration: 100, position: 95, updated: 1, watched: true, buckets: "f".repeat(25) }
+  } }, 9);
+  assert.deepEqual(next.hidden, {}); assert.deepEqual(next.watchedShown, { [auto]: 9, [progressed]: 9 });
+});
+check("clear watch history returns watched-hidden videos and clears tracking", () => {
+  const watchedKey = "https://www.youtube.com/watch?v=clearwatch1";
+  const manualKey = "https://www.youtube.com/watch?v=manualhide1";
+  const linked = HOA.clearWatchHistory({ hidden: {}, added: { "https://fawesome.tv/movies/1/kept": { title: "Kept" } }, watchLater: {}, cardLinks: { "https://fawesome.tv/hoa-card/kept": "https://fawesome.tv/movies/1/kept", "https://fawesome.tv/hoa-card/gone": "https://fawesome.tv/movies/2/gone" } });
+  assert.deepEqual(linked.cardLinks, { "https://fawesome.tv/hoa-card/kept": "https://fawesome.tv/movies/1/kept" }, "clearing history drops card addresses nothing saved uses");
+  const next = HOA.clearWatchHistory({ hidden: {
+    [watchedKey]: { title: "Watched", thumb: "", ts: 1, reason: "watched" },
+    [manualKey]: { title: "Manual", thumb: "", ts: 1 }
+  }, watchedShown: { [watchedKey]: 1 }, watchProgress: { [watchedKey]: { duration: 100, position: 95, updated: 1, watched: true } } });
+  assert.deepEqual(Object.keys(next.hidden), [manualKey]); assert.deepEqual(next.watchedShown, {}); assert.deepEqual(next.watchProgress, {});
+});
+check("backup round trip retains rows, hidden view settings and watch settings", () => {
+  const data = HOA.buildBackup({ hidden: {}, added: {}, siteRules: {}, prefs: {}, seenRows: { "example.com": ["Drama", "Drama", "Comedy"] },
+    hiddenViewPrefs: { "example.com": { sort: "title", collapsed: true }, "watched-videos": { group: "site" } },
+    watchSettings: { tagWatched: false, continueWatching: "off" } }, "1.1.0", now);
+  const parsed = HOA.parseBackup(JSON.stringify(data));
+  const merged = HOA.mergeBackup({ seenRows: { "example.com": ["Action"] }, hiddenViewPrefs: { "example.com": { dir: "asc" } }, watchSettings: { tagWatched: true, continueWatching: "auto" } }, parsed.backup);
+  assert.deepEqual(parsed.backup.seenRows["example.com"], ["Drama", "Comedy"]);
+  assert.deepEqual(merged.seenRows["example.com"], ["Action", "Drama", "Comedy"]);
+  assert.deepEqual(merged.hiddenViewPrefs["example.com"], { dir: "asc", sort: "title", collapsed: true });
+  assert.deepEqual(merged.watchSettings, { tagWatched: false, continueWatching: "off" });
+});
+check("watch later normalizes video pages, caps entries, and survives backup merging", () => {
+  const key = "https://www.youtube.com/watch?v=laterwatch1";
+  const source = { [key]: { title: "Later", thumb: "https://i.example/later.jpg", ts: 5 }, "https://www.youtube.com/": { title: "Home", ts: 8 } };
+  const normalized = HOA.normalizeWatchLater(source);
+  assert.deepEqual(Object.keys(normalized), [key]);
+  assert.equal(normalized[key].site, "youtube.com");
+  const backup = HOA.buildBackup({ watchLater: normalized }, "1.1.0", now);
+  const parsed = HOA.parseBackup(JSON.stringify(backup));
+  assert.ok(parsed.backup.watchLater[key]);
+  assert.ok(HOA.mergeBackup({ watchLater: {} }, parsed.backup).watchLater[key]);
+});
+check("watch later preserves its explicit continue-watching marker", () => {
+  const key = "https://www.youtube.com/watch?v=latertag001";
+  const progress = HOA.normalizeProgress({ [key]: { title: "Later", duration: 100, position: 12, updated: 1, buckets: "0".repeat(25), cw: "later" } });
+  assert.equal(progress[key].cw, "later");
+});
+check("watch later evicts the oldest entries at its storage cap", () => {
+  const entries = {}; for (let index = 0; index < 1501; index += 1) entries[`https://example.com/watch/${index}`] = { title: String(index), ts: index };
+  const normalized = HOA.normalizeWatchLater(entries);
+  assert.equal(Object.keys(normalized).length, 1500); assert.equal(normalized["https://example.com/watch/0"], undefined);
+  assert.ok(normalized["https://example.com/watch/1500"]);
+});
+check("YouTube channel URL variants allow one tab and reject video/deep paths", () => {
+  ["https://www.youtube.com/@creator", "https://youtube.com/channel/UC123", "https://youtube.com/c/creator/featured", "https://youtube.com/user/creator/about"].forEach(url => assert.equal(HOA.isChannelUrl(url), true, url));
+  ["https://youtube.com/shorts/x", "https://youtube.com/watch?v=x", "https://youtube.com/channel/UC123/videos/extra"].forEach(url => assert.equal(HOA.isChannelUrl(url), false, url));
+});
+check("Twitch and Kick accept creator roots but reject every documented reserved route", () => {
+  ["https://twitch.tv/streamer", "https://kick.com/creator"].forEach(url => assert.equal(HOA.isChannelUrl(url), true, url));
+  ["directory", "videos", "downloads", "settings", "subscriptions", "inventory", "wallet", "drops", "p", "jobs", "turbo", "search", "friends", "following", "prime"].forEach(path => assert.equal(HOA.isChannelUrl(`https://twitch.tv/${path}`), false, path));
+  ["browse", "categories", "following", "search", "category", "video"].forEach(path => assert.equal(HOA.isChannelUrl(`https://kick.com/${path}`), false, path));
+});
+check("Rumble recognizes c/user channels and rejects video routes", () => {
+  ["https://rumble.com/c/creator", "https://rumble.com/c/creator/shorts", "https://rumble.com/user/creator/videos"].forEach(url => assert.equal(HOA.isChannelUrl(url), true, url));
+  ["https://rumble.com/shorts/x", "https://rumble.com/video/x"].forEach(url => assert.equal(HOA.isChannelUrl(url), false, url));
+  assert.equal(HOA.kindOf("https://rumble.com/c/creator"), "channel");
+});
+check("Odysee and Dailymotion channel classifications reject their non-channel paths", () => {
+  assert.equal(HOA.isChannelUrl("https://odysee.com/@creator"), true);
+  assert.equal(HOA.isChannelUrl("https://odysee.com/channel/creator"), false);
+  assert.equal(HOA.isChannelUrl("https://dailymotion.com/creator"), true);
+  ["video", "playlist", "search", "us", "library", "following"].forEach(path => assert.equal(HOA.isChannelUrl(`https://dailymotion.com/${path}`), false, path));
+});
+check("generic channel paths permit one optional tab but not deep/video paths", () => {
+  ["https://example.com/@creator", "https://example.com/c/creator/about", "https://example.com/channel/creator", "https://example.com/channels/creator/about", "https://example.com/user/creator", "https://example.com/profile/creator/tab"].forEach(url => assert.equal(HOA.isChannelUrl(url), true, url));
+  ["https://example.com/channel/creator/about/extra", "https://example.com/videos/creator", "https://example.com/profile/creator/video"].forEach(url => assert.equal(HOA.isChannelUrl(url), false, url));
+});
+check("normalizing existing added items derives channel kind without overwriting explicit shorts", () => {
+  const channel = "https://www.youtube.com/@creator";
+  const short = "https://www.youtube.com/shorts/abc123def45";
+  const items = HOA.normalizeItems({ [channel]: { title: "Creator", thumb: "", ts: 1 }, [short]: { title: "Short", thumb: "", ts: 2, kind: "short" } });
+  assert.equal(items[channel].kind, "channel"); assert.equal(items[short].kind, "short");
+});
+check("Kick live-channel migration repairs legacy channel entries", () => {
+  const key = "https://kick.com/lacobraaa";
+  const item = HOA.normalizeItems({ [key]: { title: "true", thumb: "", kind: "channel", ts: 1 } })[key];
+  assert.equal(item.kind, "video"); assert.equal(item.type, "live"); assert.equal(item.title, "lacobraaa");
+});
+check("an explicit stored video kind wins over a channel-looking URL", () => {
+  const key = "https://www.twitch.tv/streamer";
+  assert.equal(HOA.normalizeItems({ [key]: { title: "Stream", thumb: "", kind: "video", ts: 1 } })[key].kind, "video");
+});
+check("enrichment patches always stamp their cooldown", () => {
+  const patch = HOA.enrichPatch({ title: "Stream", type: "video" }, {}, "https://example.com/video/1");
+  assert.ok(Number.isFinite(patch.enrichedAt));
+});
+check("category URLs accept supported category paths and reject lookalikes", () => {
+  ["https://www.twitch.tv/directory/category/just-chatting", "https://www.twitch.tv/directory/category/just-chatting/videos", "https://www.twitch.tv/directory/event/just-chatting", "https://www.twitch.tv/category/films", "https://example.com/category/films", "https://example.com/categories/films/popular"].forEach(url => assert.equal(HOA.isCategoryUrl(url), true, url));
+  ["https://www.twitch.tv/directory/category/just-chatting", "https://www.twitch.tv/directory/category/just-chatting/videos", "https://www.twitch.tv/directory/game/just-chatting", "https://www.twitch.tv/category/films", "https://example.com/category/films", "https://example.com/categories/films/popular"].forEach(url => assert.equal(HOA.isCategoryUrl(url), true, url));
+  ["https://www.twitch.tv/streamer", "https://www.twitch.tv/videos/1", "https://www.twitch.tv/directory", "https://www.twitch.tv/directory/all", "https://example.com/videos/category/films", "https://example.com/watch/category/films", "https://example.com/shorts/category/films", "https://example.com/categories/films/popular/extra"].forEach(url => assert.equal(HOA.isCategoryUrl(url), false, url));
+});
+check("categories are never channels and normalize from saved URLs", () => {
+  const category = "https://www.twitch.tv/directory/category/just-chatting";
+  const short = "https://www.youtube.com/shorts/abc123def45";
+  assert.equal(HOA.isChannelUrl(category), false);
+  assert.equal(HOA.kindOf(category), "category");
+  const items = HOA.normalizeItems({ [category]: { title: "Just Chatting", thumb: "", ts: 1 }, [short]: { title: "Short", thumb: "", ts: 2, kind: "short" } });
+  assert.equal(items[category].kind, "category");
+  assert.equal(items[short].kind, "short");
+});
+check("player surface distinguishes real players from thumbnail and hover-preview cards", () => {
+  const rect = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height });
+  const video = { closest: () => null, getBoundingClientRect: () => rect(0, 0, 100, 100) };
+  const player = { matches: () => false, closest: () => null, querySelectorAll: selector => selector === "video" ? [video] : [], getBoundingClientRect: () => rect(0, 0, 100, 100) };
+  assert.equal(HOA.isPlayerSurface(player, "https://rumble.com/shorts/one"), true);
+  const videoLink = { ...player, querySelectorAll: selector => selector === "video" ? [video] : [{ href: "https://rumble.com/shorts/two" }] };
+  assert.equal(HOA.isPlayerSurface(videoLink, "https://rumble.com/shorts/one"), false);
+  const channelOnly = { ...player, querySelectorAll: selector => selector === "video" ? [video] : [{ href: "https://rumble.com/c/creator/shorts" }] };
+  assert.equal(HOA.isPlayerSurface(channelOnly, "https://rumble.com/shorts/one"), true);
+  const small = { ...player, querySelectorAll: selector => selector === "video" ? [{ ...video, getBoundingClientRect: () => rect(0, 0, 20, 20) }] : [] };
+  assert.equal(HOA.isPlayerSurface(small, "https://rumble.com/shorts/one"), false);
+});
+
+check("Prime Video titles drop the row code, and saves under the old address move to the clean one", () => {
+  const old = "https://www.amazon.com/gp/video/detail/B0HKXZ6P14?jic=16%7CCgNhbGw&ref_=atv_hm";
+  assert.equal(HOA.canonicalUrl(old), "https://www.amazon.com/gp/video/detail/B0HKXZ6P14");
+  const items = HOA.normalizeItems({ [old]: { title: "Other Mommy", thumb: "", ts: Date.now(), site: "amazon.com" } });
+  assert.deepEqual(Object.keys(items), ["https://www.amazon.com/gp/video/detail/B0HKXZ6P14"]);
+  assert.equal(items["https://www.amazon.com/gp/video/detail/B0HKXZ6P14"].title, "Other Mommy");
+});
+
+check("a trailing [TV Series] or [Movie] is not part of the name", () => {
+  assert.equal(HOA.cleanTitle("Anna Pigeon [TV Series]"), "Anna Pigeon");
+  assert.equal(HOA.cleanTitle("Clueless [Movie]"), "Clueless");
+  assert.equal(HOA.cleanTitle("Band [Live]"), "Band [Live]");
+});
+
+check("Twitch links distinguish live streams, past broadcasts and clips", () => {
+  assert.equal(HOA.typeOf("https://www.twitch.tv/streamer"), "live");
+  assert.equal(HOA.typeOf("https://www.twitch.tv/videos/123456789"), "past");
+  assert.equal(HOA.typeOf("https://www.twitch.tv/streamer/clip/Clip_Slug-123"), "clip");
+  assert.equal(HOA.typeOf("https://clips.twitch.tv/Clip_Slug-123"), "clip");
+});
+check("Kick links distinguish live streams, past broadcasts and clips", () => {
+  assert.equal(HOA.typeOf("https://kick.com/lacobraaa"), "live");
+  assert.equal(HOA.typeOf("https://kick.com/lacobraaa/videos/123"), "past");
+  assert.equal(HOA.typeOf("https://kick.com/lacobraaa/clips/abc"), "clip");
+  assert.equal(HOA.typeOf("https://kick.com/clips/abc"), "clip");
+});
+check("Shout genre sections and translated genre names are supported", () => {
+  assert.equal(HOA.typeOf("https://watch.shout-tv.com/section/Anime%20Film"), "genre");
+  assert.equal(HOA.englishGenre("Acción"), "Action");
+  assert.deepEqual("Ciencia ficción/fantasía".split("/").map(HOA.englishGenre), ["Science Fiction", "Fantasy"]);
+});
+check("filmography and Letterboxd job paths are people", () => {
+  ["https://athome.fandango.com/content/browse/filmography/Stacey-Dash/560619", "https://letterboxd.com/director/greta-gerwig/"]
+    .forEach(url => assert.equal(HOA.isPersonUrl(url), true, url));
+});
+check("person roles label cards and groups", () => {
+  assert.equal(HOA.roleLabel({ type: "person", role: "Director" }), "Director");
+  assert.deepEqual(HOA.groupEntries([["a", { type: "person", role: "Actor" }], ["b", { type: "person", role: "Director" }]], "type").map(group => group.label), ["Actors", "Directors"]);
+});
+check("normalization keeps a person role and rating groups follow age", () => {
+  const items = HOA.normalizeItems({ [watch]: { title: "A", thumb: "", type: "person", role: "Actor", ts: 1 } });
+  assert.equal(items[watch].role, "Actor");
+  assert.deepEqual(HOA.groupEntries([["a", { rating: "R" }], ["b", { rating: "PG" }], ["c", { rating: "TV-14" }], ["d", {}]], "rating").map(group => group.label), ["PG", "TV-14", "R", "Unrated"]);
+});
+
+check("page scope and types separate video pages from Amazon shopping", () => {
+  const prime = CATALOG.byId("prime");
+  const marker = { getElementById: id => id === "dv-web-page-hydration-root" ? {} : null };
+  assert.equal(HOA.pageType(CATALOG.byId("youtube"), "https://www.youtube.com/"), "home");
+  assert.equal(HOA.pageType(CATALOG.byId("youtube"), `https://www.youtube.com/watch?v=${id}`), "watch");
+  assert.equal(HOA.pageType(CATALOG.byId("youtube"), `https://www.youtube.com/shorts/${id}`), "watch");
+  assert.equal(HOA.pageType(CATALOG.byId("youtube"), "https://www.youtube.com/results?search_query=x"), "search");
+  assert.equal(HOA.pageType(CATALOG.byId("youtube"), "https://www.youtube.com/@creator"), "channel");
+  assert.equal(HOA.pageType(prime, "https://www.amazon.com/gp/video/storefront"), "home");
+  assert.equal(HOA.pageType(prime, "https://www.amazon.com/gp/video/storefront?contentType=movie"), "browse");
+  assert.equal(HOA.pageType(prime, "https://www.amazon.com/gp/video/search?phrase=x"), "search");
+  assert.equal(HOA.pageType(prime, "https://www.amazon.com/gp/video/detail/X"), "detail");
+  assert.equal(HOA.pageType(prime, "https://www.amazon.com/x/dp/B0"), "other");
+  assert.equal(HOA.pageType(prime, "https://www.amazon.com/x/dp/B0", marker), "detail");
+  assert.equal(HOA.pageType(null, "https://example.com/genre/comedy"), "browse");
+  assert.equal(HOA.pageType(null, "https://example.com/movie/foo"), "detail");
+  assert.equal(HOA.pageType(null, "https://example.com/"), "home");
+  assert.equal(HOA.pageType(null, "https://example.com/about"), "other");
+  assert.equal(HOA.inScope(prime, "https://www.amazon.com/gp/video/storefront"), true);
+  assert.equal(HOA.inScope(prime, "https://www.amazon.com/x/dp/B0"), false);
+  assert.equal(HOA.inScope(prime, "https://www.amazon.com/x/dp/B0", marker), true);
+  assert.equal(HOA.inScope(prime, "https://www.primevideo.com/detail/X"), true);
+});
+
+check("progress normalization drops Amazon pages outside Prime title details", () => {
+  const saved = (url, updated) => ({ site: "amazon.com", title: "Video", url, thumbnail: "", duration: 100, position: 50, buckets: "0".repeat(25), watched: false, ts: updated, updated });
+  const detail = "https://www.amazon.com/gp/video/detail/B0";
+  assert.deepEqual(Object.keys(HOA.normalizeProgress({
+    "https://www.amazon.com/x/dp/B0": saved("https://www.amazon.com/x/dp/B0", 1),
+    "https://www.amazon.com/gp/video/storefront": saved("https://www.amazon.com/gp/video/storefront", 2),
+    "https://www.amazon.com/gp/buy/thankyou": saved("https://www.amazon.com/gp/buy/thankyou", 3),
+    [detail]: saved(detail, 4)
+  })), [detail]);
 });
 
 console.log(`shared.test.js: ${passed} passed, 0 failed`);
