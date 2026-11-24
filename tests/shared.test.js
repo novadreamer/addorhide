@@ -911,4 +911,26 @@ check("progress normalization drops Amazon pages outside Prime title details", (
   })), [detail]);
 });
 
+check("person facts avoid unrelated genres and normalize for storage", () => {
+  const { JSDOM } = require(process.env.JSDOM_PATH || "jsdom");
+  const key = "https://watch.plex.tv/person/jet-li";
+  const doc = new JSDOM(`<html><head><script type="application/ld+json">{"@type":"Person","name":"Jet Li","birthDate":"1963-04-26","jobTitle":"Actor, Producer, Director","description":"Li Lianjie, born in Beijing, China, and who was a martial artist."}</script><script>var x={"genres":"[Action](/on-demand/category/action), [Thriller](/on-demand/category/thriller)","releaseYear":2000};</script></head><body></body></html>`).window.document;
+  const person = HOA.pageInfo(doc, key);
+  assert.deepEqual({ type: person.type, role: person.role, jobs: person.jobs, born: person.born, birthplace: person.birthplace, genres: person.genres, year: person.year }, { type: "person", role: "Actor", jobs: ["Producer", "Director"], born: "1963-04-26", birthplace: "Beijing, China", genres: undefined, year: undefined });
+  const movie = HOA.pageInfo(new JSDOM(`<script type="application/ld+json">{"@type":"Movie","name":"Film"}</script><script>var x={"genres":"[Action](/on-demand/category/action), [Thriller](/x/thriller)"};</script>`).window.document, "https://plex.tv/movie/film");
+  assert.deepEqual(movie.genres, ["Action", "Thriller"]);
+  const place = HOA.pageInfo(new JSDOM(`<script type="application/ld+json">{"@type":"Person","name":"P","birthPlace":{"@type":"Place","address":{"addressLocality":"Paris","addressCountry":"France"}}}</script>`).window.document, "https://plex.tv/person/p");
+  assert.equal(place.birthplace, "Paris, France");
+  const usa = HOA.pageInfo(new JSDOM(`<script type="application/ld+json">{"@type":"Person","name":"Q","description":"Q was born in New York City, New York, U.S. and grew up there."}</script>`).window.document, "https://plex.tv/person/q");
+  assert.equal(usa.birthplace, "New York City, New York", "a dangling initial from U.S. is dropped");
+  const patch = HOA.enrichPatch({ type: "person", title: "Jet Li", genres: ["Action(", "on-demand", "category", "action)", "Thriller("] }, person, key);
+  assert.deepEqual(patch.genres, undefined); assert.deepEqual(patch.jobs, ["Producer", "Director"]); assert.equal(patch.born, "1963-04-26"); assert.equal(patch.birthplace, "Beijing, China"); assert.ok(Number.isFinite(patch.factsAt));
+  assert.equal(HOA.enrichPatch({ type: "person", genres: ["Action"], factsAt: 1 }, person, key).genres, undefined);
+  assert.equal(HOA.needsEnrich({ type: "person", enrichedAt: Date.now() - 3600000, title: "Jet Li", thumb: "x", year: 1963, genres: ["Action"] }, key), true);
+  const kept = HOA.normalizeItems({ [key]: { title: "Jet Li", thumb: "", ts: 1, type: "person", jobs: ["Producer"], born: "1963-04-26", died: "2020", birthplace: "Beijing, China", factsAt: 1 } })[key];
+  assert.equal(kept.born, "1963-04-26"); assert.deepEqual(kept.jobs, ["Producer"]); assert.equal(kept.factsAt, 1);
+  const invalid = HOA.normalizeItems({ [key]: { title: "Jet Li", thumb: "", ts: 1, type: "person", jobs: ["a", "b", "c", "d", "e"], born: "April" } })[key];
+  assert.equal(invalid.jobs, undefined); assert.equal(invalid.born, undefined);
+});
+
 console.log(`shared.test.js: ${passed} passed, 0 failed`);

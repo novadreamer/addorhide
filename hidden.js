@@ -703,7 +703,9 @@
       if (tabs) {
         const selectedMissing = !!page.selectedTab && !sections.some(section => section.key === page.selectedTab);
         const selected = selectedMissing ? sections[0].key : (page.selectedTab || sections[0].key);
-        if (selectedMissing) setPrefs("__page", { selectedTab: selected });
+        // Show the first tab but do not save it: the remembered tab may exist only in another window (a private
+        // window has no Continue Watching, Watch Later or Watched tab), and saving the fallback there made the
+        // same page in a normal window jump away from that tab every time it was clicked.
         const tabBar = element("div", "added-tab-bar");
         const tabList = element("div", "added-tab-list"); tabList.setAttribute("role", "tablist"); tabList.setAttribute("aria-label", "Hidden Videos sections");
         const selectTab = key => {

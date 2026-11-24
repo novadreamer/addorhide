@@ -232,5 +232,22 @@ async function load(initial = {}) {
   assert.equal(crowdedTabs().length + 1, 8, "a picked site takes a place rather than adding a row");
   moreButton().click(); await wait(5); crowded.document.body.dispatchEvent(new crowded.window.MouseEvent("pointerdown", { bubbles: true }));
   assert.equal(crowded.document.querySelector(".added-more-panel"), null, "clicking elsewhere closes the panel");
-  crowded.window.close(); console.log("added.test.js: 58 passed, 0 failed");
+  crowded.window.close();
+  const person = await load({ addedItems: {
+    "https://watch.plex.tv/person/jet-li": { site: "watch.plex.tv", title: "Jet Li", thumb: "", type: "person", role: "Actor", jobs: ["Producer", "Director"], born: "1963-04-26", birthplace: "Beijing, China", ts: 1 }
+  } });
+  const personCard = Array.from(person.document.querySelectorAll(".added-card")).find(card => card.textContent.includes("Jet Li"));
+  const personMeta = personCard.querySelector(".added-meta");
+  const expectedAge = new Date().getFullYear() - 1963 - (new Date() < new Date(new Date().getFullYear(), 3, 26) ? 1 : 0);
+  assert.match(personMeta.textContent, /Producer.*Director/); assert.match(personMeta.textContent, new RegExp(`Age ${expectedAge}`)); assert.match(personMeta.textContent, /Beijing, China/);
+  person.window.close();
+  // A private window has no Continue Watching tab: it shows the first site tab but must not save that, or the same
+  // page open in a normal window jumps away from Continue Watching every time it is clicked.
+  const privateTabs = await load({ __incognito: true, addedViewPrefs: { __page: { grouping: "tabs", selectedTab: "continue-watching" } }, addedItems: {
+    "https://www.youtube.com/watch?v=tabsprivate": { site: "youtube.com", title: "One", thumb: "", ts: 1 },
+    "https://tubitv.com/movies/tabs-private": { site: "tubitv.com", title: "Two", thumb: "", ts: 2 }
+  } });
+  assert.equal(privateTabs.document.querySelectorAll("[role='tab'][aria-selected='true']").length, 1, "a private page still selects a tab");
+  assert.equal(privateTabs.store.addedViewPrefs.__page.selectedTab, "continue-watching", "a private page keeps the remembered tab it cannot show");
+  privateTabs.window.close(); console.log("added.test.js: 60 passed, 0 failed");
 })().catch(error => { console.error(error); process.exitCode = 1; });

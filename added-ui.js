@@ -205,13 +205,20 @@ const HOA_ADDED = (() => {
           meta.appendChild(element("span", "meta-text", votes));
         }
       }
+      if (entry.type === "person") {
+        if (Array.isArray(entry.jobs)) entry.jobs.forEach(job => meta.appendChild(element("span", "meta-chip", job)));
+        const years = value => typeof value === "string" ? value.slice(0, 4) : "";
+        const longDate = value => { if (!value) return ""; const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : null; return date ? date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : value; };
+        if (entry.died) { const life = [years(entry.born), years(entry.died)].filter(Boolean).join("–"); if (life) { const node = element("span", "meta-text", life); node.title = [entry.born && `Born ${longDate(entry.born)}`, `died ${longDate(entry.died)}`].filter(Boolean).join(", "); meta.appendChild(node); } } else if (entry.born) { const birth = new Date(`${entry.born.length === 4 ? `${entry.born}-01-01` : entry.born}T00:00:00`); const today = new Date(); const age = entry.born.length === 4 ? today.getFullYear() - birth.getFullYear() : today.getFullYear() - birth.getFullYear() - (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0); const node = element("span", "meta-text", `Age ${age}`); node.title = `Born ${longDate(entry.born)}`; meta.appendChild(node); }
+        if (entry.birthplace) { const node = element("span", "meta-text", entry.birthplace); node.title = "Place of birth"; meta.appendChild(node); }
+      }
       const titleEntry = entry.type === "movie" || entry.type === "tv" || HOA.kindOf(key) === "title";
       if (titleEntry) {
         const year = Number.isInteger(entry.year) ? entry.year : (Number.isFinite(entry.published) ? new Date(entry.published).getFullYear() : 0);
         if (year >= 1870 && year <= new Date().getFullYear() + 1) meta.appendChild(element("span", "meta-text", String(year)));
       } else if (Number.isFinite(entry.published)) {
         meta.appendChild(element("span", "meta-text", HOA.formatAge(entry.published, Date.now())));
-      } else if (Number.isInteger(entry.year)) {
+      } else if (entry.type !== "person" && Number.isInteger(entry.year)) {
         meta.appendChild(element("span", "meta-text", String(entry.year)));
       }
       if (entry.rating) {
@@ -840,7 +847,9 @@ const HOA_ADDED = (() => {
       if (tabs) {
         const selectedMissing = !!page.selectedTab && !sections.some(section => section.key === page.selectedTab);
         const selected = selectedMissing ? sections[0].key : (page.selectedTab || sections[0].key);
-        if (selectedMissing) setPrefs("__page", { selectedTab: selected });
+        // Show the first tab but do not save it: the remembered tab may exist only in another window (a private
+        // window has no Continue Watching, Watch Later or Watched tab), and saving the fallback there made the
+        // same page in a normal window jump away from that tab every time it was clicked.
         const tabBar = element("div", "added-tab-bar");
         const tabList = element("div", "added-tab-list"); tabList.setAttribute("role", "tablist"); tabList.setAttribute("aria-label", "Added Videos sections");
         const selectTab = key => {

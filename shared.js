@@ -1095,6 +1095,13 @@ var HOA = Object.freeze((() => {
     return roles[text.toLowerCase()] || "Actor";
   }
 
+  function jobFromText(value) {
+    const text = String(value || "").trim().replace(/\s+/g, " ");
+    if (!text || text.length > 30) return "";
+    const roles = { actor: "Actor", actress: "Actor", acting: "Actor", director: "Director", directing: "Director", writer: "Writer", writing: "Writer", producer: "Producer", production: "Producer", composer: "Composer", cinematographer: "Cinematographer", camera: "Cinematographer", editor: "Editor", editing: "Editor", creator: "Creator", host: "Host" };
+    return roles[text.toLowerCase()] || text.toLowerCase().replace(/\b\p{L}/gu, letter => letter.toUpperCase());
+  }
+
   const GENRE_TRANSLATIONS = Object.freeze({
     accion: "Action", acao: "Action", azione: "Action", action: "Action",
     aventura: "Adventure", aventure: "Adventure", abenteuer: "Adventure", adventure: "Adventure",
@@ -1189,8 +1196,21 @@ var HOA = Object.freeze((() => {
     else if (types.some(type => /^(TVSeries|TVSeason|TVEpisode|Episode)$/.test(type))) info.type = "tv";
     else if (types.includes("Person")) info.type = "person";
     if (types.includes("Person")) {
-      const job = String(main.jobTitle || "").trim();
-      if (job) info.role = roleFromText(job);
+      const jobs = (Array.isArray(main.jobTitle) ? main.jobTitle : [main.jobTitle]).flatMap(job => String(job || "").split(/\s*(?:,|\/|&|\||\band\b)\s*/i)).map(job => job.trim()).filter(Boolean);
+      if (jobs.length) {
+        info.role = roleFromText(jobs[0]);
+        const other = []; const seen = new Set([info.role.toLocaleLowerCase()]);
+        jobs.slice(1).forEach(job => { const mapped = jobFromText(job); const jobKey = mapped.toLocaleLowerCase(); if (mapped && !seen.has(jobKey) && other.length < 4) { seen.add(jobKey); other.push(mapped); } });
+        if (other.length) info.jobs = other;
+      }
+      const personDate = value => { const text = String(value || "").trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(text) && parseDate(text) !== null) return text; const year = Number(text); return /^\d{4}$/.test(text) && year >= 1800 && year <= new Date().getFullYear() ? text : ""; };
+      const birthplace = value => { if (typeof value === "string") return value; if (!value || typeof value !== "object") return ""; if (typeof value.name === "string") return value.name; const address = value.address; if (typeof address === "string") return address; if (address && typeof address === "object") return [address.addressLocality, address.addressCountry && (address.addressCountry.name || address.addressCountry)].filter(part => typeof part === "string" && part.trim()).join(", "); return ""; };
+      const born = personDate(main.birthDate); const died = personDate(main.deathDate); const place = birthplace(main.birthPlace) || ((String(main.description || "").match(/\bborn\b[^.]*?\bin\s+([A-Z][\p{L}'-]*(?:\s+[A-Z][\p{L}'-]*)*(?:,\s*[A-Z][\p{L}'-]*(?:\s+[A-Z][\p{L}'-]*)*)*)/u) || [])[1] || "");
+      if (born) info.born = born;
+      if (died) info.died = died;
+      // "born in New York City, New York, U.S." stops at the first full stop: drop a dangling initial ("…, U").
+      const placeText = place.trim().replace(/,\s*\p{Lu}{1,2}$/u, "");
+      if (placeText && placeText.length <= 60) info.birthplace = placeText;
     }
     const scripts = () => Array.from(doc.querySelectorAll("script:not([src])")).map(script => script.textContent || "").join("\n").slice(0, 2000000);
     const scriptText = scripts();
@@ -1236,13 +1256,13 @@ var HOA = Object.freeze((() => {
       main.uploadDate]
       .map(value => String((typeof value === "function" ? value() : value) || "")).find(value => /\b(?:18|19|20)\d{2}\b/.test(value));
     const year = Number((date && date.match(/\b(?:18|19|20)\d{2}\b/)[0]) || 0);
-    if (year && year >= 1870 && year <= new Date().getFullYear() + 1) info.year = year;
+    if (info.type !== "person" && year && year >= 1870 && year <= new Date().getFullYear() + 1) info.year = year;
     const inlineRating = (normalizedScript.match(/"(?:contentRating|mpaaRating|maturityRating|rating|ratingValue)"\s*:\s*"([^"\\]+)"/i) || [])[1];
     const rating = normalizeRating(main.contentRating || inlineRating);
     if (rating) info.rating = rating;
-    const rawGenres = main.genre || (normalizedScript.match(/"(?:genres|genre)"\s*:\s*(\[[^\]]*\]|"[^"]+")/i) || [])[1];
-    let genres = translatedGenres(HOA_splitGenres(Array.isArray(rawGenres) ? rawGenres.join(",") : String(rawGenres || "").replace(/[\[\]"]/g, "")));
-    if (!genres.length) {
+    const rawGenres = info.type === "person" ? "" : main.genre || (normalizedScript.match(/"(?:genres|genre)"\s*:\s*(\[[^\]]*\]|"[^"]+")/i) || [])[1];
+    let genres = translatedGenres(HOA_splitGenres((Array.isArray(rawGenres) ? rawGenres.join(",") : String(rawGenres || "")).replace(/\[([^\]]+)\]\([^)]*\)/g, "$1").replace(/[\[\]"]/g, "")));
+    if (!genres.length && info.type !== "person") {
       const selectors = ['a[href*="/generos/"]', 'a[href*="/genero/"]', 'a[href*="/genres/"]', 'a[href*="/genre/"]', 'a[href*="/generi/"]', 'a[href*="/genres?"]'];
       const linked = selectors.flatMap(selector => Array.from(doc.querySelectorAll(selector)).map(node => (node.textContent || "").trim()).filter(Boolean));
       genres = translatedGenres(linked);
@@ -1279,14 +1299,23 @@ var HOA = Object.freeze((() => {
     if (!entry.thumb && details.thumb) patch.thumb = details.thumb;
     if (details.type && (!entry.type || entry.type === "video" || (entry.type === "live" && details.type === "past"))) patch.type = details.type;
     if (!entry.rating && details.rating) patch.rating = details.rating;
-    if ((!Array.isArray(entry.genres) || !entry.genres.length) && Array.isArray(details.genres) && details.genres.length) patch.genres = details.genres;
+    if (entry.type !== "person" && (!Array.isArray(entry.genres) || !entry.genres.length) && Array.isArray(details.genres) && details.genres.length) patch.genres = details.genres;
     if (entry.type === "person" && !entry.role && details.role) patch.role = details.role;
+    if (entry.type === "person") {
+      ["jobs", "born", "died", "birthplace"].forEach(field => { if (!entry[field] && details[field] !== undefined) patch[field] = details[field]; });
+      if (!Number.isFinite(entry.factsAt) && Array.isArray(entry.genres)) {
+        const genres = entry.genres.filter(genre => typeof genre === "string" && !/[()\[\]\/]/.test(genre) && !["on-demand", "category", "categories", "genre", "genres"].includes(genre.trim().toLowerCase()));
+        patch.genres = genres.length ? genres : undefined;
+      }
+      patch.factsAt = Date.now();
+    }
     patch.enrichedAt = Date.now();
     return patch;
   }
 
   function needsEnrich(entry, key) {
     if (!entry || !isObject(entry)) return false;
+    if (entry.type === "person" && !Number.isFinite(entry.factsAt)) return true;
     if (Number.isFinite(entry.enrichedAt) && Date.now() - entry.enrichedAt < 7 * 86400000) return false;
     const storedKind = typeof entry.kind === "string" ? entry.kind : "";
     const kind = storedKind || kindOf(key);
@@ -1613,6 +1642,11 @@ var HOA = Object.freeze((() => {
     if (Number.isFinite(raw.enrichedAt) && raw.enrichedAt >= 0) {
       target.enrichedAt = raw.enrichedAt;
     }
+    if (Number.isFinite(raw.factsAt) && raw.factsAt >= 0) target.factsAt = raw.factsAt;
+    if (Array.isArray(raw.jobs) && raw.jobs.length >= 1 && raw.jobs.length <= 4 && raw.jobs.every(job => typeof job === "string" && job.trim().length >= 1 && job.trim().length <= 30)) target.jobs = raw.jobs.map(job => job.trim());
+    if (typeof raw.born === "string" && /^\d{4}(-\d{2}-\d{2})?$/.test(raw.born)) target.born = raw.born;
+    if (typeof raw.died === "string" && /^\d{4}(-\d{2}-\d{2})?$/.test(raw.died)) target.died = raw.died;
+    if (typeof raw.birthplace === "string" && raw.birthplace.trim().length >= 1 && raw.birthplace.trim().length <= 60) target.birthplace = raw.birthplace.trim();
     if (Number.isInteger(raw.year) && raw.year >= 1870 && raw.year <= 2100) {
       target.year = raw.year;
     }
