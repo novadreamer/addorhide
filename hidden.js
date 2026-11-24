@@ -625,7 +625,8 @@
     watchedEntries.sort((left, right) => (Number(right[1].ts) || 0) - (Number(left[1].ts) || 0) || HOA.compareText(left[0], right[0]));
     // Nothing is tracked as watched in a private window, so the Watched group stays out of it entirely: no tab or
     // section, and its videos are left out of the counts and of Restore all / Remove all there.
-    const privateWindow = Boolean(typeof chrome !== "undefined" && chrome.extension && chrome.extension.inIncognitoContext);
+    // Opened from a private window, the page itself runs as a normal extension window: background.js adds "#private".
+    const privateWindow = location.hash === "#private" || Boolean(typeof chrome !== "undefined" && chrome.extension && chrome.extension.inIncognitoContext);
     if (privateWindow) watchedEntries.length = 0;
     const everyEntry = privateWindow ? entries.filter(([, entry]) => entry.reason !== "watched" && entry.watched !== true) : [...entries, ...watchOnly];
     const groups = groupsFor(entries.filter(([, entry]) => entry.reason !== "watched" && entry.watched !== true));
@@ -778,6 +779,8 @@
   }
 
   let unlocked = false;
+  // Reopened from the other kind of window, only the address's "#private" changes: draw the page again for it.
+  window.addEventListener("hashchange", () => { if (unlocked) refresh(); });
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (!unlocked) return;
     if (areaName === "local" && (changes[HOA.HIDDEN_KEY] || changes[HOA.CHANNELS_KEY] || changes[HOA.WATCHED_SHOWN_KEY] || changes[HOA.PROGRESS_KEY] || changes[HIDDEN_PREFS_KEY] || changes[HOA.SITES_KEY])) {

@@ -169,8 +169,15 @@ function createPlayerWindow(hash, incognito, mode, sourceWindowId, sendResponse)
   }));
 }
 
+// Hidden Videos always opens as an ordinary extension window, even from a private one, so the page cannot tell for
+// itself: "#private" tells it to leave out what a private window does not track (the Watched list).
 function openHiddenWindow(sourceWindowId, sendResponse) {
-  const url = chrome.runtime.getURL("hidden.html");
+  if (!Number.isInteger(sourceWindowId)) { openHiddenWindowAs(false, sourceWindowId, sendResponse); return; }
+  chrome.windows.get(sourceWindowId, source => openHiddenWindowAs(Boolean(!chrome.runtime.lastError && source && source.incognito), sourceWindowId, sendResponse));
+}
+
+function openHiddenWindowAs(fromPrivate, sourceWindowId, sendResponse) {
+  const url = chrome.runtime.getURL("hidden.html") + (fromPrivate ? "#private" : "");
   chrome.storage.session.get({ [HIDDEN_WINDOW_KEY]: null }, result => {
     if (chrome.runtime.lastError) {
       sendResponse({ ok: false, error: playerError() });
@@ -180,8 +187,13 @@ function openHiddenWindow(sourceWindowId, sendResponse) {
     if (Number.isInteger(rememberedId)) {
       chrome.windows.get(rememberedId, existing => {
         if (!chrome.runtime.lastError && existing && Number.isInteger(existing.id)) {
-          chrome.windows.update(existing.id, { focused: true }, () => {
-            sendResponse(chrome.runtime.lastError ? { ok: false, error: playerError() } : { ok: true });
+          // The open window may have come from the other kind of window: point it at this one's address first.
+          chrome.tabs.query({ windowId: existing.id }, tabs => {
+            const tab = !chrome.runtime.lastError && tabs && tabs[0];
+            if (tab && tab.url !== url) chrome.tabs.update(tab.id, { url }, () => void chrome.runtime.lastError);
+            chrome.windows.update(existing.id, { focused: true }, () => {
+              sendResponse(chrome.runtime.lastError ? { ok: false, error: playerError() } : { ok: true });
+            });
           });
           return;
         }
