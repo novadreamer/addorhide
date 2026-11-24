@@ -1,7 +1,8 @@
 "use strict";
 // Promo video for the store listing (1920x1080, 30 fps, H.264 + AAC): the real extension recorded on the mock sites
-// of tools/store-mock.js, framed like the screenshots, with a voice-over (edge-tts, Andrew) and no music.
-// Needs: PLAYWRIGHT_PATH (playwright-core), FFMPEG (an ffmpeg with libx264 and aac), Python with edge-tts and numpy.
+// of tools/store-mock.js, framed like the screenshots, with a voice-over (Andrew: Azure Speech when AZURE_SPEECH_KEY and
+// AZURE_SPEECH_REGION are set, else edge-tts; see tools/store-tts.py) and calm music from tools/store-music.py.
+// Needs: PLAYWRIGHT_PATH (playwright-core), FFMPEG (an ffmpeg with libx264 and aac), Python with numpy and azure-cognitiveservices-speech (or edge-tts).
 // Output: store/video/addorhide-promo.mp4
 const path = require("path"), fs = require("fs"), os = require("os");
 const { execFileSync } = require("child_process");
@@ -30,7 +31,7 @@ const SCENES = [
   { id: "feed", min: 7, say: "Hover over any video to add it to your list or hide it, and see at a glance what you've already watched." },
   { id: "types", min: 6.5, say: "Turn off whole categories, like Shorts or videos you've watched, and they vanish from your feed." },
   { id: "later", min: 6, say: "Save videos for later, then pick up right where you left off." },
-  { id: "library", min: 8.8, sync: true, say: "Everything you keep lives in your own library, sorted and grouped the way you like, in light or dark." },
+  { id: "library", min: 8.8, say: "Everything you keep lives in your own library, sorted and grouped the way you like, in light or dark." },
   { id: "hidden", min: 7, say: "Changed your mind? Bring anything back, and lock your lists with a password." },
   { id: "outro", min: 4.4, say: "AddOrHide. Free, private, and right in your browser." }
 ];
@@ -44,28 +45,36 @@ for (const scene of SCENES) {
       scene.words = JSON.parse(execFileSync(process.env.PYTHON || "python", [path.join(__dirname, "store-tts.py"), scene.say, scene.voice], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }));
       if (fs.statSync(scene.voice).size > 1000 && scene.words.length) break;
     } catch (error) { /* retry */ }
-    if (attempt >= 4) throw new Error(`edge-tts gave no audio for "${scene.say}"`);
+    if (attempt >= 4) throw new Error(`The speech service gave no audio for "${scene.say}"`);
     execFileSync(process.execPath, ["-e", "setTimeout(() => {}, 2000)"]);
   }
   const tight = path.join(WORK, `${scene.id}.wav`);
   const tail = "areverse,silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.08,areverse";
-  if (scene.sync) {
-    // A line the picture follows word by word: trim the lead-in by an exact amount and leave its pauses alone, so
-    // the reported word times stay true (its commas are short breaths anyway).
-    const lead = Math.max(0, scene.words[0].start - 0.05);
-    ff(["-i", scene.voice, "-af", `atrim=start=${lead.toFixed(4)},asetpts=N/SR/TB,${tail}`, "-ar", "48000", tight]);
-    scene.words = scene.words.map(w => ({ ...w, start: w.start - lead, end: w.end - lead }));
-  } else {
-    // edge-tts leaves long gaps after colons and full stops and silence at the end: keep comma-length breaths, cap
-    // longer pauses at a natural beat, and trim the lead-in and tail so lines run on without dead air.
-    ff(["-i", scene.voice, "-af", `silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.04,silenceremove=stop_periods=-1:stop_duration=0.3:stop_threshold=-45dB:stop_silence=0.2,${tail}`, "-ar", "48000", tight]);
-  }
+  // The picture follows the words (pointer moves and clicks land on the word that names them), so trim the lead-in
+  // by an exact amount and leave the pauses alone: the reported word times stay true. Azure's pauses are natural.
+  const lead = Math.max(0, scene.words[0].start - 0.05);
+  ff(["-i", scene.voice, "-af", `atrim=start=${lead.toFixed(4)},asetpts=N/SR/TB,${tail}`, "-ar", "48000", tight]);
+  scene.words = scene.words.map(w => ({ ...w, start: w.start - lead, end: w.end - lead }));
   scene.voice = tight;
   scene.voiceLength = durationOf(scene.voice);
   scene.length = Math.max(scene.min, VOICE_AT + scene.voiceLength + 0.6);
   console.log(`${scene.id}: voice ${scene.voiceLength.toFixed(2)} s, scene ${scene.length.toFixed(2)} s`);
 }
 const byId = id => SCENES.find(s => s.id === id);
+// When a word is spoken, in ms from the start of its scene (nth occurrence; edge: "end" for when it finishes).
+const norm = s => s.toLowerCase().replace(/[^a-z']/g, "");
+function cue(scene, word, { nth = 1, edge = "start" } = {}) {
+  const hit = scene.words.filter(w => norm(w.w) === norm(word))[nth - 1];
+  if (!hit) throw new Error(`"${word}" is not spoken in the ${scene.id} line`);
+  return (VOICE_AT + hit[edge]) * 1000;
+}
+// A scene clock started with its recording: until(ms) waits for that moment (at once if it has passed).
+function clock() {
+  const t0 = Date.now();
+  const until = async ms => { const left = ms - (Date.now() - t0); if (left > 0) await wait(left); };
+  until.t0 = t0;
+  return { t0, until };
+}
 
 // ---------- pointer, recorder ----------
 // Headless screencasts have no mouse pointer, so pages draw one that follows the real (synthetic) mouse.
@@ -80,17 +89,31 @@ const CURSOR = `(() => { if (window.top !== window) return; const add = () => { 
 
 async function glide(page, x, y, ms = 650) {
   const from = page.__pos || { x: x - 160, y: y + 120 };
-  const steps = Math.max(8, Math.round(ms / 16));
-  for (let i = 1; i <= steps; i += 1) {
-    const t = i / steps, e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  // Paced by the clock, not by step count, so a glide takes the time asked for however slow each move is.
+  const start = Date.now();
+  for (;;) {
+    const t = Math.min(1, (Date.now() - start) / ms), e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
     await page.mouse.move(from.x + (x - from.x) * e, from.y + (y - from.y) * e);
-    await wait(ms / steps);
+    if (t >= 1) break;
+    await wait(14);
   }
   page.__pos = { x, y };
 }
-async function centre(locator) { const b = await locator.boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; }
+async function centre(locator) { await locator.waitFor({ state: "visible", timeout: 5000 }); const b = await locator.boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; }
 async function glideTo(page, locator, ms) { const c = await centre(locator); await glide(page, c.x, c.y, ms); }
-async function click(page, locator, ms = 600) { await glideTo(page, locator, ms); await wait(120); await page.mouse.down(); await wait(90); await page.mouse.up(); }
+const SETTLE = 120;   // pause between arriving on a control and pressing it
+async function click(page, locator, ms = 600) { await glideTo(page, locator, ms); await wait(SETTLE); await page.mouse.down(); await wait(90); await page.mouse.up(); }
+// Arrive on a control as the word starts, or press it as the word starts.
+// Each logs how far from its word it landed, so a run shows whether the pointer kept up.
+const late = (until, at) => `${Math.round(Date.now() - until.t0 - at)} ms`;
+// A glide that cannot start early enough (a word right at the start of a line, or a previous action running late)
+// is shortened to fit, down to a still-readable 180 ms, rather than landing late.
+const fit = (until, at, ms, before = 0) => Math.max(180, Math.min(ms, at - before - (Date.now() - until.t0)));
+async function glideOn(page, locator, until, at, ms = 600) { await until(at - ms); await glideTo(page, locator, fit(until, at, ms)); console.log(`  arrive ${late(until, at)}`); }
+async function clickOn(page, locator, until, at, ms = 500) {
+  await until(at - ms - SETTLE); await glideTo(page, locator, fit(until, at, ms, SETTLE)); await wait(SETTLE);
+  console.log(`  press ${late(until, at)}`); await page.mouse.down(); await wait(90); await page.mouse.up();
+}
 
 // Record a page with the DevTools screencast (sharp JPEG frames), then turn the frames into a constant-rate clip.
 async function startRecording(page, name, size) {
@@ -212,13 +235,14 @@ const CATEGORIES = [
     const win = { x: 150, y: 220, w: 1620, h: 820, label: "lumaclips.tv" }; const box = content(win);
     const page = await ctx.newPage(); await page.setViewportSize({ width: box.w, height: box.h });
     await page.goto(`https://${M.FEED}/`); await wait(2500); await page.mouse.move(box.w - 200, box.h - 60); page.__pos = { x: box.w - 200, y: box.h - 60 };
-    const rec = await startRecording(page, "feed", { w: box.w, h: box.h }); const t0 = Date.now();
+    const rec = await startRecording(page, "feed", { w: box.w, h: box.h }); const { t0, until } = clock();
     const card = n => page.locator(".card").nth(n);
-    await wait(500); await glideTo(page, card(1).locator(".thumb"), 700); await wait(500);
-    await click(page, card(1).locator('.hoa-actions [data-action="add"]'), 450); await wait(900);
-    await glideTo(page, card(2).locator(".thumb"), 600); await wait(400);
-    await click(page, card(2).locator('.hoa-actions [data-action="hide"]'), 400); await wait(1300);
-    await glideTo(page, card(0).locator(".thumb"), 700);
+    // "Hover" lands on a card, "add" presses Add, "hide" presses Hide on the next card, "glance" shows a Watched tag.
+    await glideOn(page, card(1).locator(".thumb"), until, cue(scene, "hover"), 650);
+    await clickOn(page, card(1).locator('.hoa-actions [data-action="add"]'), until, cue(scene, "add"), 400);
+    await wait(150); await glideTo(page, card(2).locator(".thumb"), 420);
+    await clickOn(page, card(2).locator('.hoa-actions [data-action="hide"]'), until, cue(scene, "hide"), 330);
+    await glideOn(page, card(0).locator(".thumb"), until, cue(scene, "glance"), 700);
     await wait(Math.max(0, scene.length * 1000 - (Date.now() - t0)));
     await compose(scene, frameHtml({ title: "Add it or hide it, right on the thumbnail", sub: "Hover any video. Ones you've watched carry a tag.", windows: [win] }), [{ file: await rec.stop(scene.length), ...box }], ctx);
     await page.close();
@@ -236,10 +260,10 @@ const CATEGORIES = [
     await pop.goto(`chrome-extension://${id}/popup.html`); await pop.addStyleTag({ content: "html{zoom:1.15}" }); await wait(1200);
     await pop.getByText("Hide on this site").first().click(); await wait(700);
     await pop.mouse.move(pb.w / 2, pb.h - 40); pop.__pos = { x: pb.w / 2, y: pb.h - 40 };
-    const rf = await startRecording(feed, "types-feed", { w: fb.w, h: fb.h }); const rp = await startRecording(pop, "types-pop", { w: pb.w, h: pb.h }); const t0 = Date.now();
+    const rf = await startRecording(feed, "types-feed", { w: fb.w, h: fb.h }); const rp = await startRecording(pop, "types-pop", { w: pb.w, h: pb.h }); const { t0, until } = clock();
     const toggle = name => pop.locator(".filter-popover .switch-row").filter({ hasText: new RegExp("^\\s*" + name + "\\s*$") }).first().locator('[role="switch"], input[type="checkbox"]').first();
-    await wait(900); await click(pop, toggle("Shorts"), 700); await wait(1700);
-    await click(pop, toggle("Watched"), 600); await wait(800);
+    await clickOn(pop, toggle("Shorts"), until, cue(scene, "shorts"), 700);
+    await clickOn(pop, toggle("Watched"), until, cue(scene, "watched"), 550);
     await wait(Math.max(0, scene.length * 1000 - (Date.now() - t0)));
     const [cf, cp] = [await rf.stop(scene.length), await rp.stop(scene.length)];
     await compose(scene, frameHtml({ title: "Hide what you don't want to see", sub: "Switch off whole categories, or add your own keywords.", windows: [feedWin, popWin] }), [{ file: cf, ...fb }, { file: cp, ...pb }], ctx);
@@ -255,9 +279,9 @@ const CATEGORIES = [
     const lib = await ctx.newPage(); await lib.setViewportSize({ width: lb.w, height: lb.h });
     await lib.goto(`chrome-extension://${id}/added.html`); await lib.addStyleTag({ content: "html{zoom:.72}" }); await wait(1500);
     await watch.mouse.move(wb.w - 80, wb.h - 40); watch.__pos = { x: wb.w - 80, y: wb.h - 40 };
-    const rw = await startRecording(watch, "later-watch", { w: wb.w, h: wb.h }); const rl = await startRecording(lib, "later-lib", { w: lb.w, h: lb.h }); const t0 = Date.now();
-    await wait(500); await glideTo(watch, watch.locator("video"), 800); await wait(700);
-    await click(watch, watch.locator("#hoa-watch-later"), 450); await wait(1500);
+    const rw = await startRecording(watch, "later-watch", { w: wb.w, h: wb.h }); const rl = await startRecording(lib, "later-lib", { w: lb.w, h: lb.h }); const { t0, until } = clock();
+    await glideOn(watch, watch.locator("video"), until, cue(scene, "save"), 750);
+    await clickOn(watch, watch.locator("#hoa-watch-later"), until, cue(scene, "later"), 450);
     await wait(Math.max(0, scene.length * 1000 - (Date.now() - t0)));
     const [cw, cl] = [await rw.stop(scene.length), await rl.stop(scene.length)];
     await compose(scene, frameHtml({ title: "Pick up where you left off", sub: "Save videos for later. Ones you start wait with the time left.", windows: [watchWin, libWin] }), [{ file: cw, ...wb }, { file: cl, ...lb }], ctx);
@@ -270,19 +294,18 @@ const CATEGORIES = [
     const win = { x: 150, y: 220, w: 1620, h: 820, label: "Added Videos" }; const box = content(win);
     const page = await ctx.newPage(); await page.setViewportSize({ width: box.w, height: box.h });
     await page.goto(`chrome-extension://${id}/added.html`); await wait(1800); await page.mouse.move(box.w - 200, box.h - 60); page.__pos = { x: box.w - 200, y: box.h - 60 };
-    const rec = await startRecording(page, "library", { w: box.w, h: box.h }); const t0 = Date.now();
+    const rec = await startRecording(page, "library", { w: box.w, h: box.h }); const { t0, until } = clock();
     const tab = name => page.locator('[role="tab"]').filter({ hasText: name }).first();
-    // The page turns light exactly as he says "light" and dark again on "dark" (as the theme button does). The
-    // switch is sent a few frames early to cover the storage round trip and the repaint.
-    const at = word => (VOICE_AT + scene.words.find(w => w.w.toLowerCase() === word).start) * 1000 - 60;
-    const until = async ms => { const left = ms - (Date.now() - t0); if (left > 0) await wait(left); };
-    await wait(400); await click(page, tab("Reelbay"), 700); await wait(900);
-    await click(page, tab("Lumaclips"), 600);
-    await glide(page, box.w - 260, box.h - 140, 700);
-    await until(at("light")); await sw.evaluate(() => chrome.storage.local.set({ theme: "light" }));
-    await until(at("dark")); await sw.evaluate(() => chrome.storage.local.set({ theme: "dark" }));
-    await wait(500); await click(page, page.locator(".subgroup-toggle").first(), 600); await wait(700);
-    await click(page, page.locator(".subgroup-toggle").first(), 300);
+    // A tab on "library", back on "sorted", a group folds on "grouped"; the page turns light exactly as he says
+    // "light" and dark again on "dark" (as the theme button does). The theme switch is sent a few frames early to
+    // cover the storage round trip and the repaint.
+    await clickOn(page, tab("Reelbay"), until, cue(scene, "library"), 650);
+    await clickOn(page, tab("Lumaclips"), until, cue(scene, "sorted"), 550);
+    await clickOn(page, page.locator(".subgroup-toggle:visible").first(), until, cue(scene, "grouped"), 450);
+    await glide(page, box.w - 260, box.h - 140, 450);
+    await until(cue(scene, "light") - 60); await sw.evaluate(() => chrome.storage.local.set({ theme: "light" }));
+    await until(cue(scene, "dark") - 60); await sw.evaluate(() => chrome.storage.local.set({ theme: "dark" }));
+    await wait(350); await click(page, page.locator(".subgroup-toggle:visible").first(), 500);
     await wait(Math.max(0, scene.length * 1000 - (Date.now() - t0)));
     await compose(scene, frameHtml({ title: "Your own video library", sub: "Tabs, sorting, grouping and your own tags. Dark or light.", windows: [win] }), [{ file: await rec.stop(scene.length), ...box }], ctx);
     await page.close();
@@ -299,12 +322,13 @@ const CATEGORIES = [
     await lockPage.evaluate(async () => { const lock = await HOA_LOCK.hashPassword("letmein"); await chrome.storage.local.set({ pageLock: { ...lock, added: true, hidden: false } }); });
     await lockPage.goto(`chrome-extension://${id}/added.html`); await lockPage.addStyleTag({ content: "html{zoom:.8}" }); await wait(1300);
     await hid.mouse.move(hb.w - 60, hb.h - 40); hid.__pos = { x: hb.w - 60, y: hb.h - 40 }; lockPage.__pos = { x: kb.w / 2, y: kb.h - 40 };
-    const rh = await startRecording(hid, "hidden-list", { w: hb.w, h: hb.h }); const rk = await startRecording(lockPage, "hidden-lock", { w: kb.w, h: kb.h }); const t0 = Date.now();
-    await wait(500); const restore = hid.locator(".hidden-row .restore-button, .hidden-row button[aria-label^='Show'], .hidden-row button[title^='Show']").first();
-    await click(hid, restore, 800); await wait(1200);
+    const rh = await startRecording(hid, "hidden-list", { w: hb.w, h: hb.h }); const rk = await startRecording(lockPage, "hidden-lock", { w: kb.w, h: kb.h }); const { t0, until } = clock();
+    const restore = hid.locator(".hidden-row .restore-button, .hidden-row button[aria-label^='Show'], .hidden-row button[title^='Show']").first();
+    // "back" restores a video, "lock" starts typing the password, and Unlock is pressed as "password" ends.
+    await clickOn(hid, restore, until, cue(scene, "back"), 800);
     const field = lockPage.locator('input[type="password"]').first();
-    await click(lockPage, field, 600); await lockPage.keyboard.type("letmein", { delay: 110 }); await wait(250);
-    await click(lockPage, lockPage.getByRole("button", { name: /unlock/i }).first(), 450); await wait(900);
+    await clickOn(lockPage, field, until, cue(scene, "lock"), 550); await lockPage.keyboard.type("letmein", { delay: 85 });
+    await clickOn(lockPage, lockPage.getByRole("button", { name: /unlock/i }).first(), until, cue(scene, "password", { edge: "end" }), 400);
     await wait(Math.max(0, scene.length * 1000 - (Date.now() - t0)));
     const [ch, ck] = [await rh.stop(scene.length), await rk.stop(scene.length)];
     await compose(scene, frameHtml({ title: "Hidden, never lost, and private if you like", sub: "Bring anything back. Lock either page with a password.", windows: [hidWin, lockWin] }), [{ file: ch, ...hb }, { file: ck, ...kb }], ctx);
