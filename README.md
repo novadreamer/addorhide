@@ -16,6 +16,10 @@ movie and streaming sites, and a card picker that teaches it any other video sit
 | ![Add to Watch Later and Continue Watching](store/assets/screenshot-2-continue-watching.png) | ![Hide whole categories for each site](store/assets/screenshot-3-hide-by-type.png) |
 | ![Tabs, sorting and grouping on the Added Videos page](store/assets/screenshot-4-tabs-sort-group.png) | ![Hidden videos, channels and watched videos](store/assets/screenshot-5-hidden.png) |
 
+## What's new in 1.1.15
+
+- **No Watched tab in private windows:** Hidden Videos now leaves watched videos out of a private window, as Added Videos already does with Continue Watching and Watch Later: no Watched tab or section, and they are not counted or touched by Restore all / Remove all there.
+
 ## What's new in 1.1.14
 
 - **People get real facts, not film genres:** a saved actor or director shows their other jobs, age (or birth and death years) and place of birth, taken from the page's own details. Pages that describe a person no longer lend them genres from one of their films (Plex showed "Action(", "on-demand" and "category"); cards already saved repair themselves once.
@@ -202,7 +206,7 @@ Build the Chrome Web Store archive with `python tools/package.py .`. It writes t
 
 ## Status: 1.1.4
 
-1.1.14 is the next Chrome Web Store update; 1.1.13 was submitted on 2026-11-21 (see the *What's new* sections above). Up to 1.0.13: YouTube search results, Shorts and new layouts everywhere, gap-free
+1.1.15 is the next Chrome Web Store update; 1.1.13 is the version live in the store (see the *What's new* sections above). Up to 1.0.13: YouTube search results, Shorts and new layouts everywhere, gap-free
 hiding of Shorts, Hide the whole feed on every YouTube page, two installed copies no longer fight (the newest runs
 the page and the other one's popup says so), a redesigned popup (Added Videos and Hidden Videos side by side, a round
 3D power button, arrowhead Position buttons, a GitHub link) and a per-website delete button on the Added page and in

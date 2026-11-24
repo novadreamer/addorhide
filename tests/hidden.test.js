@@ -4,10 +4,10 @@ const path = require("node:path");
 let JSDOM;
 try { JSDOM = require(process.env.JSDOM_PATH || "jsdom").JSDOM; } catch (error) { console.log("hidden.test.js: SKIPPED (jsdom not installed; set JSDOM_PATH to run it)"); process.exit(0); }
 const root = path.join(__dirname, ".."); const read = file => fs.readFileSync(path.join(root, file), "utf8"); const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-async function load({ hiddenItems = {}, hiddenChannels = {}, watchProgress = {}, hiddenViewPrefs = {}, siteRules = {}, breakSite = "" } = {}) {
+async function load({ hiddenItems = {}, hiddenChannels = {}, watchProgress = {}, hiddenViewPrefs = {}, siteRules = {}, breakSite = "", incognito = false } = {}) {
   const dom = new JSDOM(read("hidden.html"), { url: "https://extension.test/hidden.html", runScripts: "outside-only", pretendToBeVisual: true });
   const { window } = dom; const store = { hiddenItems, hiddenChannels, watchedShown: {}, watchProgress, hiddenViewPrefs, siteRules }; const listeners = []; const clone = value => JSON.parse(JSON.stringify(value));
-  window.scrollTo = () => {}; window.chrome = { runtime: { getURL: value => value, lastError: null }, tabs: { create() {} }, windows: { getCurrent(callback) { callback({}); } }, storage: { local: {
+  window.scrollTo = () => {}; window.chrome = { extension: { inIncognitoContext: incognito }, runtime: { getURL: value => value, lastError: null }, tabs: { create() {} }, windows: { getCurrent(callback) { callback({}); } }, storage: { local: {
     get(defaults, callback) { const result = {}; Object.keys(defaults).forEach(key => { result[key] = key in store ? clone(store[key]) : defaults[key]; }); setTimeout(() => callback(result), 0); },
     set(values, callback) { Object.entries(values).forEach(([key, value]) => { store[key] = clone(value); }); setTimeout(() => { listeners.forEach(listener => listener({}, "local")); if (callback) callback(); }, 0); }
   }, onChanged: { addListener: listener => listeners.push(listener) } } };
@@ -128,6 +128,17 @@ async function load({ hiddenItems = {}, hiddenChannels = {}, watchProgress = {},
     "https://www.youtube.com/watch?v=abcdefghijk": { title: "Two", thumb: "", site: "youtube.com", listed: true, ts: 2 },
     "https://www.youtube.com/watch?v=zyxwvutsrqp": { title: "Watched", thumb: "", site: "youtube.com", reason: "watched", listed: true, ts: 3 }
   }, hiddenViewPrefs: { __page: { grouping: "tabs", sort: "recent", dir: "asc", selectedTab: "missing" } } });
+  const privateTabs = await load({ incognito: true, hiddenItems: {
+    "https://tubitv.com/movies/page-one": { title: "One", thumb: "", site: "tubitv.com", listed: true, ts: 1 },
+    "https://www.youtube.com/watch?v=abcdefghijk": { title: "Two", thumb: "", site: "youtube.com", listed: true, ts: 2 },
+    "https://www.youtube.com/watch?v=zyxwvutsrqp": { title: "Watched", thumb: "", site: "youtube.com", reason: "watched", listed: true, ts: 3 }
+  }, hiddenViewPrefs: { __page: { grouping: "tabs" } } });
+  check("Hidden has no Watched tab or count in a private window", () => {
+    const names = Array.from(privateTabs.document.querySelectorAll("[role='tab']")).map(tab => tab.textContent);
+    assert.ok(names.length >= 2 && !names.some(name => /Watched/.test(name)), names.join(" | "));
+    assert.match(privateTabs.document.querySelector(".hidden-header .count-badge").textContent, /^2$/);
+  });
+  privateTabs.window.close();
   check("Hidden keeps valid page preferences", () => {
     assert.equal(pageTabs.document.querySelector("#hidden-page-grouping").value, "tabs");
     assert.equal(pageTabs.document.querySelector("#hidden-page-sort").value, "recent");
